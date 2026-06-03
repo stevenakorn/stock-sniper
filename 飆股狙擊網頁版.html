@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飆股狙擊系統 v5.4</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+:root {
+  --bg:#050a12; --bg2:#0a1525; --bg3:#0d1e35;
+  --border:#1a3a5c; --cyan:#00e5ff; --cyan2:#00b8d4;
+  --green:#00e676; --red:#ff1744; --amber:#ffab00;
+  --purple:#7c4dff; --text:#c8d8e8; --text2:#7a9ab5;
+  --mono:'Share Tech Mono',monospace; --sans:'Noto Sans TC',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 20px var(--cyan);z-index:100}
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:16px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;position:relative;overflow:hidden}
+header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:38px;height:38px;border:1px solid var(--cyan);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 12px rgba(0,229,255,.3);animation:pulse-border 2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 8px rgba(0,229,255,.3)}50%{box-shadow:0 0 20px rgba(0,229,255,.6)}}
+.logo-text h1{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.5)}
+.logo-text p{font-size:10px;color:var(--text2);font-family:var(--mono);letter-spacing:2px}
+.header-right{display:flex;align-items:center;gap:16px}
+.clock{font-family:var(--mono);font-size:20px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.4);letter-spacing:2px}
+.market-badge{padding:3px 10px;border-radius:2px;font-size:11px;font-family:var(--mono);letter-spacing:1px;border:1px solid}
+.market-badge.open{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);animation:blink 1.5s ease-in-out infinite}
+.market-badge.closed{color:var(--text2);border-color:var(--border)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ── Token 設定區 ── */
+.token-bar{background:var(--bg2);border:1px solid var(--amber);border-radius:4px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.token-bar.ok{border-color:var(--green)}
+.token-label{font-size:12px;font-family:var(--mono);color:var(--amber);white-space:nowrap}
+.token-bar.ok .token-label{color:var(--green)}
+.token-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:12px;min-width:260px}
+.token-input:focus{outline:none;border-color:var(--cyan)}
+.btn-token{padding:6px 16px;border-radius:3px;border:1px solid var(--amber);color:var(--amber);background:transparent;cursor:pointer;font-size:11px;font-family:var(--mono);letter-spacing:1px;transition:all .2s}
+.btn-token:hover{background:rgba(255,171,0,.1)}
+.btn-token.ok{border-color:var(--green);color:var(--green)}
+.token-hint{font-size:11px;color:var(--text2);font-family:var(--mono)}
+
+/* ── 統計卡片 ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;position:relative;overflow:hidden;transition:border-color .3s}
+.stat-card:hover{border-color:var(--cyan2)}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent,var(--cyan)),transparent)}
+.stat-label{font-size:10px;color:var(--text2);letter-spacing:2px;margin-bottom:6px;font-family:var(--mono)}
+.stat-value{font-size:26px;font-weight:700;font-family:var(--mono);color:var(--accent,var(--cyan));text-shadow:0 0 10px rgba(0,229,255,.3)}
+.stat-sub{font-size:10px;color:var(--text2);margin-top:3px;font-family:var(--mono)}
+
+/* ── 主內容 ── */
+.main-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.panel-header{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3)}
+.panel-title{font-size:11px;font-family:var(--mono);letter-spacing:2px;color:var(--cyan)}
+.panel-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:2px;background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.3)}
+
+/* ── 篩選列 ── */
+.filter-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap}
+.filter-btn{padding:4px 12px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px}
+.filter-btn:hover{border-color:var(--cyan2);color:var(--cyan)}
+.filter-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.filter-btn.f-breakout.active{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
+.filter-btn.f-consolidation.active{background:rgba(255,171,0,.1);border-color:var(--amber);color:var(--amber)}
+.filter-btn.f-accumulation.active{background:rgba(124,77,255,.1);border-color:var(--purple);color:var(--purple)}
+
+/* ── 訊號卡片 ── */
+.hits-container{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:280px;max-height:calc(100vh - 340px);overflow-y:auto}
+.hits-container::-webkit-scrollbar{width:4px}
+.hits-container::-webkit-scrollbar-track{background:var(--bg)}
+.hits-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.hit-card{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;transition:all .3s;animation:slide-in .4s ease;cursor:default}
+@keyframes slide-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+.hit-card:hover{border-color:var(--cyan2);background:rgba(0,229,255,.03)}
+.hit-card.breakout{border-left:3px solid var(--green)}
+.hit-card.consolidation{border-left:3px solid var(--amber)}
+.hit-card.accumulation{border-left:3px solid var(--purple)}
+.hit-type{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:2px;letter-spacing:1px;white-space:nowrap}
+.hit-type.breakout{color:var(--green);background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3)}
+.hit-type.consolidation{color:var(--amber);background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3)}
+.hit-type.accumulation{color:var(--purple);background:rgba(124,77,255,.1);border:1px solid rgba(124,77,255,.3)}
+.hit-info{min-width:0}
+.hit-name{font-size:14px;font-weight:500;color:#e8f4ff;margin-bottom:1px}
+.hit-code{font-size:10px;font-family:var(--mono);color:var(--text2)}
+.hit-detail{font-size:10px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit-stars{font-size:10px;color:var(--amber);letter-spacing:1px;margin-top:2px}
+.hit-time-badge{font-size:9px;font-family:var(--mono);color:var(--text2);margin-top:3px}
+.hit-vol{text-align:center;white-space:nowrap}
+.hit-vol-val{font-size:18px;font-family:var(--mono);font-weight:700;color:var(--cyan)}
+.hit-vol-label{font-size:9px;color:var(--text2);font-family:var(--mono)}
+.hit-price{text-align:right;white-space:nowrap}
+.hit-price-val{font-size:16px;font-weight:700;font-family:var(--mono);color:#e8f4ff}
+.hit-change{font-size:12px;font-family:var(--mono);font-weight:500}
+.hit-change.up{color:var(--green)}
+.hit-change.down{color:var(--red)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:260px;color:var(--text2);gap:10px}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-text{font-size:12px;font-family:var(--mono);letter-spacing:1px}
+
+/* ── 右側 ── */
+.right-col{display:flex;flex-direction:column;gap:14px}
+.scan-status{padding:14px;display:flex;flex-direction:column;gap:10px}
+.status-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.status-row:last-child{border-bottom:none}
+.status-key{color:var(--text2);font-family:var(--mono);letter-spacing:1px}
+.status-val{color:var(--text);font-family:var(--mono)}
+.status-val.active{color:var(--green);text-shadow:0 0 8px rgba(0,230,118,.4)}
+.status-val.scanning{color:var(--cyan);animation:blink .8s ease-in-out infinite}
+.scan-bar-wrap{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:2px}
+.scan-bar{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .5s ease;box-shadow:0 0 8px var(--cyan);width:0%}
+.btn-row{display:flex;gap:8px;padding:0 14px 14px}
+.btn{flex:1;padding:7px;border-radius:3px;border:1px solid;cursor:pointer;font-size:10px;font-family:var(--mono);letter-spacing:1px;transition:all .2s;background:transparent}
+.btn-scan{color:var(--cyan);border-color:var(--cyan)}
+.btn-scan:hover{background:rgba(0,229,255,.1);box-shadow:0 0 12px rgba(0,229,255,.2)}
+.btn-scan:disabled{opacity:.4;cursor:not-allowed}
+.btn-clear{color:var(--text2);border-color:var(--border)}
+.btn-clear:hover{color:var(--red);border-color:var(--red);background:rgba(255,23,68,.05)}
+.progress-wrap{padding:0 14px 12px}
+.progress-text{font-size:10px;font-family:var(--mono);color:var(--text2);margin-bottom:4px}
+.progress-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .3s;box-shadow:0 0 6px var(--cyan);width:0%}
+
+/* ── 日誌 ── */
+.log-container{padding:10px;font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+.log-container::-webkit-scrollbar{width:3px}
+.log-container::-webkit-scrollbar-thumb{background:var(--border)}
+.log-entry{color:var(--text2);line-height:1.5}
+.log-entry.hit{color:var(--green)}
+.log-entry.warn{color:var(--amber)}
+.log-entry.err{color:var(--red)}
+
+/* ── 底部 ── */
+.statusbar{margin-top:14px;padding:7px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;color:var(--text2)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.5s ease-in-out infinite;display:inline-block;margin-right:6px}
+.sb-dot.off{background:var(--text2);box-shadow:none;animation:none}
+.sb-dot.warn{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+
+@media(max-width:900px){
+  .main-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .hit-card{grid-template-columns:auto 1fr auto}
+  .hit-vol{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎯</div>
+    <div class="logo-text">
+      <h1>飆股狙擊系統</h1>
+      <p>STOCK SNIPER SYSTEM v5.4 · FINMIND EDITION</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="market-badge closed" id="marketBadge">盤後</div>
+  </div>
+</header>
+
+<!-- Token 設定 -->
+<div class="token-bar" id="tokenBar">
+  <span class="token-label" id="tokenLabel">⚠ 請輸入 Finmind API Token</span>
+  <input class="token-input" id="tokenInput" type="password" placeholder="貼上你的 Finmind Token...">
+  <button class="btn-token" id="tokenBtn" onclick="saveToken()">確認儲存</button>
+  <span class="token-hint">Token 只存在你的瀏覽器，不會上傳至任何伺服器</span>
+</div>
+
+<!-- 統計卡片 -->
+<div class="stats-row">
+  <div class="stat-card" style="--accent:var(--green)">
+    <div class="stat-label">TODAY SIGNALS</div>
+    <div class="stat-value" id="statHits">0</div>
+    <div class="stat-sub">今日觸發訊號</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--cyan)">
+    <div class="stat-label">SCAN COUNT</div>
+    <div class="stat-value" id="statScans">0</div>
+    <div class="stat-sub">今日掃描次數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--amber)">
+    <div class="stat-label">STOCKS WATCHED</div>
+    <div class="stat-value" id="statStocks">0</div>
+    <div class="stat-sub">監控股票數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--purple)">
+    <div class="stat-label">LAST SCAN</div>
+    <div class="stat-value" style="font-size:18px" id="statLastScan">--:--</div>
+    <div class="stat-sub">下次：<span id="statNextScan">--</span></div>
+  </div>
+</div>
+
+<!-- 主內容 -->
+<div class="main-grid">
+
+  <!-- 左：訊號清單 -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">◈ SIGNAL MONITOR</span>
+      <span class="panel-badge" id="hitCount">0 訊號</span>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">全部</button>
+      <button class="filter-btn f-breakout" data-filter="breakout" onclick="setFilter('breakout',this)">🚀 爆量突破</button>
+      <button class="filter-btn f-consolidation" data-filter="consolidation" onclick="setFilter('consolidation',this)">📦 強勢整理</button>
+      <button class="filter-btn f-accumulation" data-filter="accumulation" onclick="setFilter('accumulation',this)">🔮 主力蓄勢</button>
+    </div>
+    <div class="hits-container" id="hitsContainer">
+      <div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-text">請先設定 Token 並開始掃描</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右：狀態+日誌 -->
+  <div class="right-col">
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">◈ SYSTEM STATUS</span></div>
+      <div class="scan-status">
+        <div class="status-row">
+          <span class="status-key">STATUS</span>
+          <span class="status-val" id="sysStatus">待機</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">MARKET</span>
+          <span class="status-val" id="sysMarket">--</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">TOKEN</span>
+          <span class="status-val" id="sysToken" style="color:var(--red)">未設定</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">STRATEGY</span>
+          <span class="status-val" style="color:var(--cyan);font-size:10px">突破/整理/蓄勢</span>
+        </div>
+        <div class="scan-bar-wrap"><div class="scan-bar" id="scanBar"></div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-text" id="progressText">--</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-scan" id="btnScan" onclick="startScan()" disabled>▶ 開始掃描</button>
+        <button class="btn btn-clear" onclick="clearHits()">✕ 清除</button>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><span class="panel-title">◈ SCAN LOG</span></div>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry">系統初始化完成，等待 Token...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 底部狀態列 -->
+<div class="statusbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
+    <span>資料來源：Finmind Open API</span>
+  </div>
+  <span>飆股狙擊系統 v5.0 ── 僅供參考，投資有風險</span>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ════════════════════════════════════════
+// 設定
+// ════════════════════════════════════════
+const FINMIND_API  = "https://api.finmindtrade.com/api/v4/data";
+const FINMIND_BASE = "https://api.finmindtrade.com/api/v4";
+const TOP_N        = 500;
+
+// 策略參數
+const VOL_MULT    = 2.0;
+const BOX_DAYS    = 20;
+const CONSOL_DAYS = 5;
+
+// ── 內建台股前500大市值股票名稱對照表 ──
+
+const BUILTIN_STOCKS = {
+  "2330":"台積電","2317":"鴻海","2454":"聯發科","2382":"廣達","2308":"台達電",
+  "2303":"聯電","3711":"日月光投控","2379":"瑞昱","2395":"研華","2357":"華碩",
+  "3034":"聯詠","2345":"智邦","2344","華邦電","2337":"旺宏","6770":"力積電",
+  "6669":"緯穎","3231":"緯創","2376":"技嘉","2377":"微星","5274":"信驊",
+  "2301":"光寶科","2327":"國巨","2360":"致茂","3044":"健鼎","3037":"欣興",
+  "2351":"順德","2049":"上銀","3693":"營邦","6414":"樺漢","2383":"台光電",
+  "2385":"群光","2388":"威盛","2392":"正崴","2393":"億光","2401":"凌陽",
+  "2404":"漢唐","2406":"國碩","2408":"南亞科","2409":"友達","2412":"中華電",
+  "2439":"美律","2449":"京元電子","2448":"晶電","2450":"神腦","2451":"創見",
+  "2458":"義隆","2467":"志超","2474":"可成","2476":"鉅祥","2481":"強茂",
+  "2489":"瑞軒","2492":"華新科","2496":"卓越","2498":"宏達電","2501":"國建",
+  "2881":"富邦金","2882":"國泰金","2883":"開發金","2884":"玉山金","2885":"元大金",
+  "2886":"兆豐金","2887":"台新金","2888":"新光金","2890":"永豐金","2891":"中信金",
+  "2892":"第一金","2893":"彰銀","2801":"彰化銀","2812":"台中銀","2823":"中壽",
+  "2824":"山富旅遊","2832":"台產","2834":"臺企銀","2836":"高雄銀","2838":"聯邦銀",
+  "2845":"遠東銀","2849":"安泰銀","2850":"新產","2851":"中再保","2852":"第一保",
+  "2855":"統一證","2856":"元富證","2867":"三商壽","2880":"華南金",
+  "1101":"台泥","1102":"亞泥","1216":"統一","1301":"台塑","1303":"南亞",
+  "1326":"台化","1402":"遠東新","1504":"東元","1590":"亞德客-KY","1605":"華新",
+  "1722":"台肥","1802":"台玻","2002":"中鋼","2006":"東和鋼鐵","2010":"春源鋼鐵",
+  "2015":"豐興","2022":"聚亨","2023":"燁輝","2049":"上銀","2059":"川湖",
+  "2101":"南港","2103":"台橡","2105":"正新","2106":"建大","2107":"厚生",
+  "2108":"南帝","2201":"裕隆","2204":"中華","2207":"和泰車","2227":"裕日車",
+  "2228":"劍麟","2231":"為升","2235":"謙華科技","2301":"光寶科","2303":"聯電",
+  "2308":"台達電","2312":"金寶","2313":"華通","2314":"台揚","2316":"楠梓電",
+  "2317":"鴻海","2321":"東訊","2323":"中環","2324":"仁寶","2325":"矽品",
+  "2327":"國巨","2328":"廣宇","2329":"華泰","2330":"台積電","2331":"精英",
+  "2332":"友訊","2337":"旺宏","2338":"光罩","2340":"台亞","2342":"茂矽",
+  "2344":"華邦電","2345":"智邦","2347":"聯強","2348":"海悅","2349":"錸德",
+  "2351":"順德","2352":"佳世達","2353":"宏碁","2354":"鴻準","2355":"敬鵬",
+  "2356":"英業達","2357":"華碩","2358":"廷鑫","2359":"所羅門","2360":"致茂",
+  "2362":"藍天","2363":"矽統","2364":"倫飛","2365":"昆盈","2367":"燿華",
+  "2368":"金像電","2369":"菱生","2371":"大同","2373":"震旦行","2374":"佳能",
+  "2375":"智原","2376":"技嘉","2377":"微星","2379":"瑞昱","2382":"廣達",
+  "2383":"台光電","2385":"群光","2387":"精元","2388":"威盛","2390":"云辰",
+  "2392":"正崴","2393":"億光","2394":"旺玖","2395":"研華","2397":"友通",
+  "2401":"凌陽","2402":"毅嘉","2404":"漢唐","2406":"國碩","2408":"南亞科",
+  "2409":"友達","2412":"中華電","2414":"精技","2415":"錩泰","2417":"圓剛",
+  "2419":"仲琦","2420":"新巨","2421":"建準","2423":"固緯","2424":"隴華",
+  "2425":"承啟","2426":"鑫創","2427":"三商電","2428":"興勤","2429":"銘異",
+  "2430":"燦坤","2431":"聯昌","2432":"數位河洛","2433":"互盛電","2434":"統懋",
+  "2436":"偉詮電","2438":"翔耀","2439":"美律","2441":"超豐","2442":"新美齊",
+  "2443":"昶虹","2444":"兆勁","2448":"晶電","2449":"京元電子","2450":"神腦",
+  "2451":"創見","2453":"凌群","2454":"聯發科","2455":"全新","2456":"奇力新",
+  "2457":"飛宏","2458":"義隆","2459":"敦吉","2461":"光群雷","2462":"寶元",
+  "2464":"盟立","2466":"冠西電","2467":"志超","2468":"華經","2471":"資通",
+  "2474":"可成","2476":"鉅祥","2478":"大毅","2480":"敦陽科","2481":"強茂",
+  "2482":"連宇","2483":"百容","2485":"兆赫","2486":"一詮","2488":"漢平",
+  "2489":"瑞軒","2491":"吉祥全","2492":"華新科","2493":"揚博","2495":"普安",
+  "2496":"卓越","2497":"怡利電","2498":"宏達電","3008":"大立光","3009":"奇美材",
+  "3010":"華立","3011":"今皓","3012":"易飛網","3013":"晟銘電","3014":"台揚科",
+  "3015":"全漢","3016":"嘉澤","3017":"奇鈦科","3018":"同開","3019":"亞洲化學",
+  "3020":"祺驊","3021":"鴻碩","3022":"威強電","3023":"信邦","3024":"憶聲",
+  "3025":"星通","3026":"禾伸堂","3027":"盛達","3034":"聯詠","3035":"智原",
+  "3036":"文曄","3037":"欣興","3038":"全台晶像","3039":"泰詠","3041":"揚智",
+  "3042":"晶技","3044":"健鼎","3045":"台灣大","3046":"建碁","3047":"訊舟",
+  "3048":"益登","3049":"和鑫","3050":"鈺太","3051":"力特","3052":"夆典",
+  "3054":"立積","3055":"蒙恬","3056":"總太","3057":"喬鼎","3059":"華晶科",
+  "3060":"薩摩亞商銘異","3062":"建漢","3064":"泰偉","3066":"利機","3067":"全域",
+  "3068":"大霸","3072":"羅昇","3073":"創奕能源","3074":"大聯大","3075":"安勤",
+  "3076":"德寶航太","3078":"僑威","3079":"華瑞電","3080":"晶剛","3081":"聯亞",
+  "3082":"晶成半導","3083":"網際威信","3084":"大塚","3085":"久尹","3086":"華義",
+  "4904":"遠傳","4938":"和碩","4958":"臻鼎-KY","4967":"十銓","4968":"立積",
+  "5274":"信驊","5347":"世界","5388":"中磊","5392":"應華","5403":"中菲行",
+  "5410":"國眾","5425":"台半","5434":"崇越","5439":"吉輔","5457":"宣德",
+  "5468":"佳能","5469":"瀚宇博","5471":"松翰","5474":"光環","5478":"智冠",
+  "5481":"光麗-KY","5490":"同亨","5491":"世新","5492":"捷流閥業","5493":"三聯",
+  "6005":"群益證","6008":"神腦","6009":"正達","6010":"首德","6011":"百達-KY",
+  "6012":"中強光電","6024":"群益期","6025":"信昂","6026":"福興","6027":"易普生",
+  "6028":"喬福","6029":"台端","6030":"信義房屋","6031":"集瀚","6032":"德盈-KY",
+  "6033":"孫大千","6034":"泰偉遊戲","6036":"凌通","6037":"驊訊","6038":"富宇",
+  "6041":"銘旺實","6042":"普誠","6043":"Audio","6044":"大眾光電","6046":"嘉雲",
+  "6047":"晶豪科","6048":"鴻碩電業","6049":"南電","6050":"南亞光電","6051":"力致",
+  "6052":"協益","6053":"訊芯-KY","6054":"燿爾","6055":"見龍","6057":"詠發",
+  "6058":"羽冠","6059":"業強","6061":"碩華","6062":"通訊行","6063":"世康",
+  "6064":"安泰醫","6065":"萬泰商銀","6066":"波若威","6067":"以利電子",
+  "6116":"彩晶","6147":"頎邦","6176":"瑞儀","6179":"亞通","6180":"加百裕",
+  "6183":"關中","6184":"大豐電","6185":"幸康","6188":"廣明","6189":"豐藝",
+  "6190":"萬潤","6191":"精成科","6192":"台灣高鐵","6197":"佳必琪","6198":"凌泰",
+  "6199":"天鈺","6200":"八貫","6201":"亞弘電","6202":"盛群","6204":"艾訊",
+  "6205":"詮欣","6206":"飛捷","6207":"雷科","6208":"日揚","6209":"今國光",
+  "6210":"慶生","6213":"聯茂","6214":"精誠","6215":"和椿","6217":"中探針",
+  "6218":"蒙恬科","6219":"富旺","6220":"岳豐","6221":"晉泰","6222":"上奇",
+  "6223":"旺矽","6224":"糠榮","6225":"天瀚","6226":"光鋐","6227":"通泰",
+  "6229":"研通","6230":"超眾","6231":"系統電","6232":"亞太電","6233":"旺詮",
+  "6235":"華孚","6236":"凌陽創新","6237":"驊宏","6238":"勝麗","6239":"力成",
+  "6240":"松崗","6241":"易通展","6243":"迅達","6244":"茂緯","6245":"立端",
+  "6246":"臺灣動力","6247":"九暘","6248":"沛旭","6249":"勝薪","6251":"定穎",
+  "6252":"嘉聯益","6253":"風信子","6254":"雲達","6255":"旺玖","6256":"威宇",
+  "6257":"矽格","6258":"台勤","6259":"百徽","6261":"久元","6262":"科誠",
+  "6263":"普萊德","6264":"佑勝","6265":"方土昌","6266":"泰茂","6267":"台灣高速鐵路",
+  "6269":"台郡","6271":"同欣電","6272":"川升","6273":"普誠科技","6274":"台燿",
+  "6275":"元山","6277":"宏正","6278":"台表科","6279":"胡連","6280":"威剛",
+  "6281":"全台電","6282":"康舒","6283":"愛沛","6284":"佳淩","6285":"啟碁",
+  "6286":"立錡","6288":"聯嘉","6289":"華寬","6290":"良維","6291":"沅聖",
+  "6292":"迎廣","6293":"新唐","6294":"建通","6295":"固德","6296":"安國",
+  "6297":"捷笙","6298":"崑鼎","6299":"唐鋒","6301":"星泰","6302":"崑鼎",
+  "6303":"謙信","6304":"亞同","6305":"辰巨","6306":"村上","6307":"元wafer",
+  "6308":"天剛","6309":"新銳科","6311":"英誌","6312":"科閎","6313":"嘉基",
+  "6314":"P-KY","6315":"閎康","6317":"迅映","6318":"曜亞","6319":"泰銘",
+  "6321":"沈氏","6322":"臻優","6323":"日月光","6324":"偉盟","6325":"美格",
+  "6327":"泰碩","6328":"興能高","6329":"邁達特","6330":"仁川","6331":"倚強",
+  "6332":"弘憶股份","6333":"鼎天","6336":"同泰","6337":"上銓","6338":"泰碩",
+  "6339":"台灣神戶電池","6340":"大銀微","6341":"富光","6342":"新美齊","6343":"丞相",
+  "6344":"萬旭","6345":"天揚","6346":"耕興","6347":"貿聯-KY","6348":"健策",
+  "6349":"台揚科技","6350":"弘帆","6351":"速博思","6352":"英業達","6353":"牧德",
+  "6354":"世德","6355":"金居","6356":"至美","6357":"永信電","6358":"勁達",
+  "6359":"台境","6360":"NB","6361":"旺銓","6362":"誠研","6363":"詮佳",
+  "6364":"台灣榮化","6365":"台榮","6366":"久正","6367":"志強-KY","6368":"玉晶光",
+  "6369":"銓寶工業","6370":"出門","6371":"兆利","6372":"泰博","6373":"上城",
+  "6374":"鉅沃","6375":"德爾","6376":"安特羅","6377":"群電","6378":"上詮",
+  "6379":"普電","6380":"正航","6381":"泰博科技","6382":"仁寶","6414":"樺漢",
+  "6415":"矽力-KY","6416":"瑞祺電通","6417":"韋僑","6418":"展通","6419":"源捷",
+  "6420":"圓剛科技","6421":"弘凱","6422":"阿福股份","6423":"恩德","6424":"鉅邁",
+  "6425":"勁永","6426":"統新半","6427":"北極星","6428":"旺瑞","6429":"銘異",
+  "6430":"合一","6431":"光麗","6432":"今晶","6433":"台半導","6434":"統崧",
+  "6436":"優群","6438":"迅德","6439":"土城","6440":"尼得科超眾","6441":"廣積",
+  "6442":"元晶","6443":"元翎","6444":"IML","6446":"藥華藥","6447":"達能",
+  "6448":"創耀-KY","6449":"創意","6450":"聯合再生","6451":"訊連","6452":"康友-KY",
+  "6453":"康聯生醫","6454":"富采","6455":"基亞","6456":"GreenPower","6457":"宏觀",
+  "6458":"義隆電子","6460":"神基","6461":"益得","6462":"神盾","6464":"台數科",
+  "6465":"威潤科技","6466":"亞昕","6467":"奕力","6468":"強盛","6469":"大樹",
+  "6470":"宏全","6471":"協益電子","6472":"保瑞","6473":"大地-KY","6474":"追日",
+  "6475":"光磊","6477":"承啟科技","6478":"廠辦","6479":"合邦","6480":"宇隆",
+  "6481":"均豪精密","6482":"弘凱科技","6484":"基勝","6485":"訊智海","6486":"互動",
+  "6487":"詮興","6488":"環球晶","6489":"台揚","6490":"臻鼎","6491":"揚信",
+  "6492":"泰鼎-KY","6494":"誠鼎精密","6495":"漢磊","6496":"中美晶","6497":"台境",
+  "6547":"川立","6548":"長科興業","6549":"台灣高速鐵路","6550":"北極星藥業-KY",
+  "6556":"ST3","6557":"南六","6558":"興能高科","6559":"北方晶圓","6560":"精測",
+  "6561":"是方電訊","6562":"穎崴","6563":"波若威科技","6564":"誠美材","6565":"力致",
+  "6566":"康鈦","6567":"康普","6568":"明泰","6569":"健策精密","6570":"鈺創",
+  "6573":"宜特","6576":"神雲","6577":"正文","6578":"立昂技術","6579":"研勤",
+  "6580":"達億鋼","6581":"均豪","6582":"申豐","6583":"弘憶","6584":"上品",
+  "6585":"芯鼎","6586":"周大福","6587":"金麗科","6588":"錩泰工業","6589":"台康生技",
+  "6590":"藍海光電","6591":"默克KGaA","6592":"和潤企業","6593":"台半","6594":"立積電子",
+  "6595":"旭泓","6596":"慶豐富","6598":"聯嘉光電","6603":"富適","6605":"帝普",
+  "6609":"唐鋒科技","6610":"得力","6611":"宏全國際","6612":"奈米龍","6613":"互動",
+  "6615":"慧穩","6616":"特昇-KY","6617":"強特","6618":"金麗生科","6619":"台康",
+  "6621":"旭曜","6622":"信驊科技","6623":"富采投控","6624":"大地","6625":"新復興",
+  "6626":"圓展","6627":"精程精密","6628":"誠品生活","6629":"赤子城-KY","6630":"新普",
+  "6631":"新日光","6632":"舒適堡","6633":"台康生技","6634":"銥光-KY","6635":"大聯大",
+  "6636":"奇力新電子","6637":"英特磊","6638":"詠嘉","6639":"廣穎電通","6640":"南電",
+  "6641":"杰力","6643":"M31","6645":"藥華醫藥","6646":"台形精密","6647":"六豐機械",
+  "6648":"創意電子","6649":"台灣大哥大","6650":"復盛應用科技","6651":"精智",
+  "6654":"天鈺科技","6657":"中磊電子","6658":"精湛光學","6659":"金利豐-KY",
+  "6660":"富鉅科技","6661":"威宏-KY","6662":"樂陞科技","6663":"鑫禾科技",
+  "6664":"群創光電","6665":"光聖","6667":"亞積電","6668":"中美矽晶","6669":"緯穎科技",
+  "6670":"復旦","6671":"泰鼎","6672":"立超","6674":"康普材料","6675":"良興",
+  "6676":"鑫禾","6677":"金鼎","6679":"捷榮技術","6680":"安碁資訊","6681":"奕力科技",
+  "6683":"雍智科技","6684":"安力","6685":"康聯生醫","6686":"統懋半導體","6689":"達邁",
+  "6690":"智易","6691":"法巴百達投信","6692":"宏捷科","6693":"訊芯","6694":"力源資訊",
+  "6695":"頎邦科技","6697":"晟楠科技","6698":"旭隼","6699":"力智","6700":"威鋒電子",
+  "6701":"力旺","6702":"漢翔航空","6703":"岱宇國際","6704":"驊訊電子","6706":"惠特",
+  "6707":"力積電","6708":"景碩","6709":"梭特科技","6710":"力達電子","6711":"廣鐸",
+  "6712":"思達半導體","6713":"台灣高鐵","6714":"磐石","6715":"驊宏展業",
+  "6716":"英業達","6717":"聯發科技","6718":"晶采光電","6719":"力旺電子",
+  "6720":"美超微電腦","6721":"台半導體","6722":"百一電子","6724":"力源","6726":"億豐",
+  "6727":"安力士","6728":"品安","6729":"信義房屋","6730":"亞德客","6731":"金碳科",
+  "6732":"康舒科技","6734":"元太科技","6735":"台達電子","6736":"巧新科技",
+  "6737":"英業達","6738":"和碩","6739":"宸展","6741":"晶焱科技","6742":"力成科技",
+  "6743":"崇越科技","6744":"達能科技","6745":"元山科技","6746":"神基科技",
+  "6747":"康舒","6748":"威光","6749":"泰博科技","6750":"達邁科技","6751":"博智",
+  "6752":"聯強國際","6753":"璟德電子","6754":"立錡科技","6755":"英誌","6756":"諾貝爾",
+  "6757":"台灣大","6758":"東龍互動","6759":"康生","6760":"恩德生技","6761":"台灣松下",
+  "6762":"立凱-KY","6763":"威宇科技","6764":"廣達電腦","6765":"宏達電","6766":"精技",
+  "6767":"旭聚","6768":"晶采","6769":"志旭","6770":"力積電","6771":"富邦媒",
+  "6772":"合晶科技","6773":"智崴","6774":"聯合碳化","6775":"亞通","6776":"品安科技",
+  "6778":"昇銳電子","6779":"力旺","6780":"力成","6781":"AES-KY","6782":"嘉澤端子",
+  "6783":"日月光","6784":"倚強科技","6785":"昭明","6786":"富采","6787":"晶元光電",
+  "6788":"康適達","6789":"威潤","6790":"泰碩電子","6791":"上海銀行","6792":"中鋼構",
+  "6793":"安力","6794":"晉弘","6795":"大聯大控股","6796":"永佳捷","6797":"瑪黛茶-KY",
+  "6798":"正點","6799":"精研科技","6800":"立錡","8008":"建興電子","8010":"建榮聯合",
+  "8011":"台通","8012":"致新","8014":"富達","8015":"銓寶","8016":"矽創",
+  "8017":"展茂光電","8018":"宏碁","8019":"佳鼎科技","8020":"彩富","8021":"G-Tech",
+  "8022":"華研國際","8024":"佑華","8025":"貝聿銘","8027":"鑽全","8028":"昇陽國際半導體",
+  "8029":"中國化學製藥","8030":"零壹","8031":"大豐電","8032":"光精科技","8033":"雷伯格",
+  "8034":"榮群","8035":"華頓","8036":"江興鍛造","8039":"台虹","8040":"九豪",
+  "8041":"發現通訊","8042":"金山電機","8044":"網路家庭","8046":"建興電子","8048":"德勝",
+  "8049":"晶采","8050":"廣隆","8051":"智冠科技","8052":"大同","8054":"安國際半導體",
+  "8055":"精技電腦","8059":"凱衛","8060":"泰昇","8069":"元太","8086":"宏捷科",
+  "8088":"品川","8092":"建碁","8096":"擎亞","8097":"常珵","8099":"大世科",
+  "8101":"華榮","8103":"瀚荃","8104":"錸德科技","8105":"凌巨科技","8106":"象王洗衣",
+  "8107":"大立光電","8108":"威強電","8109":"博達科技","8110":"天鈺科技",
+  "8111":"李長榮化工","8112":"至上電子","8113":"富晶通","8114":"万達光電",
+  "8115":"晉越電子","8116":"創銘","8117":"亞矽","8118":"台灣愛司帝","8119":"電翊",
+  "8120":"軒揚","8121":"越峰","8122":"互盛電子","8123":"英聯","8124":"帝冠",
+  "8125":"雷科","8126":"福華電子","8127":"展鑫","8128":"全曜財經","8129":"聯嘉",
+  "8130":"東訊","8131":"福懋科技","8132":"大同","8133":"M31技術","8134":"展達",
+  "8135":"福華","8136":"高力熱處理工業","8137":"勤誠興業","8138":"海陸特材",
+  "8139":"中宇環保","8140":"元晶太陽能","8141":"進化","8142":"遠傳電信","8143":"志超",
+  "8144":"達華智能","8145":"勤美","8146":"翠豐-KY","8147":"正薪","8148":"合一",
+  "8150":"南茂","8152":"雷虎科技","8153":"瑞典商富迪","8154":"千附精密",
+  "8155":"博智電子","8156":"波若威","8157":"太景-KY","8158":"霹靂","8159":"新鼎",
+  "8160":"達方電子","8161":"上銀科技","8162":"睿能創意","8163":"RFHIC",
+  "8164":"達興材料","8165":"貝特萊","8166":"達能科技","8167":"國碩","8168":"七賢",
+  "8169":"正航資訊","8170":"台灣高速鐵路","8171":"倉和","8172":"立鎧精密","8173":"宜特",
+  "8174":"台灣護貝","8175":"台欣生技","8176":"智伸科","8177":"朋億","8178":"寶德能源",
+  "8179":"信昌電陶","8180":"達麗","8181":"瑞颯","8182":"威宇","8183":"百威",
+  "8184":"大成長城企業","8185":"華亞科技","8186":"金麗科技","8187":"佳鋒業",
+  "8188":"夠麻吉","8189":"台灣上市公司","8190":"輔信","8191":"明基材","8192":"翔名",
+  "8193":"台精工","8194":"白金科技","8195":"彩度","8196":"建茂鋒","8197":"台鑽科技",
+  "8198":"全界","8199":"必翔","8201":"超捷","8202":"劍度","8203":"三顧",
+  "8204":"大眾電腦","8205":"達思科技","8206":"雄獅集團","8207":"匯鑽科技",
+  "8208":"台達化學","8209":"大田精密","8210":"佑威","8211":"台旭","8212":"名軒",
+  "8213":"志廣","8214":"愛普","8215":"鑫永銓","8216":"信凱科技","8217":"台勝科",
+  "8218":"裕融企業","8219":"富驊","8220":"達方","8221":"台灣半導體","8222":"菱光科技",
+  "8223":"博探","8224":"三晃","8225":"功得電子","8226":"鉅橡","8227":"通訊行動網",
+  "8228":"蔚藍","8229":"尚凡","8230":"全達光電","8231":"精金","8232":"大學光",
+  "8233":"瑞麒科技","8234":"達普","8235":"志旭","8236":"巧新","8237":"大宇資訊",
+  "8238":"台汽電","8239":"富晟","8240":"華寬","8241":"晨星半導體","8242":"佳易",
+  "8243":"利勤","8244":"弘晶","8245":"天剛網路","8246":"鍵橋通訊","8247":"耕興",
+  "8248":"華新科技","8249":"力暘","8250":"遠鑫電子","8251":"安碁","8252":"建台水泥",
+  "8253":"邑昇","8254":"鋒形科技","8255":"聲遠","8256":"欣技資訊","8257":"大台北",
+  "8258":"達易特生技","8259":"鋒毅","8260":"精基科技","8261":"富驊科技","8262":"科嘉-KY",
+  "8263":"英利-KY","8264":"富喬工業","8265":"東捷","8266":"富驊","8267":"大江生醫",
+  "8268":"台騏","8269":"帝寶工業","8271":"宇泰","8272":"汎泰","8273":"公信電子",
+  "8274":"巨路","8275":"旭源","8277":"商丞科技","8278":"中國化工塗料","8279":"歐買尬",
+  "8280":"活碩科技","8281":"可昱","8282":"法拉第","8283":"加拿大商威盛","8284":"康聯",
+  "8285":"久大","8286":"台灣","8287":"美時","8288":"台發","8289":"歐特明","8290":"晟德",
+  "8291":"敦南科技","8292":"元亨電機","8293":"眾達-KY","8294":"台林","8295":"群電",
+  "8296":"賀泰","8297":"昇貿","8299":"群聯","8300":"明安","8302":"晶技",
+  "8303":"展逸國際","8304":"芮特科技","8305":"上品精密","8306":"中菲電腦",
+  "8307":"台達化","8308":"元豐新科技","8309":"巨路","8310":"福大","8311":"台光電子材料",
+  "8312":"源興科技","8313":"國際牌","8314":"武漢光電","8315":"大洋","8316":"宏高",
+  "8317":"展唐","8318":"台灣奈米","8319":"富林","8320":"台灣神隆","8321":"融正",
+  "8322":"名軒開發","8323":"詮達","8324":"台灣半導體封裝","8325":"達擎",
+  "8326":"南光製藥","8327":"華健","8328":"南寶樹脂","8329":"華夏海灣","8330":"源星生技",
+  "8331":"聯合紡織","8332":"泰茂","8333":"閎康科技","8334":"健亞生物科技","8336":"臺灣工銀",
+  "8337":"DIGITIMES","8338":"群益期貨","8339":"九豪精密陶瓷","8340":"台灣神隆",
+  "8341":"日勝生活科技","8342":"台灣光罩","8343":"澤磊","8344":"浤盛科技",
+  "8345":"台灣高速鐵路","8346":"台聚","8347":"萬泰商業銀行","8349":"鑄天",
+  "8350":"台灣高速鐵路","9921":"巨大","9922":"太子","9924":"台表科",
+  "9925":"新保","9926":"新海","9927":"泰銘工業","9928":"中視","9929":"秋雨",
+  "9930":"中聯資源","9931":"欣高","9932":"中鼎","9933":"中鼎工程","9934":"成霖",
+  "9935":"慶豐富","9936":"台輪","9937":"全國電子","9938":"百和工業","9939":"宏全",
+  "9940":"信義房屋","9941":"裕融","9942":"茂順","9943":"好樂迪","9944":"新麗",
+  "9945":"潤泰新","9946":"三發地產","9947":"丹基-KY","9950":"萬國通路","9951":"皇田",
+  "9955":"佳醫","9958":"世紀鋼",
+};
+
+// 動態股票清單（從內建清單初始化）
+let STOCK_LIST   = Object.keys(BUILTIN_STOCKS);
+let stockNameMap = {...BUILTIN_STOCKS};
+
+// ════════════════════════════════════════
+// 狀態
+// ════════════════════════════════════════
+let token      = localStorage.getItem("finmind_token") || "";
+let hits       = JSON.parse(localStorage.getItem("hits_today") || "[]");
+let scanCount  = parseInt(localStorage.getItem("scan_count") || "0");
+let scanning   = false;
+let filterType = "all";
+let scanTimer  = null;
+let logs       = [];
+const SCAN_INTERVAL = 5 * 60 * 1000; // 5分鐘
+
+// ════════════════════════════════════════
+// Token 管理
+// ════════════════════════════════════════
+function saveToken() {
+  const t = document.getElementById("tokenInput").value.trim();
+  if (!t) { addLog("請輸入有效的 Token", "warn"); return; }
+  token = t;
+  localStorage.setItem("finmind_token", t);
+  updateTokenUI(true);
+  addLog("Token 已儲存至瀏覽器本機");
+  document.getElementById("btnScan").disabled = false;
+  fetchTopStocks(); // 儲存 token 後立即抓股票清單
+}
+
+function updateTokenUI(ok) {
+  const bar   = document.getElementById("tokenBar");
+  const label = document.getElementById("tokenLabel");
+  const btn   = document.getElementById("tokenBtn");
+  const sys   = document.getElementById("sysToken");
+  if (ok) {
+    bar.classList.add("ok");
+    label.textContent = "✅ Token 已設定";
+    btn.classList.add("ok");
+    btn.textContent = "已儲存";
+    sys.textContent = "已設定";
+    sys.style.color = "var(--green)";
+  }
+}
+
+// ════════════════════════════════════════
+// 時鐘 & 盤中判斷
+// ════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,"0");
+  const m = String(now.getMinutes()).padStart(2,"0");
+  const s = String(now.getSeconds()).padStart(2,"0");
+  document.getElementById("clock").textContent = `${h}:${m}:${s}`;
+  const t = `${h}:${m}`;
+  const inMkt = t >= "09:00" && t <= "13:30";
+  const badge = document.getElementById("marketBadge");
+  badge.textContent = inMkt ? "盤中" : (t < "09:00" ? "開盤前" : "盤後");
+  badge.className = "market-badge " + (inMkt ? "open" : "closed");
+  document.getElementById("sysMarket").textContent = inMkt ? "盤中 ●" : "非盤中";
+  document.getElementById("sysMarket").style.color = inMkt ? "var(--green)" : "var(--text2)";
+  return inMkt;
+}
+setInterval(updateClock, 1000);
+
+// ════════════════════════════════════════
+// Finmind API
+// ════════════════════════════════════════
+async function fetchStockData(stockId) {
+  // 取近90天資料
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 90);
+  const fmt = d => d.toISOString().split("T")[0];
+
+  // 用 CORS proxy 讓本機與 GitHub Pages 都能呼叫 Finmind API
+  const apiUrl = `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+  const res    = await fetch(proxy);
+  const outer  = await res.json();
+  const json   = JSON.parse(outer.contents);
+
+  if (!json.data || json.data.length < 30) return null;
+
+  // 整理成陣列格式
+  const rows = json.data;
+  return {
+    close:  rows.map(r => parseFloat(r.close)),
+    open:   rows.map(r => parseFloat(r.open)),
+    high:   rows.map(r => parseFloat(r.max)),
+    low:    rows.map(r => parseFloat(r.min)),
+    volume: rows.map(r => parseFloat(r.Trading_Volume)),
+    date:   rows.map(r => r.date),
+  };
+}
+
+// ════════════════════════════════════════
+// 計算工具
+// ════════════════════════════════════════
+const avg = arr => arr.reduce((a,b) => a+b, 0) / arr.length;
+const last = (arr, n=1) => arr.slice(-n);
+const max  = arr => Math.max(...arr);
+const min  = arr => Math.min(...arr);
+
+// ════════════════════════════════════════
+// 策略一：爆量突破
+// ════════════════════════════════════════
+function checkBreakout(id, d) {
+  if (d.close.length < 25) return null;
+  const todayVol  = d.volume[d.volume.length-1];
+  const avgVol5   = avg(last(d.volume.slice(0,-1), 5));
+  const todayClose= d.close[d.close.length-1];
+  const prevClose = d.close[d.close.length-2];
+  const high20    = max(last(d.close.slice(0,-1), 20));
+  const ma5       = avg(last(d.close, 5));
+  const ma20      = avg(last(d.close, 20));
+  const changePct = (todayClose - prevClose) / prevClose * 100;
+  const volRatio  = todayVol / avgVol5;
+
+  if (volRatio >= VOL_MULT && todayClose >= high20 && ma5 > ma20 && changePct > 0) {
+    return {
+      type: "breakout", label: "爆量突破",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: volRatio.toFixed(1),
+      detail: `創20日新高｜量能${volRatio.toFixed(1)}倍｜漲幅${changePct.toFixed(1)}%`,
+    };
+  }
+  return null;
+}
+
+// ════════════════════════════════════════
+// 策略二：強勢整理
+// ════════════════════════════════════════
+function checkConsolidation(id, d) {
+  if (d.close.length < 35) return null;
+  const lookBack   = 15;
+  const baseVol    = avg(d.volume.slice(-lookBack-20, -lookBack));
+  const recent     = d.volume.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+  const recentC    = d.close.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+
+  let blastVol = 0, blastClose = 0;
+  recent.forEach((v,i) => { if (v > baseVol*3) { blastVol=v; blastClose=recentC[i]; } });
+  if (!blastVol) return null;
+
+  const consolVol   = d.volume.slice(-CONSOL_DAYS-1,-1);
+  const consolClose = d.close.slice(-CONSOL_DAYS-1,-1);
+  const cAvgVol     = avg(consolVol);
+  const cHigh       = max(consolClose);
+  const cLow        = min(consolClose);
+  const drop        = (blastClose - cLow) / blastClose;
+
+  const todayVol    = d.volume[d.volume.length-1];
+  const todayClose  = d.close[d.close.length-1];
+  const prevClose   = d.close[d.close.length-2];
+  const changePct   = (todayClose-prevClose)/prevClose*100;
+  const vr          = todayVol/cAvgVol;
+
+  if (cAvgVol < blastVol*0.6 && drop < 0.05 && todayVol > cAvgVol*1.5 && todayClose > cHigh && changePct > 0) {
+    return {
+      type:"consolidation", label:"強勢整理",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: vr.toFixed(1),
+      detail: `整理${CONSOL_DAYS}日後突破｜回撤${(drop*100).toFixed(1)}%｜量能${vr.toFixed(1)}倍`,
+    };
+  }
+  return null;
+}
+
+// ════════════════════════════════════════
+// 策略三：主力蓄勢（量增價平）
+// ════════════════════════════════════════
+function checkAccumulation(id, d) {
+  if (d.close.length < 60) return null;
+
+  const ma5  = avg(last(d.close, 5));
+  const ma20 = avg(last(d.close, 20));
+  const ma60 = avg(last(d.close, 60));
+
+  const maSpread = Math.abs(ma5-ma20)/ma20;
+  const maGlued  = maSpread < 0.03;
+
+  const high20   = max(last(d.high, 20));
+  const low20    = min(last(d.low, 20));
+  const boxRange = (high20-low20)/low20;
+  const boxTight = boxRange < 0.10;
+
+  const mv5  = avg(last(d.volume, 5));
+  const mv20 = avg(last(d.volume, 20));
+  const volExpand = mv5 > mv20;
+
+  const mv5Prev  = avg(d.volume.slice(-10,-5));
+  const volSlope = mv5 - mv5Prev;
+  const volGentle= volSlope > 0 && volSlope < mv20*0.5;
+
+  const bodies   = last(d.close,10).map((c,i) => Math.abs(c - last(d.open,10)[i]));
+  const avgBody  = avg(bodies);
+  const priceNow = d.close[d.close.length-1];
+  const bodySmall= avgBody < priceNow*0.02;
+
+  if (!(maGlued && boxTight && volExpand && volGentle && bodySmall)) return null;
+
+  // 評分
+  const maBullish   = ma5 > ma20 && ma20 > ma60;
+  const minVol30    = min(last(d.volume, 30));
+  const volRecovery = mv5 > minVol30*1.3;
+  const score = [
+    maSpread < 0.015,
+    boxRange < 0.06,
+    maBullish,
+    volRecovery,
+  ].filter(Boolean).length;
+
+  const prevClose = d.close[d.close.length-2];
+  const changePct = (priceNow-prevClose)/prevClose*100;
+  const vr        = (mv5/mv20).toFixed(1);
+  const waveHint  = maBullish ? "W3蓄勢" : "W2築底";
+
+  return {
+    type:"accumulation", label:"主力蓄勢",
+    close: priceNow.toFixed(1), changePct: changePct.toFixed(2),
+    volRatio: vr, score,
+    detail: `箱型${(boxRange*100).toFixed(1)}%｜均線糾結${(maSpread*100).toFixed(1)}%｜${waveHint}｜評分${score}/4`,
+  };
+}
+
+// ════════════════════════════════════════
+// 主掃描
+// ════════════════════════════════════════
+let scanIdx = 0;
+
+async function startScan() {
+  if (scanning) return;
+  if (!token) { addLog("請先設定 Token！","warn"); return; }
+  scanning = true;
+
+  // 每天重置
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") !== today) {
+    hits = []; scanCount = 0;
+    localStorage.setItem("scan_date", today);
+    localStorage.setItem("hits_today", "[]");
+    localStorage.setItem("scan_count", "0");
+  }
+
+  const notified = new Set(hits.map(h => h.id));
+  scanCount++;
+  localStorage.setItem("scan_count", scanCount);
+  document.getElementById("statScans").textContent = scanCount;
+  document.getElementById("sysStatus").textContent = "掃描中...";
+  document.getElementById("sysStatus").className = "status-val scanning";
+  document.getElementById("btnScan").disabled = true;
+  document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+  const total = STOCK_LIST.length;
+  document.getElementById("statStocks").textContent = total;
+  addLog(`開始第 ${scanCount} 次掃描，共 ${total} 檔`);
+
+  let newHits = 0;
+  for (let i = 0; i < STOCK_LIST.length; i++) {
+    const id = STOCK_LIST[i];
+    if (notified.has(id)) continue;
+
+    // 進度
+    const pct = Math.round((i+1)/total*100);
+    document.getElementById("progressFill").style.width = pct+"%";
+    document.getElementById("progressText").textContent = `掃描中 ${i+1}/${total}：${id}`;
+    document.getElementById("scanBar").style.width = pct+"%";
+    document.getElementById("connDot").className = "sb-dot warn";
+    document.getElementById("connStatus").textContent = `掃描中 ${id}...`;
+
+    try {
+      const d = await fetchStockData(id);
+      if (!d) continue;
+
+      const result = checkBreakout(id,d) || checkConsolidation(id,d) || checkAccumulation(id,d);
+      if (result) {
+        result.id   = id;
+        result.name = stockNameMap[id] || id; // 從股票清單取名稱
+        result.time = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+        hits.unshift(result);
+        notified.add(id);
+        newHits++;
+        addLog(`✅ 觸發：${id} ${result.label} ${result.changePct > 0 ? "+":""}${result.changePct}%`, "hit");
+        renderHits();
+        localStorage.setItem("hits_today", JSON.stringify(hits));
+      }
+    } catch(e) {
+      addLog(`${id} 抓取失敗：${e.message}`, "err");
+    }
+
+    // 每檔間隔300ms，避免 API rate limit
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  scanning = false;
+  document.getElementById("sysStatus").textContent = "監控中";
+  document.getElementById("sysStatus").className = "status-val active";
+  document.getElementById("btnScan").disabled = false;
+  document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
+  document.getElementById("connDot").className = "sb-dot";
+  document.getElementById("connStatus").textContent = "Finmind API 連線正常";
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+
+  // 計算下次掃描時間
+  const next = new Date(Date.now() + SCAN_INTERVAL);
+  document.getElementById("statNextScan").textContent =
+    next.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+  addLog(newHits ? `掃描完成，發現 ${newHits} 個新訊號` : "掃描完成，無新訊號");
+
+  // 排程下一次
+  if (scanTimer) clearTimeout(scanTimer);
+  scanTimer = setTimeout(startScan, SCAN_INTERVAL);
+}
+
+// ════════════════════════════════════════
+// 渲染訊號
+// ════════════════════════════════════════
+function renderHits() {
+  const c = document.getElementById("hitsContainer");
+  const filtered = filterType === "all" ? hits : hits.filter(h => h.type === filterType);
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+  document.getElementById("statHits").textContent = hits.length;
+
+  if (!filtered.length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <div class="empty-text">${hits.length ? "此策略目前無訊號" : "尚無訊號，點擊開始掃描"}</div>
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = filtered.map(h => {
+    const up    = parseFloat(h.changePct) >= 0;
+    const sign  = up ? "+" : "";
+    const stars = h.score !== undefined
+      ? "★".repeat(h.score) + "☆".repeat(4-h.score)
+      : "";
+    return `
+    <div class="hit-card ${h.type}">
+      <div>
+        <div class="hit-type ${h.type}">${h.label}</div>
+        <div class="hit-time-badge">${h.time||""}</div>
+        ${stars ? `<div class="hit-stars">${stars}</div>` : ""}
+      </div>
+      <div class="hit-info">
+        <div class="hit-name">${esc(h.name||h.id)}</div>
+        <div class="hit-code">${h.id}</div>
+        <div class="hit-detail">${esc(h.detail)}</div>
+      </div>
+      <div class="hit-vol">
+        <div class="hit-vol-val">${h.volRatio}x</div>
+        <div class="hit-vol-label">量能</div>
+      </div>
+      <div class="hit-price">
+        <div class="hit-price-val">$${h.close}</div>
+        <div class="hit-change ${up?"up":"down"}">${sign}${h.changePct}%</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════
+// 工具
+// ════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function addLog(msg, type="") {
+  const ts = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  logs.unshift({msg, type, ts});
+  logs = logs.slice(0,40);
+  const lc = document.getElementById("logContainer");
+  lc.innerHTML = logs.map(l =>
+    `<div class="log-entry ${l.type}">[${l.ts}] ${esc(l.msg)}</div>`
+  ).join("");
+}
+
+function setFilter(type, btn) {
+  filterType = type;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHits();
+}
+
+function clearHits() {
+  if (!confirm("確定清除所有今日訊號？")) return;
+  hits = [];
+  localStorage.setItem("hits_today","[]");
+  renderHits();
+  addLog("已清除所有訊號");
+}
+
+// ════════════════════════════════════════
+// 初始化
+// ════════════════════════════════════════
+// ════════════════════════════════════════
+// 抓取前 N 大市值股票清單
+// ════════════════════════════════════════
+function fetchTopStocks() {
+  // 直接使用內建清單，不需要 API 請求
+  STOCK_LIST   = Object.keys(BUILTIN_STOCKS);
+  stockNameMap = {...BUILTIN_STOCKS};
+  addLog(`✅ 已載入 ${STOCK_LIST.length} 檔台股清單`);
+  document.getElementById("statStocks").textContent = STOCK_LIST.length;
+  return true;
+}
+
+(async function init() {
+  updateClock();
+
+  // 還原 token
+  if (token) {
+    document.getElementById("tokenInput").value = token;
+    updateTokenUI(true);
+    document.getElementById("btnScan").disabled = false;
+    // 有 token 才自動抓清單
+    fetchTopStocks();
+  }
+
+  // 還原今日資料
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") === today) {
+    hits = JSON.parse(localStorage.getItem("hits_today")||"[]");
+    scanCount = parseInt(localStorage.getItem("scan_count")||"0");
+    document.getElementById("statScans").textContent = scanCount;
+  }
+
+  renderHits();
+  addLog("飆股狙擊系統 v5.4 初始化完成");
+  addLog("資料來源：Finmind Open API（台股前500大市值）");
+})();
+</script>
+</body>
+</html>
