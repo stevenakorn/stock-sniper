@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飆股狙擊系統 v5.3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+:root {
+  --bg:#050a12; --bg2:#0a1525; --bg3:#0d1e35;
+  --border:#1a3a5c; --cyan:#00e5ff; --cyan2:#00b8d4;
+  --green:#00e676; --red:#ff1744; --amber:#ffab00;
+  --purple:#7c4dff; --text:#c8d8e8; --text2:#7a9ab5;
+  --mono:'Share Tech Mono',monospace; --sans:'Noto Sans TC',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 20px var(--cyan);z-index:100}
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:16px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;position:relative;overflow:hidden}
+header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:38px;height:38px;border:1px solid var(--cyan);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 12px rgba(0,229,255,.3);animation:pulse-border 2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 8px rgba(0,229,255,.3)}50%{box-shadow:0 0 20px rgba(0,229,255,.6)}}
+.logo-text h1{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.5)}
+.logo-text p{font-size:10px;color:var(--text2);font-family:var(--mono);letter-spacing:2px}
+.header-right{display:flex;align-items:center;gap:16px}
+.clock{font-family:var(--mono);font-size:20px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.4);letter-spacing:2px}
+.market-badge{padding:3px 10px;border-radius:2px;font-size:11px;font-family:var(--mono);letter-spacing:1px;border:1px solid}
+.market-badge.open{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);animation:blink 1.5s ease-in-out infinite}
+.market-badge.closed{color:var(--text2);border-color:var(--border)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ── Token 設定區 ── */
+.token-bar{background:var(--bg2);border:1px solid var(--amber);border-radius:4px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.token-bar.ok{border-color:var(--green)}
+.token-label{font-size:12px;font-family:var(--mono);color:var(--amber);white-space:nowrap}
+.token-bar.ok .token-label{color:var(--green)}
+.token-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:12px;min-width:260px}
+.token-input:focus{outline:none;border-color:var(--cyan)}
+.btn-token{padding:6px 16px;border-radius:3px;border:1px solid var(--amber);color:var(--amber);background:transparent;cursor:pointer;font-size:11px;font-family:var(--mono);letter-spacing:1px;transition:all .2s}
+.btn-token:hover{background:rgba(255,171,0,.1)}
+.btn-token.ok{border-color:var(--green);color:var(--green)}
+.token-hint{font-size:11px;color:var(--text2);font-family:var(--mono)}
+
+/* ── 統計卡片 ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;position:relative;overflow:hidden;transition:border-color .3s}
+.stat-card:hover{border-color:var(--cyan2)}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent,var(--cyan)),transparent)}
+.stat-label{font-size:10px;color:var(--text2);letter-spacing:2px;margin-bottom:6px;font-family:var(--mono)}
+.stat-value{font-size:26px;font-weight:700;font-family:var(--mono);color:var(--accent,var(--cyan));text-shadow:0 0 10px rgba(0,229,255,.3)}
+.stat-sub{font-size:10px;color:var(--text2);margin-top:3px;font-family:var(--mono)}
+
+/* ── 主內容 ── */
+.main-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.panel-header{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3)}
+.panel-title{font-size:11px;font-family:var(--mono);letter-spacing:2px;color:var(--cyan)}
+.panel-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:2px;background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.3)}
+
+/* ── 篩選列 ── */
+.filter-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap}
+.filter-btn{padding:4px 12px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px}
+.filter-btn:hover{border-color:var(--cyan2);color:var(--cyan)}
+.filter-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.filter-btn.f-breakout.active{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
+.filter-btn.f-consolidation.active{background:rgba(255,171,0,.1);border-color:var(--amber);color:var(--amber)}
+.filter-btn.f-accumulation.active{background:rgba(124,77,255,.1);border-color:var(--purple);color:var(--purple)}
+
+/* ── 訊號卡片 ── */
+.hits-container{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:280px;max-height:calc(100vh - 340px);overflow-y:auto}
+.hits-container::-webkit-scrollbar{width:4px}
+.hits-container::-webkit-scrollbar-track{background:var(--bg)}
+.hits-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.hit-card{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;transition:all .3s;animation:slide-in .4s ease;cursor:default}
+@keyframes slide-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+.hit-card:hover{border-color:var(--cyan2);background:rgba(0,229,255,.03)}
+.hit-card.breakout{border-left:3px solid var(--green)}
+.hit-card.consolidation{border-left:3px solid var(--amber)}
+.hit-card.accumulation{border-left:3px solid var(--purple)}
+.hit-type{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:2px;letter-spacing:1px;white-space:nowrap}
+.hit-type.breakout{color:var(--green);background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3)}
+.hit-type.consolidation{color:var(--amber);background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3)}
+.hit-type.accumulation{color:var(--purple);background:rgba(124,77,255,.1);border:1px solid rgba(124,77,255,.3)}
+.hit-info{min-width:0}
+.hit-name{font-size:14px;font-weight:500;color:#e8f4ff;margin-bottom:1px}
+.hit-code{font-size:10px;font-family:var(--mono);color:var(--text2)}
+.hit-detail{font-size:10px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit-stars{font-size:10px;color:var(--amber);letter-spacing:1px;margin-top:2px}
+.hit-time-badge{font-size:9px;font-family:var(--mono);color:var(--text2);margin-top:3px}
+.hit-vol{text-align:center;white-space:nowrap}
+.hit-vol-val{font-size:18px;font-family:var(--mono);font-weight:700;color:var(--cyan)}
+.hit-vol-label{font-size:9px;color:var(--text2);font-family:var(--mono)}
+.hit-price{text-align:right;white-space:nowrap}
+.hit-price-val{font-size:16px;font-weight:700;font-family:var(--mono);color:#e8f4ff}
+.hit-change{font-size:12px;font-family:var(--mono);font-weight:500}
+.hit-change.up{color:var(--green)}
+.hit-change.down{color:var(--red)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:260px;color:var(--text2);gap:10px}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-text{font-size:12px;font-family:var(--mono);letter-spacing:1px}
+
+/* ── 右側 ── */
+.right-col{display:flex;flex-direction:column;gap:14px}
+.scan-status{padding:14px;display:flex;flex-direction:column;gap:10px}
+.status-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.status-row:last-child{border-bottom:none}
+.status-key{color:var(--text2);font-family:var(--mono);letter-spacing:1px}
+.status-val{color:var(--text);font-family:var(--mono)}
+.status-val.active{color:var(--green);text-shadow:0 0 8px rgba(0,230,118,.4)}
+.status-val.scanning{color:var(--cyan);animation:blink .8s ease-in-out infinite}
+.scan-bar-wrap{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:2px}
+.scan-bar{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .5s ease;box-shadow:0 0 8px var(--cyan);width:0%}
+.btn-row{display:flex;gap:8px;padding:0 14px 14px}
+.btn{flex:1;padding:7px;border-radius:3px;border:1px solid;cursor:pointer;font-size:10px;font-family:var(--mono);letter-spacing:1px;transition:all .2s;background:transparent}
+.btn-scan{color:var(--cyan);border-color:var(--cyan)}
+.btn-scan:hover{background:rgba(0,229,255,.1);box-shadow:0 0 12px rgba(0,229,255,.2)}
+.btn-scan:disabled{opacity:.4;cursor:not-allowed}
+.btn-clear{color:var(--text2);border-color:var(--border)}
+.btn-clear:hover{color:var(--red);border-color:var(--red);background:rgba(255,23,68,.05)}
+.progress-wrap{padding:0 14px 12px}
+.progress-text{font-size:10px;font-family:var(--mono);color:var(--text2);margin-bottom:4px}
+.progress-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .3s;box-shadow:0 0 6px var(--cyan);width:0%}
+
+/* ── 日誌 ── */
+.log-container{padding:10px;font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+.log-container::-webkit-scrollbar{width:3px}
+.log-container::-webkit-scrollbar-thumb{background:var(--border)}
+.log-entry{color:var(--text2);line-height:1.5}
+.log-entry.hit{color:var(--green)}
+.log-entry.warn{color:var(--amber)}
+.log-entry.err{color:var(--red)}
+
+/* ── 底部 ── */
+.statusbar{margin-top:14px;padding:7px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;color:var(--text2)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.5s ease-in-out infinite;display:inline-block;margin-right:6px}
+.sb-dot.off{background:var(--text2);box-shadow:none;animation:none}
+.sb-dot.warn{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+
+@media(max-width:900px){
+  .main-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .hit-card{grid-template-columns:auto 1fr auto}
+  .hit-vol{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎯</div>
+    <div class="logo-text">
+      <h1>飆股狙擊系統</h1>
+      <p>STOCK SNIPER SYSTEM v5.3 · FINMIND EDITION</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="market-badge closed" id="marketBadge">盤後</div>
+  </div>
+</header>
+
+<!-- Token 設定 -->
+<div class="token-bar" id="tokenBar">
+  <span class="token-label" id="tokenLabel">⚠ 請輸入 Finmind API Token</span>
+  <input class="token-input" id="tokenInput" type="password" placeholder="貼上你的 Finmind Token...">
+  <button class="btn-token" id="tokenBtn" onclick="saveToken()">確認儲存</button>
+  <span class="token-hint">Token 只存在你的瀏覽器，不會上傳至任何伺服器</span>
+</div>
+
+<!-- 統計卡片 -->
+<div class="stats-row">
+  <div class="stat-card" style="--accent:var(--green)">
+    <div class="stat-label">TODAY SIGNALS</div>
+    <div class="stat-value" id="statHits">0</div>
+    <div class="stat-sub">今日觸發訊號</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--cyan)">
+    <div class="stat-label">SCAN COUNT</div>
+    <div class="stat-value" id="statScans">0</div>
+    <div class="stat-sub">今日掃描次數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--amber)">
+    <div class="stat-label">STOCKS WATCHED</div>
+    <div class="stat-value" id="statStocks">0</div>
+    <div class="stat-sub">監控股票數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--purple)">
+    <div class="stat-label">LAST SCAN</div>
+    <div class="stat-value" style="font-size:18px" id="statLastScan">--:--</div>
+    <div class="stat-sub">下次：<span id="statNextScan">--</span></div>
+  </div>
+</div>
+
+<!-- 主內容 -->
+<div class="main-grid">
+
+  <!-- 左：訊號清單 -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">◈ SIGNAL MONITOR</span>
+      <span class="panel-badge" id="hitCount">0 訊號</span>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">全部</button>
+      <button class="filter-btn f-breakout" data-filter="breakout" onclick="setFilter('breakout',this)">🚀 爆量突破</button>
+      <button class="filter-btn f-consolidation" data-filter="consolidation" onclick="setFilter('consolidation',this)">📦 強勢整理</button>
+      <button class="filter-btn f-accumulation" data-filter="accumulation" onclick="setFilter('accumulation',this)">🔮 主力蓄勢</button>
+    </div>
+    <div class="hits-container" id="hitsContainer">
+      <div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-text">請先設定 Token 並開始掃描</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右：狀態+日誌 -->
+  <div class="right-col">
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">◈ SYSTEM STATUS</span></div>
+      <div class="scan-status">
+        <div class="status-row">
+          <span class="status-key">STATUS</span>
+          <span class="status-val" id="sysStatus">待機</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">MARKET</span>
+          <span class="status-val" id="sysMarket">--</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">TOKEN</span>
+          <span class="status-val" id="sysToken" style="color:var(--red)">未設定</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">STRATEGY</span>
+          <span class="status-val" style="color:var(--cyan);font-size:10px">突破/整理/蓄勢</span>
+        </div>
+        <div class="scan-bar-wrap"><div class="scan-bar" id="scanBar"></div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-text" id="progressText">--</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-scan" id="btnScan" onclick="startScan()" disabled>▶ 開始掃描</button>
+        <button class="btn btn-clear" onclick="clearHits()">✕ 清除</button>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><span class="panel-title">◈ SCAN LOG</span></div>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry">系統初始化完成，等待 Token...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 底部狀態列 -->
+<div class="statusbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
+    <span>資料來源：Finmind Open API</span>
+  </div>
+  <span>飆股狙擊系統 v5.0 ── 僅供參考，投資有風險</span>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ════════════════════════════════════════
+// 設定
+// ════════════════════════════════════════
+const FINMIND_API  = "https://api.finmindtrade.com/api/v4/data";
+const FINMIND_BASE = "https://api.finmindtrade.com/api/v4";
+const TOP_N        = 500; // 前幾大市值
+
+// 策略參數
+const VOL_MULT    = 2.0;
+const BOX_DAYS    = 20;
+const CONSOL_DAYS = 5;
+
+// 動態股票清單（啟動時從 Finmind 抓取）
+let STOCK_LIST   = []; // ["2330","2317",...]
+let stockNameMap = {}; // {"2330":"台積電"}
+
+// ════════════════════════════════════════
+// 狀態
+// ════════════════════════════════════════
+let token      = localStorage.getItem("finmind_token") || "";
+let hits       = JSON.parse(localStorage.getItem("hits_today") || "[]");
+let scanCount  = parseInt(localStorage.getItem("scan_count") || "0");
+let scanning   = false;
+let filterType = "all";
+let scanTimer  = null;
+let logs       = [];
+const SCAN_INTERVAL = 5 * 60 * 1000; // 5分鐘
+
+// ════════════════════════════════════════
+// Token 管理
+// ════════════════════════════════════════
+function saveToken() {
+  const t = document.getElementById("tokenInput").value.trim();
+  if (!t) { addLog("請輸入有效的 Token", "warn"); return; }
+  token = t;
+  localStorage.setItem("finmind_token", t);
+  updateTokenUI(true);
+  addLog("Token 已儲存至瀏覽器本機");
+  document.getElementById("btnScan").disabled = false;
+  fetchTopStocks(); // 儲存 token 後立即抓股票清單
+}
+
+function updateTokenUI(ok) {
+  const bar   = document.getElementById("tokenBar");
+  const label = document.getElementById("tokenLabel");
+  const btn   = document.getElementById("tokenBtn");
+  const sys   = document.getElementById("sysToken");
+  if (ok) {
+    bar.classList.add("ok");
+    label.textContent = "✅ Token 已設定";
+    btn.classList.add("ok");
+    btn.textContent = "已儲存";
+    sys.textContent = "已設定";
+    sys.style.color = "var(--green)";
+  }
+}
+
+// ════════════════════════════════════════
+// 時鐘 & 盤中判斷
+// ════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,"0");
+  const m = String(now.getMinutes()).padStart(2,"0");
+  const s = String(now.getSeconds()).padStart(2,"0");
+  document.getElementById("clock").textContent = `${h}:${m}:${s}`;
+  const t = `${h}:${m}`;
+  const inMkt = t >= "09:00" && t <= "13:30";
+  const badge = document.getElementById("marketBadge");
+  badge.textContent = inMkt ? "盤中" : (t < "09:00" ? "開盤前" : "盤後");
+  badge.className = "market-badge " + (inMkt ? "open" : "closed");
+  document.getElementById("sysMarket").textContent = inMkt ? "盤中 ●" : "非盤中";
+  document.getElementById("sysMarket").style.color = inMkt ? "var(--green)" : "var(--text2)";
+  return inMkt;
+}
+setInterval(updateClock, 1000);
+
+// ════════════════════════════════════════
+// Finmind API
+// ════════════════════════════════════════
+async function fetchStockData(stockId) {
+  // 取近90天資料
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 90);
+  const fmt = d => d.toISOString().split("T")[0];
+
+  // 用 CORS proxy 讓本機與 GitHub Pages 都能呼叫 Finmind API
+  const apiUrl = `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+  const res    = await fetch(proxy);
+  const outer  = await res.json();
+  const json   = JSON.parse(outer.contents);
+
+  if (!json.data || json.data.length < 30) return null;
+
+  // 整理成陣列格式
+  const rows = json.data;
+  return {
+    close:  rows.map(r => parseFloat(r.close)),
+    open:   rows.map(r => parseFloat(r.open)),
+    high:   rows.map(r => parseFloat(r.max)),
+    low:    rows.map(r => parseFloat(r.min)),
+    volume: rows.map(r => parseFloat(r.Trading_Volume)),
+    date:   rows.map(r => r.date),
+  };
+}
+
+// ════════════════════════════════════════
+// 計算工具
+// ════════════════════════════════════════
+const avg = arr => arr.reduce((a,b) => a+b, 0) / arr.length;
+const last = (arr, n=1) => arr.slice(-n);
+const max  = arr => Math.max(...arr);
+const min  = arr => Math.min(...arr);
+
+// ════════════════════════════════════════
+// 策略一：爆量突破
+// ════════════════════════════════════════
+function checkBreakout(id, d) {
+  if (d.close.length < 25) return null;
+  const todayVol  = d.volume[d.volume.length-1];
+  const avgVol5   = avg(last(d.volume.slice(0,-1), 5));
+  const todayClose= d.close[d.close.length-1];
+  const prevClose = d.close[d.close.length-2];
+  const high20    = max(last(d.close.slice(0,-1), 20));
+  const ma5       = avg(last(d.close, 5));
+  const ma20      = avg(last(d.close, 20));
+  const changePct = (todayClose - prevClose) / prevClose * 100;
+  const volRatio  = todayVol / avgVol5;
+
+  if (volRatio >= VOL_MULT && todayClose >= high20 && ma5 > ma20 && changePct > 0) {
+    return {
+      type: "breakout", label: "爆量突破",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: volRatio.toFixed(1),
+      detail: `創20日新高｜量能${volRatio.toFixed(1)}倍｜漲幅${changePct.toFixed(1)}%`,
+    };
+  }
+  return null;
+}
+
+// ════════════════════════════════════════
+// 策略二：強勢整理
+// ════════════════════════════════════════
+function checkConsolidation(id, d) {
+  if (d.close.length < 35) return null;
+  const lookBack   = 15;
+  const baseVol    = avg(d.volume.slice(-lookBack-20, -lookBack));
+  const recent     = d.volume.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+  const recentC    = d.close.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+
+  let blastVol = 0, blastClose = 0;
+  recent.forEach((v,i) => { if (v > baseVol*3) { blastVol=v; blastClose=recentC[i]; } });
+  if (!blastVol) return null;
+
+  const consolVol   = d.volume.slice(-CONSOL_DAYS-1,-1);
+  const consolClose = d.close.slice(-CONSOL_DAYS-1,-1);
+  const cAvgVol     = avg(consolVol);
+  const cHigh       = max(consolClose);
+  const cLow        = min(consolClose);
+  const drop        = (blastClose - cLow) / blastClose;
+
+  const todayVol    = d.volume[d.volume.length-1];
+  const todayClose  = d.close[d.close.length-1];
+  const prevClose   = d.close[d.close.length-2];
+  const changePct   = (todayClose-prevClose)/prevClose*100;
+  const vr          = todayVol/cAvgVol;
+
+  if (cAvgVol < blastVol*0.6 && drop < 0.05 && todayVol > cAvgVol*1.5 && todayClose > cHigh && changePct > 0) {
+    return {
+      type:"consolidation", label:"強勢整理",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: vr.toFixed(1),
+      detail: `整理${CONSOL_DAYS}日後突破｜回撤${(drop*100).toFixed(1)}%｜量能${vr.toFixed(1)}倍`,
+    };
+  }
+  return null;
+}
+
+// ════════════════════════════════════════
+// 策略三：主力蓄勢（量增價平）
+// ════════════════════════════════════════
+function checkAccumulation(id, d) {
+  if (d.close.length < 60) return null;
+
+  const ma5  = avg(last(d.close, 5));
+  const ma20 = avg(last(d.close, 20));
+  const ma60 = avg(last(d.close, 60));
+
+  const maSpread = Math.abs(ma5-ma20)/ma20;
+  const maGlued  = maSpread < 0.03;
+
+  const high20   = max(last(d.high, 20));
+  const low20    = min(last(d.low, 20));
+  const boxRange = (high20-low20)/low20;
+  const boxTight = boxRange < 0.10;
+
+  const mv5  = avg(last(d.volume, 5));
+  const mv20 = avg(last(d.volume, 20));
+  const volExpand = mv5 > mv20;
+
+  const mv5Prev  = avg(d.volume.slice(-10,-5));
+  const volSlope = mv5 - mv5Prev;
+  const volGentle= volSlope > 0 && volSlope < mv20*0.5;
+
+  const bodies   = last(d.close,10).map((c,i) => Math.abs(c - last(d.open,10)[i]));
+  const avgBody  = avg(bodies);
+  const priceNow = d.close[d.close.length-1];
+  const bodySmall= avgBody < priceNow*0.02;
+
+  if (!(maGlued && boxTight && volExpand && volGentle && bodySmall)) return null;
+
+  // 評分
+  const maBullish   = ma5 > ma20 && ma20 > ma60;
+  const minVol30    = min(last(d.volume, 30));
+  const volRecovery = mv5 > minVol30*1.3;
+  const score = [
+    maSpread < 0.015,
+    boxRange < 0.06,
+    maBullish,
+    volRecovery,
+  ].filter(Boolean).length;
+
+  const prevClose = d.close[d.close.length-2];
+  const changePct = (priceNow-prevClose)/prevClose*100;
+  const vr        = (mv5/mv20).toFixed(1);
+  const waveHint  = maBullish ? "W3蓄勢" : "W2築底";
+
+  return {
+    type:"accumulation", label:"主力蓄勢",
+    close: priceNow.toFixed(1), changePct: changePct.toFixed(2),
+    volRatio: vr, score,
+    detail: `箱型${(boxRange*100).toFixed(1)}%｜均線糾結${(maSpread*100).toFixed(1)}%｜${waveHint}｜評分${score}/4`,
+  };
+}
+
+// ════════════════════════════════════════
+// 主掃描
+// ════════════════════════════════════════
+let scanIdx = 0;
+
+async function startScan() {
+  if (scanning) return;
+  if (!token) { addLog("請先設定 Token！","warn"); return; }
+  scanning = true;
+
+  // 每天重置
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") !== today) {
+    hits = []; scanCount = 0;
+    localStorage.setItem("scan_date", today);
+    localStorage.setItem("hits_today", "[]");
+    localStorage.setItem("scan_count", "0");
+  }
+
+  const notified = new Set(hits.map(h => h.id));
+  scanCount++;
+  localStorage.setItem("scan_count", scanCount);
+  document.getElementById("statScans").textContent = scanCount;
+  document.getElementById("sysStatus").textContent = "掃描中...";
+  document.getElementById("sysStatus").className = "status-val scanning";
+  document.getElementById("btnScan").disabled = true;
+  document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+  const total = STOCK_LIST.length;
+  document.getElementById("statStocks").textContent = total;
+  addLog(`開始第 ${scanCount} 次掃描，共 ${total} 檔`);
+
+  let newHits = 0;
+  for (let i = 0; i < STOCK_LIST.length; i++) {
+    const id = STOCK_LIST[i];
+    if (notified.has(id)) continue;
+
+    // 進度
+    const pct = Math.round((i+1)/total*100);
+    document.getElementById("progressFill").style.width = pct+"%";
+    document.getElementById("progressText").textContent = `掃描中 ${i+1}/${total}：${id}`;
+    document.getElementById("scanBar").style.width = pct+"%";
+    document.getElementById("connDot").className = "sb-dot warn";
+    document.getElementById("connStatus").textContent = `掃描中 ${id}...`;
+
+    try {
+      const d = await fetchStockData(id);
+      if (!d) continue;
+
+      const result = checkBreakout(id,d) || checkConsolidation(id,d) || checkAccumulation(id,d);
+      if (result) {
+        result.id   = id;
+        result.name = stockNameMap[id] || id; // 從股票清單取名稱
+        result.time = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+        hits.unshift(result);
+        notified.add(id);
+        newHits++;
+        addLog(`✅ 觸發：${id} ${result.label} ${result.changePct > 0 ? "+":""}${result.changePct}%`, "hit");
+        renderHits();
+        localStorage.setItem("hits_today", JSON.stringify(hits));
+      }
+    } catch(e) {
+      addLog(`${id} 抓取失敗：${e.message}`, "err");
+    }
+
+    // 每檔間隔300ms，避免 API rate limit
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  scanning = false;
+  document.getElementById("sysStatus").textContent = "監控中";
+  document.getElementById("sysStatus").className = "status-val active";
+  document.getElementById("btnScan").disabled = false;
+  document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
+  document.getElementById("connDot").className = "sb-dot";
+  document.getElementById("connStatus").textContent = "Finmind API 連線正常";
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+
+  // 計算下次掃描時間
+  const next = new Date(Date.now() + SCAN_INTERVAL);
+  document.getElementById("statNextScan").textContent =
+    next.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+  addLog(newHits ? `掃描完成，發現 ${newHits} 個新訊號` : "掃描完成，無新訊號");
+
+  // 排程下一次
+  if (scanTimer) clearTimeout(scanTimer);
+  scanTimer = setTimeout(startScan, SCAN_INTERVAL);
+}
+
+// ════════════════════════════════════════
+// 渲染訊號
+// ════════════════════════════════════════
+function renderHits() {
+  const c = document.getElementById("hitsContainer");
+  const filtered = filterType === "all" ? hits : hits.filter(h => h.type === filterType);
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+  document.getElementById("statHits").textContent = hits.length;
+
+  if (!filtered.length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <div class="empty-text">${hits.length ? "此策略目前無訊號" : "尚無訊號，點擊開始掃描"}</div>
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = filtered.map(h => {
+    const up    = parseFloat(h.changePct) >= 0;
+    const sign  = up ? "+" : "";
+    const stars = h.score !== undefined
+      ? "★".repeat(h.score) + "☆".repeat(4-h.score)
+      : "";
+    return `
+    <div class="hit-card ${h.type}">
+      <div>
+        <div class="hit-type ${h.type}">${h.label}</div>
+        <div class="hit-time-badge">${h.time||""}</div>
+        ${stars ? `<div class="hit-stars">${stars}</div>` : ""}
+      </div>
+      <div class="hit-info">
+        <div class="hit-name">${esc(h.name||h.id)}</div>
+        <div class="hit-code">${h.id}</div>
+        <div class="hit-detail">${esc(h.detail)}</div>
+      </div>
+      <div class="hit-vol">
+        <div class="hit-vol-val">${h.volRatio}x</div>
+        <div class="hit-vol-label">量能</div>
+      </div>
+      <div class="hit-price">
+        <div class="hit-price-val">$${h.close}</div>
+        <div class="hit-change ${up?"up":"down"}">${sign}${h.changePct}%</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════
+// 工具
+// ════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function addLog(msg, type="") {
+  const ts = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  logs.unshift({msg, type, ts});
+  logs = logs.slice(0,40);
+  const lc = document.getElementById("logContainer");
+  lc.innerHTML = logs.map(l =>
+    `<div class="log-entry ${l.type}">[${l.ts}] ${esc(l.msg)}</div>`
+  ).join("");
+}
+
+function setFilter(type, btn) {
+  filterType = type;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHits();
+}
+
+function clearHits() {
+  if (!confirm("確定清除所有今日訊號？")) return;
+  hits = [];
+  localStorage.setItem("hits_today","[]");
+  renderHits();
+  addLog("已清除所有訊號");
+}
+
+// ════════════════════════════════════════
+// 初始化
+// ════════════════════════════════════════
+// ════════════════════════════════════════
+// 抓取前 N 大市值股票清單
+// ════════════════════════════════════════
+async function fetchTopStocks() {
+  addLog("正在抓取前 500 大市值股票清單...");
+  document.getElementById("sysStatus").textContent = "抓取清單...";
+
+  // 先嘗試用快取（當日）
+  const today = new Date().toDateString();
+  const cached = localStorage.getItem("stock_list_cache");
+  const cachedDate = localStorage.getItem("stock_list_date");
+  if (cached && cachedDate === today) {
+    const parsed = JSON.parse(cached);
+    // 快取有效且有資料才用
+    if (parsed.ids && parsed.ids.length > 10) {
+      STOCK_LIST   = parsed.ids;
+      stockNameMap = parsed.names;
+      addLog(`使用快取清單，共 ${STOCK_LIST.length} 檔`);
+      document.getElementById("statStocks").textContent = STOCK_LIST.length;
+      return true;
+    }
+    // 快取資料異常，清除重抓
+    localStorage.removeItem("stock_list_cache");
+    localStorage.removeItem("stock_list_date");
+    addLog("快取清單異常，重新抓取...", "warn");
+  }
+
+  try {
+    // 抓台股股票清單（TaiwanStockInfo）
+    // 用 CORS proxy 解決跨域問題，本機與 GitHub Pages 都能使用
+    const apiUrl = `${FINMIND_BASE}/data?dataset=TaiwanStockInfo&token=${token}`;
+    const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+    const res    = await fetch(proxy);
+    const outer  = await res.json();
+    const json   = JSON.parse(outer.contents);
+
+    if (!json.data || !json.data.length) {
+      throw new Error("無法取得股票清單");
+    }
+
+    // 過濾：只取4位純數字代號（一般股，排除ETF/權證/特別股）
+    const filtered = json.data.filter(s => {
+      const id = String(s.stock_id || "");
+      return /^\d{4}$/.test(id);
+    });
+
+    // 取前 TOP_N 筆
+    const top = filtered.slice(0, TOP_N);
+
+    STOCK_LIST   = top.map(s => String(s.stock_id));
+    stockNameMap = {};
+    top.forEach(s => {
+      stockNameMap[String(s.stock_id)] = s.stock_name || String(s.stock_id);
+    });
+
+    // 清除舊快取，存入新的
+    localStorage.setItem("stock_list_cache", JSON.stringify({ids: STOCK_LIST, names: stockNameMap}));
+    localStorage.setItem("stock_list_date", today);
+
+    addLog(`✅ 成功載入 ${STOCK_LIST.length} 檔上市櫃股票`);
+    document.getElementById("statStocks").textContent = STOCK_LIST.length;
+    return true;
+
+  } catch(e) {
+    // 若 API 無法取得，fallback 到精選清單
+    addLog(`清單抓取失敗（${e.message}），改用精選清單`, "warn");
+    STOCK_LIST = [
+      "2330","2317","2454","2382","2308","2303","3711","2379","2395","2357",
+      "3034","2345","2344","2337","6770","6669","3231","2376","2377","5274",
+      "2301","2327","2360","3044","3037","2351","2049","3693","6414","2383",
+      "2881","2882","2883","2884","2885","2886","2887","2888","2890","2891",
+      "6277","6223","6176","6147","6116","5269","5264","4968","4967","4966",
+      "6547","6643","8150","8069","8046","8039","8028","8027","6415","3596",
+    ];
+    document.getElementById("statStocks").textContent = STOCK_LIST.length;
+    return true;
+  }
+}
+
+(async function init() {
+  updateClock();
+
+  // 還原 token
+  if (token) {
+    document.getElementById("tokenInput").value = token;
+    updateTokenUI(true);
+    document.getElementById("btnScan").disabled = false;
+    // 有 token 才自動抓清單
+    await fetchTopStocks();
+  }
+
+  // 還原今日資料
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") === today) {
+    hits = JSON.parse(localStorage.getItem("hits_today")||"[]");
+    scanCount = parseInt(localStorage.getItem("scan_count")||"0");
+    document.getElementById("statScans").textContent = scanCount;
+  }
+
+  renderHits();
+  addLog("飆股狙擊系統 v5.3 初始化完成");
+  addLog("資料來源：Finmind Open API（台股前500大市值）");
+})();
+</script>
+</body>
+</html>
