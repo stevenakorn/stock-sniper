@@ -157,6 +157,14 @@ def health():
         "cache_keys": len(_cache)
     })
 
+@app.route("/api/clear_cache")
+def clear_cache():
+    """清除所有快取"""
+    with _cache_lock:
+        count = len(_cache)
+        _cache.clear()
+    return jsonify({"status": "ok", "cleared": count})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
