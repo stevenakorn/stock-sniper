@@ -98,7 +98,9 @@ def institutional():
     if stock_id:
         params["data_id"] = stock_id
 
-    cache_key = f"inst_{stock_id}_{start}_{end}"
+    # 快取 key 加入今日日期，每天自動更新
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    cache_key = f"inst_{stock_id}_{start}_{end}_{today_str}"
     cached = get_cache(cache_key)
     if cached:
         return jsonify(cached)
@@ -106,7 +108,7 @@ def institutional():
     data = call_finmind("TaiwanStockInstitutionalInvestorsBuySell", params, token)
 
     if data.get("data"):
-        set_cache(cache_key, data, ttl=3600)  # 快取1小時
+        set_cache(cache_key, data, ttl=1800)  # 快取30分鐘
 
     return jsonify(data)
 
