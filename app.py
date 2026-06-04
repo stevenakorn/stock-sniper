@@ -71,6 +71,45 @@ def margin():
     }, token)
     return jsonify(data)
 
+
+@app.route("/api/twse_institutional")
+def twse_institutional():
+    """TWSE 三大法人買賣超（免費，不需 Token）"""
+    date = request.args.get("date", "")
+    if not date:
+        from datetime import datetime
+        today = datetime.now()
+        date = f"{today.year-1911}{today.month:02d}{today.day:02d}"
+    try:
+        # TWSE 個股三大法人買賣超日報
+        url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date}&selectType=ALL&response=json"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers, timeout=15)
+        data = res.json()
+        if data.get("stat") == "OK" and data.get("data"):
+            fields = data.get("fields", [])
+            result = []
+            for row in data["data"]:
+                result.append({
+                    "Code": row[0].strip(),
+                    "Name": row[1].strip(),
+                    "Foreignbuy": row[2].replace(",",""),
+                    "Foreignsell": row[3].replace(",",""),
+                    "ForeignNet": row[4].replace(",",""),
+                    "Investmentbuy": row[5].replace(",",""),
+                    "Investmentsell": row[6].replace(",",""),
+                    "InvestmentNet": row[7].replace(",",""),
+                    "Dealerbuy": row[8].replace(",",""),
+                    "Dealersell": row[9].replace(",",""),
+                    "DealerNet": row[10].replace(",",""),
+                    "TotalNet": row[11].replace(",",""),
+                })
+            return jsonify({"data": result, "date": date, "status": 200})
+        else:
+            return jsonify({"data": [], "msg": data.get("stat","無資料"), "status": 404})
+    except Exception as e:
+        return jsonify({"data": [], "error": str(e), "status": 500})
+
 @app.route("/api/clear_cache")
 def clear_cache():
     return jsonify({"status": "ok", "cleared": 0})
