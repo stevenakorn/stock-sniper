@@ -1,8 +1,8 @@
 """
-飆股狙擊系統後端 v9.0 - FinMind 官方精準欄位版
+飆股狙擊系統後端 v9.5 - 智能雙日期格式相容版
 ======================================================
-1. 修復 twse_institutional 路由因 FinMind 官方法人欄位名稱對齊錯誤導致回傳空資料的 Bug
-2. 完美支援週末自動退回週五數據機制，不需依賴不穩定的證交所網頁爬蟲
+1. 修復前端傳入西元格式(2026-05-28)或民國格式(1150528)時，後端切片算錯日期的致命 Bug
+2. 完美支援週末與假日自動退回上一個交易日(週五)數據機制
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -27,7 +27,7 @@ def call_finmind(dataset, params, token):
 
 @app.route("/")
 def index():
-    return jsonify({"status": "ok", "message": "飆股狙擊後端 v9.0 - 官方欄位精準對齊版"})
+    return jsonify({"status": "ok", "message": "飆股狙擊後端 v9.5 - 智能日期相容版"})
 
 @app.route("/api/health")
 def health():
@@ -44,11 +44,17 @@ def stock_price():
         return jsonify({"error": "缺少參數", "data": []}), 400
 
     try:
-        end_dt = datetime.strptime(end, "%Y-%m-%d")
+        # 統一處理西元格式
+        if "-" in end:
+            end_dt = datetime.strptime(end, "%Y-%m-%d")
+        else:
+            y = int(end[:-4]) + 1911
+            end_dt = datetime(y, int(end[-4:-2]), int(end[-2:]))
+
         if end_dt.date() >= datetime.now().date():
-            if end_dt.weekday() == 5:  # 週六
+            if end_dt.weekday() == 5: # 週六
                 end_dt = end_dt - timedelta(days=1)
-            elif end_dt.weekday() == 6:  # 週日
+            elif end_dt.weekday() == 6: # 週日
                 end_dt = end_dt - timedelta(days=2)
             end = end_dt.strftime("%Y-%m-%d")
     except:
@@ -69,7 +75,12 @@ def institutional():
         return jsonify({"error": "缺少 token", "data": []}), 400
         
     try:
-        end_dt = datetime.strptime(end, "%Y-%m-%d")
+        if "-" in end:
+            end_dt = datetime.strptime(end, "%Y-%m-%d")
+        else:
+            y = int(end[:-4]) + 1911
+            end_dt = datetime(y, int(end[-4:-2]), int(end[-2:]))
+
         if end_dt.date() >= datetime.now().date():
             if end_dt.weekday() == 5:
                 end_dt = end_dt - timedelta(days=1)
@@ -95,7 +106,12 @@ def margin():
         return jsonify({"error": "缺少參數", "data": []}), 400
         
     try:
-        end_dt = datetime.strptime(end, "%Y-%m-%d")
+        if "-" in end:
+            end_dt = datetime.strptime(end, "%Y-%m-%d")
+        else:
+            y = int(end[:-4]) + 1911
+            end_dt = datetime(y, int(end[-4:-2]), int(end[-2:]))
+
         if end_dt.date() >= datetime.now().date():
             if end_dt.weekday() == 5:
                 end_dt = end_dt - timedelta(days=1)
@@ -112,7 +128,7 @@ def margin():
 
 @app.route("/api/twse_institutional")
 def twse_institutional():
-    """【全市場資金雷達】精確比對 FinMind 官方三大法人欄位結構並加上週末回推機制"""
+    """【智能防錯雷達】自動識別前端傳入的 民國 或 西元 日期格式"""
     token = request.args.get("token", "")
     req_date = request.args.get("date", "") 
     
@@ -120,15 +136,20 @@ def twse_institutional():
         return jsonify({"data": [], "error": "後端通道未獲取付費 Token 金鑰", "status": 400})
 
     try:
-        if req_date and len(req_date) >= 6:
-            y = int(req_date[:-4]) + 1911
-            m = req_date[-4:-2]
-            d = req_date[-2:]
-            dt_obj = datetime(y, int(m), int(d))
+        if req_date:
+            # 判斷前端傳過來的是不是自帶橫線的西元格式 (e.g., 2026-05-28)
+            if "-" in req_date:
+                dt_obj = datetime.strptime(req_date, "%Y-%m-%d")
+            else:
+                # 民國格式 (e.g., 1150528)
+                y = int(req_date[:-4]) + 1911
+                m = req_date[-4:-2]
+                d = req_date[-2:]
+                dt_obj = datetime(y, int(m), int(d))
         else:
             dt_obj = datetime.now()
             
-        # 智慧型防錯：若是週六或週日，自動將查詢目標指向週五最新交易日
+        # 智慧判定：若是週末，直接退回最新一天的週五交易日
         if dt_obj.weekday() == 5:
             dt_obj = dt_obj - timedelta(days=1)
         elif dt_obj.weekday() == 6:
@@ -161,7 +182,6 @@ def twse_institutional():
                     "Dealerbuy": 0, "Dealersell": 0, "DealerNet": 0, "TotalNet": 0
                 }
             
-            # 關鍵修正點：完全依照 FinMind 付費版官方文件映射格式提取
             legal_by = row.get("institutional_investors", "")
             
             if legal_by == "Foreign_Investor" or "外資" in legal_by:
