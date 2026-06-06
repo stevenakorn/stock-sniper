@@ -1505,56 +1505,35 @@ let selectedIndustry = null;  // 目前選取的產業
 let moneyFlowData = [];       // 產業資金流向資料
 
 async function loadMoneyFlow() {
-  document.getElementById("radarList").innerHTML =
+  document.getElementById("radarList").innerHTML = 
     '<div class="radar-loading"><div class="radar-spin"></div>載入產業資金流向...</div>';
-  document.getElementById("flowChart").innerHTML =
+  document.getElementById("flowChart").innerHTML = 
     '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
   try {
-    // 使用 TWSE 證交所免費 API（不需 Token）
-    // 透過後端轉發解決 CORS 問題
-    const today = new Date();
-    const fmtTWSE = d => {
-      const y   = d.getFullYear() - 1911; // 民國年
-      const m   = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}${m}${day}`;
-    };
+    // 1. 使用標準 YYYY-MM-DD 格式日期，對接你的 FinMind 後端
+    const today = new Date().toISOString().split('T')[0]; 
+    
+    // 2. 呼叫你已經部署好、且已設定 Token 的後端 API
+    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
+    console.log("正在請求後端 API:", url);
 
-    // TWSE 三大法人買賣超日報（上市）
-    // 用後端轉發
-    const twseUrl = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(today)}&_t=${Date.now()}`;
-    console.log("TWSE URL:", twseUrl);
-
-    const res  = await fetch(twseUrl, { signal: AbortSignal.timeout(20000) });
+    const res = await fetch(url);
     const json = await res.json();
-    console.log("TWSE 回傳:", JSON.stringify(json).substring(0, 200));
 
-    if (!json.data || !json.data.length) {
-      // 嘗試前一個交易日
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(yesterday)}&_t=${Date.now()}`;
-      const res2 = await fetch(url2, { signal: AbortSignal.timeout(20000) });
-      const json2 = await res2.json();
-      if (!json2.data || !json2.data.length) {
-        throw new Error("TWSE 無資料");
-      }
-      renderMoneyFlowData(json2.data, fmtTWSE(yesterday));
+    if (json && json.data) {
+        // 3. 直接使用 renderMoneyFlowData 處理資料
+        // 注意：dateStr 傳入標準日期即可
+        renderMoneyFlowData(json.data, today);
+        addLog("✅ 資金雷達更新成功");
     } else {
-      renderMoneyFlowData(json.data, fmtTWSE(today));
+        throw new Error("API 回傳資料格式異常，請檢查 Token 設定");
     }
-
   } catch(e) {
     console.error("資金雷達錯誤:", e);
-    // fallback：用 Finmind（需要 Token）
-    const tk = localStorage.getItem("finmind_token") || token || "";
-    if (tk) {
-      loadMoneyFlowFinmind(tk);
-    } else {
-      document.getElementById("radarList").innerHTML =
-        `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
-    }
+    document.getElementById("radarList").innerHTML = 
+      `<div class="radar-loading" style="color:var(--red)">載入失敗，請確認 Token</div>`;
+    addLog("資金雷達載入失敗", "err");
   }
 }
 
