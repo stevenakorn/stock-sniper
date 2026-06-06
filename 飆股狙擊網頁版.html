@@ -1599,17 +1599,18 @@ function renderMoneyFlowData(data, dateStr) {
 
   const stockNet = {};
   data.forEach(d => {
-    // 根據你的後端 API 回傳格式對應
+    // 根據 FinMind API 回傳的真實欄位進行調整
+    // d.stock_id 是代號，d.name 是法人名稱，d.buy/d.sell 是買賣張數
     const id = d.stock_id; 
     const buy = parseInt(d.buy) || 0;
     const sell = parseInt(d.sell) || 0;
     const net = buy - sell;
 
     if (!stockNet[id]) {
-      stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+        stockNet[id] = { name: d.stock_name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
     }
     
-    // 根據 name 分類 (這是 FinMind 資料集的特性)
+    // 分類累加 (注意名稱要與 API 回傳的 name 欄位一致)
     if (d.name.includes("外資")) stockNet[id].foreign += net;
     else if (d.name.includes("投信")) stockNet[id].trust += net;
     else if (d.name.includes("自營商")) stockNet[id].dealer += net;
@@ -1617,7 +1618,7 @@ function renderMoneyFlowData(data, dateStr) {
     stockNet[id].net += net;
   });
 
-  // 產業分類
+  // 產業分類渲染邏輯
   const industryFlow = {};
   for (const [id, flow] of Object.entries(stockNet)) {
     const ind = getIndustry(id);
@@ -1628,6 +1629,7 @@ function renderMoneyFlowData(data, dateStr) {
     industryFlow[ind].total   += flow.net;
     industryFlow[ind].stocks++;
   }
+  
   moneyFlowData = Object.entries(industryFlow)
     .map(([name,f]) => ({name,...f}))
     .filter(d => d.stocks > 0)
@@ -1635,47 +1637,29 @@ function renderMoneyFlowData(data, dateStr) {
     
   renderRadar();
 
-  // 右側前10名渲染
+  // 右側法人買超前10名
   const sorted = Object.values(stockNet)
     .filter(d => d.net !== 0)
     .sort((a,b) => b.net - a.net);
   const top10 = sorted.slice(0,10);
-  const top5s = sorted.filter(d=>d.net<0).slice(-5).reverse();
-  const maxVal = Math.max(...[...top10,...top5s].map(d=>Math.abs(d.net)))||1;
-  const totalNet = top10.reduce((s,d)=>s+d.net,0);
+  const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
+  const totalNet = top10.reduce((s,d) => s + d.net, 0);
 
   document.getElementById("flowTotal").textContent =
-    (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+    (totalNet>=0 ? "淨買+" : "淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
 
-  document.getElementById("flowChart").innerHTML =
-    `<div style="padding:6px 12px;font-size:10px;font-family:var(--mono);color:var(--text2)">
-      📅 ${dateStr} 三大法人淨買超前10
-    </div>` +
-    top10.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
+  document.getElementById("flowChart").innerHTML = top10.map(d => {
+    const pct = Math.abs(d.net)/maxVal*88;
+    return `<div class="flow-row">
         <span class="flow-label">${esc(d.name)}</span>
         <div class="flow-bar-wrap">
-          <div class="flow-bar up" style="width:${pct}%">
-            <span class="flow-val">+${(d.net/1000).toFixed(1)}K</span>
-          </div>
-        </div>
-      </div>`;
-    }).join("") +
-    (top5s.length ? `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--red)">── 淨賣超 ──</div>` : "") +
-    top5s.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
-        <span class="flow-label">${esc(d.name)}</span>
-        <div class="flow-bar-wrap">
-          <div class="flow-bar down" style="width:${pct}%">
+          <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
             <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
           </div>
         </div>
-      </div>`;
-    }).join("");
-}
-function renderMoneyFlowFromFinmind(data, latestDate) {
+    </div>`;
+  }).join("");
+}function renderMoneyFlowFromFinmind(data, latestDate) {
   const stockFlow = {};
   data.filter(d=>d.date===latestDate).forEach(d => {
     const id  = d.stock_id;
