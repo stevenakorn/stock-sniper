@@ -1507,99 +1507,84 @@ let moneyFlowData = [];       // 產業資金流向資料
 // ════════════════════════════════════════
 // [修復版] 資金流向載入與渲染
 // ════════════════════════════════════════
+// 重新確保資金雷達相關函式完整且無錯
 async function loadMoneyFlow() {
-  document.getElementById("radarList").innerHTML = 
-    '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
-  document.getElementById("flowChart").innerHTML = 
-    '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
-
-  const today = new Date().toISOString().split('T')[0]; 
-  const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
-
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json && json.data) {
-        renderMoneyFlowData(json.data, today);
-        addLog("✅ 資金雷達更新成功");
-    } else {
-        throw new Error("格式錯誤");
+    console.log("嘗試載入資金雷達...");
+    const today = new Date().toISOString().split('T')[0];
+    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
+    
+    document.getElementById("radarList").innerHTML = '<div class="radar-loading"><div class="radar-spin"></div>載入產業資金流向...</div>';
+    
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.data) {
+            renderMoneyFlowData(data.data, today);
+            addLog("✅ 資金雷達更新成功");
+        } else {
+            throw new Error("格式錯誤");
+        }
+    } catch (e) {
+        console.error("載入失敗", e);
+        document.getElementById("radarList").innerHTML = "載入失敗";
+        addLog("資金雷達載入失敗", "err");
     }
-  } catch(e) {
-    addLog("資金雷達載入失敗", "err");
-    document.getElementById("radarList").innerHTML = "載入失敗";
-  }
 }
 
 function renderMoneyFlowData(data, dateStr) {
-  document.getElementById("radarDate").textContent = dateStr;
+    document.getElementById("radarDate").textContent = dateStr;
+    const stockNet = {};
+    
+    data.forEach(d => {
+        const id = d.stock_id; 
+        const buy = parseInt(d.buy) || 0;
+        const sell = parseInt(d.sell) || 0;
+        const net = buy - sell;
+        if (!stockNet[id]) stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+        if (d.name.includes("外資")) stockNet[id].foreign += net;
+        else if (d.name.includes("投信")) stockNet[id].trust += net;
+        else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+        stockNet[id].net += net;
+    });
 
-  const stockNet = {};
-  
-  // 核心修改：正確解析 FinMind 資料格式
-  data.forEach(d => {
-    const id = d.stock_id; 
-    const buy = parseInt(d.buy) || 0;
-    const sell = parseInt(d.sell) || 0;
-    const net = buy - sell;
-
-    if (!stockNet[id]) {
-        // FinMind 的資料通常沒有直接提供中文名稱，若有需要需額外對照
-        stockNet[id] = { name: id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+    const industryFlow = {};
+    for (const [id, flow] of Object.entries(stockNet)) {
+        const ind = getIndustry(id);
+        if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
+        industryFlow[ind].foreign += flow.foreign;
+        industryFlow[ind].trust += flow.trust;
+        industryFlow[ind].dealer += flow.dealer;
+        industryFlow[ind].total += flow.net;
+        industryFlow[ind].stocks++;
     }
     
-    // 這裡判斷名稱來源是否正確
-    // FinMind 的 'name' 欄位對應的是「外資」、「投信」、「自營商」
-    if (d.name === "外資") stockNet[id].foreign += net;
-    else if (d.name === "投信") stockNet[id].trust += net;
-    else if (d.name === "自營商") stockNet[id].dealer += net;
-    
-    stockNet[id].net += net;
-  });
+    moneyFlowData = Object.entries(industryFlow)
+        .map(([name,f]) => ({name,...f}))
+        .filter(d => d.stocks > 0)
+        .sort((a,b) => b.total - a.total);
+        
+    renderRadar();
 
-  // ... 以下產業計算與渲染保持不變 ...
-  const industryFlow = {};
-  for (const [id, flow] of Object.entries(stockNet)) {
-    const ind = getIndustry(id); // 確保你有這個 helper
-    if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
-    industryFlow[ind].foreign += flow.foreign;
-    industryFlow[ind].trust   += flow.trust;
-    industryFlow[ind].dealer  += flow.dealer;
-    industryFlow[ind].total   += flow.net;
-    industryFlow[ind].stocks++;
-  }
-  
-  moneyFlowData = Object.entries(industryFlow)
-    .map(([name,f]) => ({name,...f}))
-    .filter(d => d.stocks > 0)
-    .sort((a,b) => b.total - a.total);
-    
-  renderRadar();
+    const sorted = Object.values(stockNet)
+        .filter(d => d.net !== 0)
+        .sort((a,b) => b.net - a.net);
+    const top10 = sorted.slice(0,10);
+    const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
+    const totalNet = top10.reduce((s,d) => s + d.net, 0);
 
-  const sorted = Object.values(stockNet)
-    .filter(d => d.net !== 0)
-    .sort((a,b) => b.net - a.net);
-  const top10 = sorted.slice(0,10);
-  
-  const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
-  const totalNet = top10.reduce((s,d)=>s+d.net,0);
-
-  document.getElementById("flowTotal").textContent =
-    (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
-
-  document.getElementById("flowChart").innerHTML = top10.map(d => {
-    const pct = Math.abs(d.net)/maxVal*88;
-    return `<div class="flow-row">
-        <span class="flow-label">${d.name}</span>
-        <div class="flow-bar-wrap">
-          <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
-            <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
-          </div>
-        </div>
-    </div>`;
-  }).join("");
-} // <--- 這個括號非常重要，它確保 renderMoneyFlowData 結束了
-
+    document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+    document.getElementById("flowChart").innerHTML = top10.map(d => {
+        const pct = Math.abs(d.net)/maxVal*88;
+        return `<div class="flow-row">
+            <span class="flow-label">${esc(d.name)}</span>
+            <div class="flow-bar-wrap">
+              <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
+                <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+              </div>
+            </div>
+        </div>`;
+    }).join("");
+}
 // 這是已經修正完畢的完整函式，請直接覆蓋
 function renderMoneyFlowData(data, dateStr) {
   document.getElementById("radarDate").textContent = dateStr;
