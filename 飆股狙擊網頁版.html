@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飆股狙擊系統 v12.5</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+:root { --bg:#050a12; --bg2:#0a1525; --bg3:#0d1e35; --border:#1a3a5c; --cyan:#00e5ff; --cyan2:#00b8d4; --green:#00e676; --red:#ff1744; --amber:#ffab00; --purple:#7c4dff; --text:#c8d8e8; --text2:#7a9ab5; --mono:'Share Tech Mono',monospace; --sans:'Noto Sans TC',sans-serif; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 20px var(--cyan);z-index:100}
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:16px}
+.main-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.panel-header{padding:10px 18px;background:var(--bg3);font-size:11px;font-family:var(--mono);color:var(--cyan);letter-spacing:2px;border-bottom:1px solid var(--border)}
+.btn-row{padding:10px;display:flex;flex-direction:column;gap:8px}
+.select-box{width:100%;padding:8px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:3px;font-family:var(--mono);font-size:11px}
+.btn{width:100%;padding:8px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:transparent;cursor:pointer;font-family:var(--mono);font-size:11px;transition:0.2s}
+.btn:hover{background:rgba(0,229,255,0.1)}
+.btn-clear{margin-top:8px;border-color:var(--red);color:var(--red)}
+.hits-container{padding:10px;height:400px;overflow-y:auto}
+.log-container{padding:10px;font-size:10px;color:var(--text2);height:150px;overflow-y:auto;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>飆股狙擊系統 v12.5</h1></header>
+  <div class="main-grid">
+    <div class="panel">
+        <div class="panel-header">◈ SIGNAL MONITOR</div>
+        <div id="hitsContainer" class="hits-container"></div>
+    </div>
+    <div class="right-col">
+      <div class="panel">
+        <div class="panel-header">◈ 盤後分析控制台</div>
+        <div class="btn-row">
+          <label style="font-size:10px;color:var(--text2)">選擇產業：</label>
+          <select id="industrySelect" class="select-box">
+            <option value="all">全市場掃描</option>
+            <option value="半導體">半導體產業</option>
+            <option value="電腦硬體">電腦硬體設備</option>
+            <option value="金融保險">金融保險類</option>
+            <option value="電子零組件">電子零組件</option>
+            <option value="鋼鐵">鋼鐵類</option>
+            <option value="航運">航運類</option>
+            <option value="生技醫療">生技醫療</option>
+          </select>
+          <label style="font-size:10px;color:var(--text2)">上市櫃篩選：</label>
+          <select id="marketType" class="select-box">
+            <option value="all">上市+上櫃</option>
+            <option value="TSE">僅上市</option>
+            <option value="OTC">僅上櫃</option>
+          </select>
+          <button class="btn" id="btnScan" onclick="runCustomScan()">▶ 開始掃描</button>
+          <button class="btn btn-clear" onclick="clearHits()">✕ 清除訊號</button>
+        </div>
+        <div class="log-container" id="logContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 1. 設定 Token
+const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+let STOCK_LIST = []; let stockNameMap = {};
+const INDUSTRY_MAP = {
+  "半導體": ["2330","2454"], "電腦硬體": ["2317","2382"], "金融保險": ["2881","2882"],
+  "電子零組件": ["2327","2392"], "鋼鐵": ["2002","2006"], "航運": ["2603","2609"], "生技醫療": ["4147","4746"]
+};
+
+// 2. 初始化：Token 隱藏並載入股票清單
+(async function init() {
+  document.getElementById("tokenBar") && (document.getElementById("tokenBar").style.display = "none");
+  await fetchTopStocks();
+})();
+
+async function fetchTopStocks() {
+  try {
+    const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo&token=${token}`);
+    const json = await res.json();
+    json.data.forEach(item => {
+        if (/^\d{4}$/.test(item.stock_id)) stockNameMap[item.stock_id] = item.stock_name;
+    });
+    STOCK_LIST = Object.keys(stockNameMap);
+    addLog("✅ 系統資料庫載入完成");
+  } catch(e) { addLog("資料庫載入失敗"); }
+}
+
+// 3. 執行掃描邏輯 (整合產業與市場篩選)
+async function runCustomScan() {
+    const industry = document.getElementById("industrySelect").value;
+    const market = document.getElementById("marketType").value;
+    
+    let filtered = (industry === "all") ? Object.keys(stockNameMap) : (INDUSTRY_MAP[industry] || []);
+    
+    STOCK_LIST = filtered.filter(id => {
+        if (market === 'TSE') return id.startsWith('1') || id.startsWith('2');
+        if (market === 'OTC') return id.startsWith('3') || id.startsWith('5') || id.startsWith('6');
+        return true;
+    });
+    
+    addLog(`開始掃描：${industry} / ${market}，共 ${STOCK_LIST.length} 檔`);
+    startScan(); 
+}
+
+// 4. 強效亂碼過濾 (根除 Foreign_Investor 雜訊)
+function renderMoneyFlowData(data) {
+    data.forEach(d => {
+        const id = d.Code || d.stock_id || "";
+        if (!id || !/^\d{4}$/.test(id)) return; // 只有4位數代碼才處理
+        // ... (你原本 render 的後續邏輯)
+    });
+}
+
+function addLog(msg) { document.getElementById("logContainer").innerHTML += `<div>${msg}</div>`; }
+
+// [請將你原本 v12.5 的其他 startScan, analyzeChip, renderHits 等所有核心程式碼貼在此下方即可]
+</script>
+</body>
+</html>
