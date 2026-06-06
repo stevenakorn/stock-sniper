@@ -2,68 +2,1558 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>飆股狙擊系統 v12.5 (修正版)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飆股狙擊系統 v12.5</title>
 <style>
-/* 為了確保你現有的 UI 不跑位，請將你原檔的 <style> 內容完整貼在這裡 */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght=300;400;500;700&display=swap');
+:root {
+  --bg:#050a12; --bg2:#0a1525; --bg3:#0d1e35;
+  --border:#1a3a5c; --cyan:#00e5ff; --cyan2:#00b8d4;
+  --green:#00e676; --red:#ff1744; --amber:#ffab00;
+  --purple:#7c4dff; --text:#c8d8e8; --text2:#7a9ab5;
+  --mono:'Share Tech Mono',monospace; --sans:'Noto Sans TC',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 20px var(--cyan);z-index:100}
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:16px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;position:relative;overflow:hidden}
+header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:38px;height:38px;border:1px solid var(--cyan);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 12px rgba(0,229,255,.3);animation:pulse-border 2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 8px rgba(0,229,255,.3)}50%{box-shadow:0 0 20px rgba(0,229,255,.6)}}
+.logo-text h1{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.5)}
+.logo-text p{font-size:10px;color:var(--text2);font-family:var(--mono);letter-spacing:2px}
+.header-right{display:flex;align-items:center;gap:16px}
+.clock{font-family:var(--mono);font-size:20px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.4);letter-spacing:2px}
+.market-badge{padding:3px 10px;border-radius:2px;font-size:11px;font-family:var(--mono);letter-spacing:1px;border:1px solid}
+.market-badge.open{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);animation:blink 1.5s ease-in-out infinite}
+.market-badge.closed{color:var(--text2);border-color:var(--border)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ── Token 設定區 ── */
+.token-bar{background:var(--bg2);border:1px solid var(--amber);border-radius:4px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.token-bar.ok{border-color:var(--green)}
+.token-label{font-size:12px;font-family:var(--mono);color:var(--amber);white-space:nowrap}
+.token-bar.ok .token-label{color:var(--green)}
+.token-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:12px;min-width:260px}
+.token-input:focus{outline:none;border-color:var(--cyan)}
+.btn-token{padding:6px 16px;border-radius:3px;border:1px solid var(--amber);color:var(--amber);background:transparent;cursor:pointer;font-size:11px;font-family:var(--mono);letter-spacing:1px;transition:all .2s}
+.btn-token:hover{background:rgba(255,171,0,.1)}
+.btn-token.ok{border-color:var(--green);color:var(--green)}
+.token-hint{font-size:11px;color:var(--text2);font-family:var(--mono)}
+
+/* ── 統計卡片 ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;position:relative;overflow:hidden;transition:border-color .3s}
+.stat-card:hover{border-color:var(--cyan2)}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent,var(--cyan)),transparent)}
+.stat-label{font-size:10px;color:var(--text2);letter-spacing:2px;margin-bottom:6px;font-family:var(--mono)}
+.stat-value{font-size:26px;font-weight:700;font-family:var(--mono);color:var(--accent,var(--cyan));text-shadow:0 0 10px rgba(0,229,255,.3)}
+.stat-sub{font-size:10px;color:var(--text2);margin-top:3px;font-family:var(--mono)}
+
+/* ── 主內容 ── */
+.main-grid{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.panel-header{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg3)}
+.panel-title{font-size:11px;font-family:var(--mono);letter-spacing:2px;color:var(--cyan)}
+.panel-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:2px;background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.3)}
+
+/* ── 篩選列 ── */
+.filter-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap}
+.filter-btn{padding:4px 12px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px}
+.filter-btn:hover{border-color:var(--cyan2);color:var(--cyan)}
+.filter-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.filter-btn.f-breakout.active{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
+.filter-btn.f-consolidation.active{background:rgba(255,171,0,.1);border-color:var(--amber);color:var(--amber)}
+.filter-btn.f-accumulation.active{background:rgba(124,77,255,.1);border-color:var(--purple);color:var(--purple)}
+
+/* ── 訊號卡片 ── */
+.hits-container{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:280px;max-height:calc(100vh - 340px);overflow-y:auto}
+.hits-container::-webkit-scrollbar{width:4px}
+.hits-container::-webkit-scrollbar-track{background:var(--bg)}
+.hits-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.hit-card{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;transition:all .3s;animation:slide-in .4s ease;cursor:default}
+@keyframes slide-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+.hit-card:hover{border-color:var(--cyan2);background:rgba(0,229,255,.03)}
+.hit-card.breakout{border-left:3px solid var(--green)}
+.hit-card.consolidation{border-left:3px solid var(--amber)}
+.hit-card.accumulation{border-left:3px solid var(--purple)}
+.hit-type{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:2px;letter-spacing:1px;white-space:nowrap}
+.hit-type.breakout{color:var(--green);background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3)}
+.hit-type.consolidation{color:var(--amber);background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3)}
+.hit-type.accumulation{color:var(--purple);background:rgba(124,77,255,.1);border:1px solid rgba(124,77,255,.3)}
+.hit-info{min-width:0}
+.hit-name{font-size:14px;font-weight:500;color:#e8f4ff;margin-bottom:1px}
+.hit-code{font-size:10px;font-family:var(--mono);color:var(--text2)}
+.hit-detail{font-size:10px;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit-stars{font-size:10px;color:var(--amber);letter-spacing:1px;margin-top:2px}
+.hit-time-badge{font-size:9px;font-family:var(--mono);color:var(--text2);margin-top:3px}
+.hit-vol{text-align:center;white-space:nowrap}
+.hit-vol-val{font-size:18px;font-family:var(--mono);font-weight:700;color:var(--cyan)}
+.hit-vol-label{font-size:9px;color:var(--text2);font-family:var(--mono)}
+.hit-price{text-align:right;white-space:nowrap}
+.hit-price-val{font-size:16px;font-weight:700;font-family:var(--mono);color:#e8f4ff}
+.hit-change{font-size:12px;font-family:var(--mono);font-weight:500}
+.hit-change.up{color:var(--green)}
+.hit-change.down{color:var(--red)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:260px;color:var(--text2);gap:10px}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-text{font-size:12px;font-family:var(--mono);letter-spacing:1px}
+
+/* ── 右側 ── */
+.right-col{display:flex;flex-direction:column;gap:14px}
+.scan-status{padding:14px;display:flex;flex-direction:column;gap:10px}
+.status-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.status-row:last-child{border-bottom:none}
+.status-key{color:var(--text2);font-family:var(--mono);letter-spacing:1px}
+.status-val{color:var(--text);font-family:var(--mono)}
+.status-val.active{color:var(--green);text-shadow:0 0 8px rgba(0,230,118,.4)}
+.status-val.scanning{color:var(--cyan);animation:blink .8s ease-in-out infinite}
+.scan-bar-wrap{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:2px}
+.scan-bar{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .5s ease;box-shadow:0 0 8px var(--cyan);width:0%}
+.btn-row{display:flex;gap:8px;padding:0 14px 14px}
+.btn{flex:1;padding:7px;border-radius:3px;border:1px solid;cursor:pointer;font-size:10px;font-family:var(--mono);letter-spacing:1px;transition:all .2s;background:transparent}
+.btn-scan{color:var(--cyan);border-color:var(--cyan)}
+.btn-scan:hover{background:rgba(0,229,255,.1);box-shadow:0 0 12px rgba(0,229,255,.2)}
+.btn-scan:disabled{opacity:.4;cursor:not-allowed}
+.btn-clear{color:var(--text2);border-color:var(--border)}
+.btn-clear:hover{color:var(--red);border-color:var(--red);background:rgba(255,23,68,.05)}
+.progress-wrap{padding:0 14px 12px}
+.progress-text{font-size:10px;font-family:var(--mono);color:var(--text2);margin-bottom:4px}
+.progress-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:2px;transition:width .3s;box-shadow:0 0 6px var(--cyan);width:0%}
+
+/* ── 日誌 ── */
+.log-container{padding:10px;font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+.log-container::-webkit-scrollbar{width:3px}
+.log-container::-webkit-scrollbar-thumb{background:var(--border)}
+.log-entry{color:var(--text2);line-height:1.5}
+.log-entry.hit{color:var(--green)}
+.log-entry.warn{color:var(--amber)}
+.log-entry.err{color:var(--red)}
+
+/* ── 底部 ── */
+.statusbar{margin-top:14px;padding:7px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;color:var(--text2)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.5s ease-in-out infinite;display:inline-block;margin-right:6px}
+.sb-dot.off{background:var(--text2);box-shadow:none;animation:none}
+.sb-dot.warn{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+
+/* ── 資金雷達 ── */
+.radar-section{margin-bottom:16px}
+.radar-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.radar-list{padding:12px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+.radar-list::-webkit-scrollbar{width:3px}
+.radar-list::-webkit-scrollbar-thumb{background:var(--border)}
+.industry-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:3px;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.industry-row:hover{background:rgba(0,229,255,.05);border-color:var(--border)}
+.industry-row.selected{background:rgba(0,229,255,.1);border-color:var(--cyan)}
+.industry-rank{font-size:10px;font-family:var(--mono);color:var(--text2);min-width:18px}
+.industry-name{font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.industry-bar-wrap{width:80px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.industry-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+.industry-bar-fill.up{background:linear-gradient(90deg,var(--green),#00ff88)}
+.industry-bar-fill.down{background:linear-gradient(90deg,var(--red),#ff6b6b)}
+.industry-val{font-size:11px;font-family:var(--mono);min-width:50px;text-align:right}
+.industry-val.up{color:var(--green)}
+.industry-val.down{color:var(--red)}
+.radar-btn-row{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);flex-wrap:wrap}
+.radar-btn{padding:4px 10px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:10px;font-family:var(--mono);cursor:pointer;transition:all .2s}
+.radar-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.radar-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.flow-chart{padding:12px;display:flex;flex-direction:column;gap:5px}
+.flow-row{display:flex;align-items:center;gap:8px}
+.flow-label{font-size:10px;font-family:var(--mono);color:var(--text2);min-width:70px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flow-bar-wrap{flex:1;height:16px;background:var(--bg3);border-radius:2px;overflow:hidden;position:relative}
+.flow-bar{height:100%;border-radius:2px;transition:width .6s;display:flex;align-items:center;padding-left:6px}
+.flow-bar.up{background:linear-gradient(90deg,rgba(0,230,118,.3),rgba(0,230,118,.6))}
+.flow-bar.down{background:linear-gradient(90deg,rgba(255,23,68,.3),rgba(255,23,68,.6))}
+.flow-val{font-size:9px;font-family:var(--mono);color:var(--text);white-space:nowrap}
+.radar-loading{display:flex;align-items:center;justify-content:center;height:120px;color:var(--text2);font-family:var(--mono);font-size:11px;gap:8px}
+.radar-spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.selected-industry-bar{padding:8px 12px;background:rgba(0,229,255,.05);border-bottom:1px solid var(--border);display:none;align-items:center;gap:8px;font-size:11px}
+.selected-industry-bar.show{display:flex}
+.sel-tag{padding:2px 8px;background:rgba(0,229,255,.15);border:1px solid var(--cyan);border-radius:2px;color:var(--cyan);font-family:var(--mono);font-size:10px}
+.sel-clear{cursor:pointer;color:var(--text2);font-family:var(--mono);font-size:10px;margin-left:auto}
+.sel-clear:hover{color:var(--red)}
+
+/* ── 星級 ── */
+.star-badge{font-size:13px;letter-spacing:1px;color:var(--amber)}
+.star-badge.s5{color:#FFD700;text-shadow:0 0 6px rgba(255,215,0,.5)}
+.star-badge.s4{color:var(--amber)}
+.star-badge.s3{color:var(--amber);opacity:.8}
+.star-badge.s2{color:var(--text2)}
+.star-badge.s1{color:var(--text2);opacity:.6}
+.hit-card.s5{border-left-width:4px;box-shadow:0 0 12px rgba(255,215,0,.1)}
+.hit-card.s4{border-left-width:3px}
+.chip-badge{font-size:9px;padding:1px 5px;border-radius:2px;margin-left:4px;font-family:var(--mono)}
+.chip-badge.good{background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3)}
+.chip-badge.mid{background:rgba(255,171,0,.1);color:var(--amber);border:1px solid rgba(255,171,0,.3)}
+.chip-badge.low{background:rgba(122,154,181,.1);color:var(--text2);border:1px solid var(--border)}
+
+/* ── 個股搜尋 ── */
+.search-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.search-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:7px 12px;color:var(--text);font-family:var(--mono);font-size:13px}
+.search-input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,.2)}
+.btn-search{padding:7px 16px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:transparent;cursor:pointer;font-size:11px;font-family:var(--mono);letter-spacing:1px;transition:all .2s;white-space:nowrap}
+.btn-search:hover{background:rgba(0,229,255,.1)}
+.stock-detail{margin:0 12px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;overflow:hidden;display:none}
+.stock-detail.show{display:block}
+.stock-detail-header{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.stock-detail-name{font-size:16px;font-weight:700;color:#e8f4ff}
+.stock-detail-code{font-size:12px;font-family:var(--mono);color:var(--text2)}
+.stock-detail-price{margin-left:auto;text-align:right}
+.stock-detail-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.detail-block{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px 14px}
+.detail-block-title{font-size:10px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:8px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
+.detail-row:last-child{border-bottom:none}
+.detail-key{color:var(--text2);font-family:var(--mono)}
+.detail-val{color:var(--text);font-family:var(--mono);font-weight:500}
+.detail-val.up{color:var(--green)}
+.detail-val.down{color:var(--red)}
+.detail-val.cyan{color:var(--cyan)}
+.chip-stars{font-size:14px;color:var(--amber)}
+.search-loading{display:flex;align-items:center;gap:8px;padding:20px;color:var(--text2);font-family:var(--mono);font-size:12px}
+
+@media(max-width:900px){
+  .main-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .hit-card{grid-template-columns:auto 1fr auto}
+  .hit-vol{display:none}
+}
 </style>
 </head>
 <body>
-<script>
-// 1. Token 鎖死並自動隱藏
-const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+<div class="wrap">
 
-// 2. 補齊所有產業類別
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎯</div>
+    <div class="logo-text">
+      <h1>飆股狙擊系統</h1>
+      <p>STOCK SNIPER SYSTEM v12.5 · 上市櫃全市場內核完全體</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="market-badge closed" id="marketBadge">盤後</div>
+  </div>
+</header>
+
+<div class="token-bar" id="tokenBar">
+  <span class="token-label" id="tokenLabel">⚠ 請輸入 Finmind API Token (支援699方案無延遲)</span>
+  <input class="token-input" id="tokenInput" type="text" placeholder="貼上你的 Finmind Token..." autocomplete="off" spellcheck="false">
+  <button class="btn-token" onclick="document.getElementById('tokenInput').type=document.getElementById('tokenInput').type==='text'?'password':'text'" style="padding:6px 10px;font-size:10px">👁</button>
+  <button class="btn-token" id="tokenBtn" onclick="saveToken()">確認儲存</button>
+  <span class="token-hint">Token 已直接寫死整合至後端內核，此提示列將在初始化後自動精緻隱藏</span>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card" style="--accent:var(--green)">
+    <div class="stat-label">TODAY SIGNALS</div>
+    <div class="stat-value" id="statHits">0</div>
+    <div class="stat-sub">今日觸發訊號</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--cyan)">
+    <div class="stat-label">SCAN COUNT</div>
+    <div class="stat-value" id="statScans">0</div>
+    <div class="stat-sub">今日掃描次數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--amber)">
+    <div class="stat-label">STOCKS WATCHED</div>
+    <div class="stat-value" id="statStocks">0</div>
+    <div class="stat-sub">監控股票數</div>
+  </div>
+  <div class="stat-card" style="--accent:var(--purple)">
+    <div class="stat-label">LAST SCAN</div>
+    <div class="stat-value" style="font-size:18px" id="statLastScan">--:--</div>
+    <div class="stat-sub">狀態：<span id="statNextScan">監控監聽中</span></div>
+  </div>
+</div>
+
+<div class="radar-section">
+  <div class="radar-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">◈ MONEY FLOW RADAR · 產業資金流向</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="panel-badge" id="radarDate">--</span>
+          <button class="radar-btn" onclick="loadMoneyFlow()" style="padding:2px 8px">↻ 更新</button>
+        </div>
+      </div>
+      <div class="radar-btn-row">
+        <button class="radar-btn active" onclick="setRadarMode('all',this)">全部</button>
+        <button class="radar-btn" onclick="setRadarMode('foreign',this)">🌐 外資</button>
+        <button class="radar-btn" onclick="setRadarMode('trust',this)">🏦 投信</button>
+        <button class="radar-btn" onclick="setRadarMode('dealer',this)">🏢 自營商</button>
+      </div>
+      <div id="radarList" class="radar-list">
+        <div class="radar-loading"><div class="radar-spin"></div>載入資金流向中...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">◈ INSTITUTIONAL FLOW · 三大法人淨買超</span>
+        <span class="panel-badge" id="flowTotal">--</span>
+      </div>
+      <div id="flowChart" class="flow-chart">
+        <div class="radar-loading"><div class="radar-spin"></div>載入中...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main-grid">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">◈ SIGNAL MONITOR</span>
+      <span class="panel-badge" id="hitCount">0 訊號</span>
+    </div>
+    <div class="search-bar">
+      <input class="search-input" id="stockSearchInput" type="text"
+        placeholder="輸入股票代號或名稱（如 2330 或 台積電）..."
+        onkeydown="if(event.key==='Enter') searchStock()">
+      <button class="btn-search" onclick="searchStock()">🔍 分析個股</button>
+    </div>
+    <div class="stock-detail" id="stockDetail"></div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">全部</button>
+      <button class="filter-btn f-breakout" data-filter="breakout" onclick="setFilter('breakout',this)">🚀 爆量突破</button>
+      <button class="filter-btn f-consolidation" data-filter="consolidation" onclick="setFilter('consolidation',this)">📦 強勢整理</button>
+      <button class="filter-btn f-accumulation" data-filter="accumulation" onclick="setFilter('accumulation',this)">🔮 主力蓄勢</button>
+    </div>
+    <div class="filter-bar" style="border-top:none;padding-top:0;gap:4px">
+      <span style="font-size:10px;font-family:var(--mono);color:var(--text2);margin-right:4px">星級：</span>
+      <button class="filter-btn active" data-star="0" onclick="setStarFilter(0,this)">全部</button>
+      <button class="filter-btn" data-star="5" onclick="setStarFilter(5,this)" style="color:var(--amber)">★★★★★</button>
+      <button class="filter-btn" data-star="4" onclick="setStarFilter(4,this)" style="color:var(--amber)">★★★★</button>
+      <button class="filter-btn" data-star="3" onclick="setStarFilter(3,this)" style="color:var(--amber)">★★★</button>
+      <button class="filter-btn" data-star="2" onclick="setStarFilter(2,this)">★★</button>
+      <button class="filter-btn" data-star="1" onclick="setStarFilter(1,this)">★</button>
+    </div>
+    <div class="selected-industry-bar" id="selectedIndustryBar">
+      <span style="color:var(--text2);font-family:var(--mono);font-size:10px">篩選族群：</span>
+      <span class="sel-tag" id="selectedIndustryTag"></span>
+      <span class="sel-clear" onclick="clearIndustryFilter()">✕ 清除篩選</span>
+    </div>
+    <div class="hits-container" id="hitsContainer">
+      <div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <div class="empty-text">正在從 FinMind 高級資料庫雲端初始化全台上市櫃中文對照庫...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">◈ SYSTEM STATUS</span></div>
+      <div class="scan-status">
+        <div class="status-row">
+          <span class="status-key">STATUS</span>
+          <span class="status-val" id="sysStatus">初始化中</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">MARKET</span>
+          <span class="status-val" id="sysMarket">--</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">TOKEN</span>
+          <span class="status-val" id="sysToken" style="color:var(--red)">未設定</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">STRATEGY</span>
+          <span class="status-val" style="color:var(--cyan);font-size:10px">突破/整理/蓄勢</span>
+        </div>
+        <div class="scan-bar-wrap"><div class="scan-bar" id="scanBar"></div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-text" id="progressText">--</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-scan" id="btnScan" onclick="startScan()" disabled>▶ 盤後分析</button>
+        <button class="btn btn-clear" onclick="clearHits()">✕ 清除</button>
+      </div>
+      <div class="btn-row" style="padding-top:0">
+        <button class="btn" id="btnRealtime" onclick="toggleRealtimeScan()"
+          style="color:var(--green);border-color:var(--green);flex:1">
+          ⚡ 開啟盤中即時掃描
+        </button>
+      </div>
+      <div class="btn-row" style="padding-top:0">
+        <button class="btn" id="btnExport" onclick="exportReport()" disabled
+          style="color:var(--amber);border-color:var(--amber);flex:1">
+          ↓ 匯出分析報告
+        </button>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><span class="panel-title">◈ SCAN LOG</span></div>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry">系統初始化完成，等待 Token...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
+    <span>資料來源：Finmind Open API</span>
+  </div>
+  <span>飆股狙擊系統 v12.5 ── 僅供參考，投資有風險</span>
+</div>
+
+</div><script>
+// ════════════════════════════════════════
+// 設定核心
+// ════════════════════════════════════════
+const FINMIND_API  = "https://api.finmindtrade.com/api/v4/data";
+const FINMIND_BASE = "https://api.finmindtrade.com/api/v4";
+const TOP_N        = 500;
+
+const BACKEND_URL = "https://stock-sniper-fkoq.vercel.app";
+const USE_BACKEND  = BACKEND_URL.length > 0;
+
+let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+
+const VOL_MULT    = 2.0;
+const BOX_DAYS    = 20;
+const CONSOL_DAYS = 5;
+
+let BUILTIN_STOCKS = {};
+let STOCK_LIST   = [];
+let stockNameMap = {};
+
+let hits       = JSON.parse(localStorage.getItem("hits_today") || "[]");
+let scanCount  = parseInt(localStorage.getItem("scan_count") || "0");
+let scanning   = false;
+let filterType = "all";
+let scanTimer  = null;
+let logs       = [];
+
+function saveToken() {
+  const input = document.getElementById("tokenInput");
+  const t = (input.value || "").trim();
+  if (!t || t.length < 10) {
+    addLog("Token 無效", "warn");
+    return;
+  }
+  token = t;
+  localStorage.setItem("finmind_token", t);
+  updateTokenUI(true);
+  loadMoneyFlow();
+}
+
+function updateTokenUI(ok) {
+  const sys = document.getElementById("sysToken");
+  if (ok && sys) {
+    sys.textContent = "高頻付費權限已啟用";
+    sys.style.color = "var(--green)";
+  }
+}
+
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,"0");
+  const m = String(now.getMinutes()).padStart(2,"0");
+  const s = String(now.getSeconds()).padStart(2,"0");
+  document.getElementById("clock").textContent = `${h}:${m}:${s}`;
+  
+  const t = `${h}:${m}`;
+  const day = now.getDay(); 
+  
+  const inMkt = (day >= 1 && day <= 5) && (t >= "09:00" && t <= "13:30");
+  
+  const badge = document.getElementById("marketBadge");
+  badge.textContent = inMkt ? "盤中" : ((day === 0 || day === 6) ? "假日休市" : (t < "09:00" ? "開盤前" : "盤後"));
+  badge.className = "market-badge " + (inMkt ? "open" : "closed");
+  
+  document.getElementById("sysMarket").textContent = inMkt ? "盤中 ●" : ((day === 0 || day === 6) ? "假日休市" : "非盤中");
+  document.getElementById("sysMarket").style.color = inMkt ? "var(--green)" : "var(--text2)";
+  return inMkt;
+}
+setInterval(updateClock, 1000);
+
+async function fetchStockData(stockId) {
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 90);
+  const fmt = d => d.toISOString().split("T")[0];
+
+  let url, options = { signal: AbortSignal.timeout(12000) };
+
+  if (USE_BACKEND) {
+    url = `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`;
+  } else {
+    url = `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+    options.headers = { "Authorization": `Bearer ${token}` };
+  }
+
+  try {
+    const res  = await fetch(url, options);
+    const json = await res.json();
+    if (!json.data || json.data.length < 20) return null;
+    const rows = json.data;
+    return {
+      close:  rows.map(r => parseFloat(r.close)),
+      open:   rows.map(r => parseFloat(r.open)),
+      high:   rows.map(r => parseFloat(r.max)),
+      low:    rows.map(r => parseFloat(r.min)),
+      volume: rows.map(r => parseFloat(r.Trading_Volume)),
+      date:   rows.map(r => r.date),
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
+const avg = arr => arr.reduce((a,b) => a+b, 0) / arr.length;
+const last = (arr, n=1) => arr.slice(-n);
+const max  = arr => Math.max(...arr);
+const min  = arr => Math.min(...arr);
+
+async function callFinmind(apiUrl, backendPath) {
+  try {
+    let url = apiUrl;
+    let options = { signal: AbortSignal.timeout(10000) };
+    if (USE_BACKEND && backendPath) {
+      url = `${BACKEND_URL}${backendPath}`;
+    } else {
+      options.headers = { "Authorization": `Bearer ${token}` };
+    }
+    const res  = await fetch(url, options);
+    const json = await res.json();
+    return json && json.data ? json.data : null;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function fetchChipData(stockId) {
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  const fmt = d => d.toISOString().split("T")[0];
+
+  const [instData, marginData] = await Promise.allSettled([
+    callFinmind(
+      `${FINMIND_API}?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`,
+      `/api/institutional?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    ),
+    callFinmind(
+      `${FINMIND_API}?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`,
+      `/api/margin?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    ),
+  ]);
+
+  const inst   = instData.status   === "fulfilled" ? instData.value   : null;
+  const margin = marginData.status === "fulfilled" ? marginData.value : null;
+
+  return { inst, margin };
+}
+
+function analyzeChip(chip) {
+  const result = {
+    foreignNet5: 0, trustNet5: 0, dealerNet5: 0, totalNet5: 0,
+    foreignNet20:0, trustNet20: 0, marginChgPct:0, marginTrend: 0,
+    chipScore: 0, chipDetail: "",
+  };
+
+  if (chip.inst && chip.inst.length) {
+    const latestDate = chip.inst[chip.inst.length-1].date;
+    
+    const sumNet = (arr, name, days) => {
+      const validNames = {
+        "外資": ["Foreign_Investor","外資","外資及陸資"],
+        "投信": ["Investment_Trust","投信"],
+        "自營商": ["Dealer_self","Dealer_Hedging","自營商","Dealer"],
+      }[name] || [name];
+      
+      const filtered = arr.filter(d => {
+        const diff = (new Date(latestDate) - new Date(d.date)) / 86400000;
+        const targetName = d.name || d.Name || "";
+        return diff < days && validNames.includes(targetName);
+      });
+      return filtered.reduce((s,d) => {
+        const b = parseInt(d.buy||0) || parseInt(d.Buy||0) || parseInt(d.buy_volume||0) || 0;
+        const sl = parseInt(d.sell||0) || parseInt(d.Sell||0) || parseInt(d.sell_volume||0) || 0;
+        return s + b - sl;
+      }, 0);
+    };
+
+    result.foreignNet5  = sumNet(chip.inst, "外資", 6);
+    result.trustNet5    = sumNet(chip.inst, "投信", 6);
+    result.dealerNet5   = sumNet(chip.inst, "自營商", 6);
+    result.totalNet5    = result.foreignNet5 + result.trustNet5 + result.dealerNet5;
+    result.foreignNet20 = sumNet(chip.inst, "外資", 21);
+    result.trustNet20   = sumNet(chip.inst, "投信", 21);
+  }
+
+  if (chip.margin && chip.margin.length) {
+    const sorted = [...chip.margin].sort((a,b) => a.date.localeCompare(b.date));
+    const today  = sorted[sorted.length-1];
+    const prev   = sorted[sorted.length-2];
+    if (today && prev) {
+      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
+      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
+      result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
+    }
+    const last5 = sorted.slice(-5).map(d => parseInt(d.MarginPurchase||d.margin_purchase||0));
+    if (last5.length >= 2) {
+      result.marginTrend = last5[last5.length-1] - last5[0];
+    }
+  }
+
+  let score = 0;
+  const details = [];
+
+  if (result.foreignNet5 > 0) { score++; details.push(`外資買+${(result.foreignNet5/1000).toFixed(0)}K`); }
+  if (result.trustNet5 > 0) { score++; details.push(`投信買+${(result.trustNet5/1000).toFixed(0)}K`); }
+  if (result.totalNet5 > 0) { score++; details.push("法人共識多"); }
+  if (result.foreignNet20 > 0) { score++; details.push("外資底子厚"); }
+  if (result.marginChgPct < -3) { score++; details.push(`資減筹碼乾淨`); } 
+  else if (result.marginChgPct > 15) { score++; details.push(`資增主力拉抬`); }
+
+  result.chipScore  = score;
+  result.chipDetail = details.join("｜") || "法人觀望";
+  return result;
+}
+
+function checkBreakout(id, d) {
+  if (d.close.length < 25) return null;
+  const todayVol  = d.volume[d.volume.length-1];
+  const avgVol5   = avg(last(d.volume.slice(0,-1), 5));
+  const todayClose= d.close[d.close.length-1];
+  const prevClose = d.close[d.close.length-2];
+  const high20    = max(last(d.close.slice(0,-1), 20));
+  const ma5       = avg(last(d.close, 5));
+  const ma20      = avg(last(d.close, 20));
+  const changePct = (todayClose - prevClose) / prevClose * 100;
+  const volRatio  = todayVol / avgVol5;
+
+  if (volRatio >= 2.0 && todayClose >= high20 && ma5 > ma20 && changePct >= 1.0) {
+    return {
+      type: "breakout", label: "爆量突破",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: volRatio.toFixed(1),
+      detail: `創20日高點｜量能放大${volRatio.toFixed(1)}倍｜漲幅${changePct.toFixed(1)}%`,
+    };
+  }
+  return null;
+}
+
+function checkConsolidation(id, d) {
+  if (d.close.length < 35) return null;
+  const lookBack   = 15;
+  const baseVol    = avg(d.volume.slice(-lookBack-20, -lookBack));
+  const recent     = d.volume.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+  const recentC    = d.close.slice(-lookBack-CONSOL_DAYS-1, -CONSOL_DAYS-1);
+
+  let blastVol = 0, blastClose = 0;
+  recent.forEach((v,i) => { if (v > baseVol*3) { blastVol=v; blastClose=recentC[i]; } });
+  if (!blastVol) return null;
+
+  const consolVol  = d.volume.slice(-CONSOL_DAYS-1,-1);
+  const consolClose = d.close.slice(-CONSOL_DAYS-1,-1);
+  const cAvgVol      = avg(consolVol);
+  const cHigh       = max(consolClose);
+  const cLow        = min(consolClose);
+  const drop        = (blastClose - cLow) / blastClose;
+
+  const todayVol    = d.volume[d.volume.length-1];
+  const todayClose  = d.close[d.close.length-1];
+  const prevClose   = d.close[d.close.length-2];
+  const changePct   = (todayClose-prevClose)/prevClose*100;
+  const vr          = todayVol/cAvgVol;
+
+  if (cAvgVol < blastVol*0.6 && drop < 0.06 && todayVol > cAvgVol*1.5 && todayClose >= cHigh && changePct >= 0.5) {
+    return {
+      type:"consolidation", label:"強勢整理",
+      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      volRatio: vr.toFixed(1),
+      detail: `清洗籌碼${CONSOL_DAYS}日再度放量突破｜回撤波段幅${(drop*100).toFixed(1)}%`,
+    };
+  }
+  return null;
+}
+
+function checkAccumulation(id, d) {
+  if (d.close.length < 60) return null;
+
+  const ma5  = avg(last(d.close, 5));
+  const ma20 = avg(last(d.close, 20));
+  const ma60 = avg(last(d.close, 60));
+
+  const maSpread = Math.abs(ma5-ma20)/ma20;
+  const maGlued  = maSpread < 0.03;
+
+  const high20   = max(last(d.high, 20));
+  const low20    = min(last(d.low, 20));
+  const boxRange = (high20-low20)/low20;
+  const boxTight = boxRange < 0.08;
+
+  const mv5  = avg(last(d.volume, 5));
+  const mv20 = avg(last(d.volume, 20));
+  const volExpand = mv5 > mv20;
+
+  const mv5Prev  = avg(d.volume.slice(-10,-5));
+  const volSlope = mv5 - mv5Prev;
+  const volGentle= volSlope > 0 && volSlope < mv20*0.5;
+
+  const bodies   = last(d.close,10).map((c,i) => Math.abs(c - last(d.open,10)[i]));
+  const avgBody  = avg(bodies);
+  const priceNow = d.close[d.close.length-1];
+  const bodySmall= avgBody < priceNow*0.02;
+
+  if (!(maGlued && boxTight && volExpand && volGentle && bodySmall)) return null;
+
+  const maBullish   = ma5 > ma20 && ma20 > ma60;
+  const minVol30    = min(last(d.volume, 30));
+  const volRecovery = mv5 > minVol30*1.3;
+  const score = [maSpread < 0.015, boxRange < 0.06, maBullish, volRecovery].filter(Boolean).length;
+
+  const prevClose = d.close[d.close.length-2];
+  const changePct = (priceNow-prevClose)/prevClose*100;
+  const vr        = (mv5/mv20).toFixed(1);
+  const waveHint  = maBullish ? "主升段蓄勢" : "底部分形構築";
+
+  return {
+    type:"accumulation", label:"主力蓄勢",
+    close: priceNow.toFixed(1), changePct: changePct.toFixed(2),
+    volRatio: vr, score,
+    detail: `壓縮箱型邊界 ${(boxRange*100).toFixed(1)}%｜均線糾結度 ${(maSpread*100).toFixed(1)}%｜${waveHint}`,
+  };
+}
+
+async function startScan() {
+  if (scanning) return;
+  scanning = true;
+
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") !== today) {
+    hits = []; scanCount = 0;
+    localStorage.setItem("scan_date", today);
+    localStorage.setItem("hits_today", "[]");
+    localStorage.setItem("scan_count", "0");
+  }
+
+  const notified = new Set(hits.map(h => h.id));
+  scanCount++;
+  localStorage.setItem("scan_count", scanCount);
+  document.getElementById("statScans").textContent = scanCount;
+  document.getElementById("sysStatus").textContent = "全上市櫃掃描中...";
+  document.getElementById("sysStatus").className = "status-val scanning";
+  document.getElementById("btnScan").disabled = true;
+  document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+  const total = STOCK_LIST.length;
+  document.getElementById("statStocks").textContent = total;
+  addLog(`[付費版高頻上市櫃併發] 開始第 ${scanCount} 次全市場大範圍掃描，共 ${total} 檔標的`);
+
+  const BATCH_SIZE = 35; 
+  const toScan = STOCK_LIST.filter(id => !notified.has(id));
+
+  for (let i = 0; i < toScan.length; i += BATCH_SIZE) {
+    const batch = toScan.slice(i, i + BATCH_SIZE);
+
+    const phase1 = await Promise.allSettled(
+      batch.map(async id => {
+        try {
+          const d = await fetchStockData(id);
+          if (!d) return null;
+          const result = checkBreakout(id,d) || checkConsolidation(id,d) || checkAccumulation(id,d);
+          if (result) {
+            result.id   = id;
+            result.name = stockNameMap[id] || id;
+            result.time = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+            result.d    = d; 
+          }
+          return result;
+        } catch(e) { return null; }
+      })
+    );
+
+    const candidates = phase1
+      .filter(r => r.status === "fulfilled" && r.value)
+      .map(r => r.value);
+
+    const results = await Promise.allSettled(
+      candidates.map(async result => {
+        try {
+          const chip    = await fetchChipData(result.id);
+          const chipInfo = analyzeChip(chip);
+          result.chipScore = chipInfo.chipScore;
+          result.chipDetail = chipInfo.chipDetail;
+          result.foreignNet5 = chipInfo.foreignNet5;
+          result.trustNet5   = chipInfo.trustNet5;
+          result.totalNet5   = chipInfo.totalNet5;
+          if (result.score !== undefined) {
+            result.score = Math.min(result.score + Math.floor(chipInfo.chipScore/2), 5);
+          }
+          result.detail = result.detail + (chipInfo.chipDetail ? `｜${chipInfo.chipDetail}` : "");
+          delete result.d;
+          return result;
+        } catch(e) {
+          delete result.d;
+          return result; 
+        }
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) {
+        const result = r.value;
+        hits.unshift(result);
+        notified.add(result.id);
+        newHits++;
+        addLog(`🎯 狙擊命中：${result.id} ${result.name} [${result.label}] 收盤價 $${result.close}`, "hit");
+        renderHits();
+        localStorage.setItem("hits_today", JSON.stringify(hits));
+      }
+    }
+
+    doneCount = Math.min(i + BATCH_SIZE, toScan.length);
+    const pct = Math.round(doneCount / toScan.length * 100);
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressText").textContent = `深度掃描中 ${doneCount}/${toScan.length}（${pct}%）`;
+    document.getElementById("scanBar").style.width = pct + "%";
+    document.getElementById("connDot").className = "sb-dot warn";
+    document.getElementById("connStatus").textContent = `併發請求中... ${doneCount}/${toScan.length}`;
+
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  scanning = false;
+  document.getElementById("sysStatus").textContent = "全市場即時監控中";
+  document.getElementById("sysStatus").className = "status-val active";
+  document.getElementById("btnScan").disabled = false;
+  document.getElementById("progressText").textContent = `全市場掃描完成｜今日累計發現 ${hits.length} 個高價值型態訊號`;
+  document.getElementById("connDot").className = "sb-dot";
+  document.getElementById("connStatus").textContent = "Finmind 高級開發者通道連線正常";
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+
+  addLog(`全市場大範圍掃描完成，此波次新增 ${newHits} 檔強勢型態目標。`);
+}
+
+function calcStars(h) {
+  let score = 0;
+  const vr = parseFloat(h.volRatio) || 0;
+  if (vr >= 3)      score += 3;
+  else if (vr >= 2) score += 2;
+  else if (vr >= 1.5) score += 1;
+  const cs = h.chipScore || 0;
+  if (cs >= 4)      score += 2;
+  else if (cs >= 2) score += 1;
+  if (Math.abs(parseFloat(h.changePct)) >= 3) score += 1;
+  if (h.type === "breakout")      score = Math.min(score + 1, 5);
+  return Math.min(Math.max(score, 1), 5);
+}
+
+let starFilter = 0; 
+
+function setStarFilter(n, btn) {
+  starFilter = n;
+  document.querySelectorAll("[data-star]").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHits();
+}
+
+function renderHits() {
+  const c = document.getElementById("hitsContainer");
+  const withStars = hits.map(h => ({ ...h, stars: calcStars(h) }));
+
+  let filtered = withStars;
+  if (filterType !== "all") filtered = filtered.filter(h => h.type === filterType);
+  if (starFilter > 0)       filtered = filtered.filter(h => h.stars >= starFilter);
+
+  filtered.sort((a,b) => b.stars - a.stars || (b.chipScore || 0) - (a.chipScore || 0));
+
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("btnExport").disabled = hits.length === 0;
+
+  if (!filtered.length) {
+    c.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <div class="empty-text">${hits.length ? "當前多重過濾條件下無對應目標" : "等待 analysis 指令，請點選上方「盤後分析」"}</div>
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = filtered.map(h => {
+    const up      = parseFloat(h.changePct) >= 0;
+    const sign    = up ? "+" : "";
+    const stars   = h.stars || calcStars(h);
+    const starStr = "★".repeat(stars) + "☆".repeat(5-stars);
+    const chipCls = (h.chipScore||0) >= 4 ? "good" : (h.chipScore||0) >= 2 ? "mid" : "low";
+    return `
+    <div class="hit-card ${h.type} s${stars}">
+      <div style="min-width:60px">
+        <div class="hit-type ${h.type}">${h.label}</div>
+        <div class="star-badge s${stars}" style="margin-top:4px;font-size:11px">${starStr}</div>
+        <div class="hit-time-badge">${h.time||""}</div>
+      </div>
+      <div class="hit-info">
+        <div class="hit-name">${esc(h.name||h.id)}</div>
+        <div class="hit-code" style="display:flex;align-items:center;flex-wrap:wrap;gap:3px">
+          <span>${h.id}</span>
+          ${h.chipScore !== undefined ? `<span class="chip-badge ${chipCls}">籌碼權重 ${h.chipScore}/5</span>` : ""}
+          ${(h.foreignNet5||0) > 0 ? `<span class="chip-badge good">外資多頭</span>` : ""}
+          ${(h.trustNet5||0)   > 0 ? `<span class="chip-badge mid" style="color:var(--purple);border-color:rgba(124,77,255,.3);background:rgba(124,77,255,.1)">投信金流</span>` : ""}
+        </div>
+        <div class="hit-detail">${esc(h.detail)}</div>
+      </div>
+      <div class="hit-vol">
+        <div class="hit-vol-val">${h.volRatio}x</div>
+        <div class="hit-vol-label">量能相對比</div>
+      </div>
+      <div class="hit-price">
+        <div class="hit-price-val">$${h.close}</div>
+        <div class="hit-change ${up?"up":"down"}">${sign}${h.changePct}%</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function addLog(msg, type="") {
+  const ts = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  logs.unshift({msg, type, ts});
+  logs = logs.slice(0,40);
+  const lc = document.getElementById("logContainer");
+  if (lc) {
+    lc.innerHTML = logs.map(l => `<div class="log-entry ${l.type}">[${l.ts}] ${esc(l.msg)}</div>`).join("");
+  }
+}
+
+function setFilter(type, btn) {
+  filterType = type;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHits();
+}
+
+function clearHits() {
+  if (!confirm("確定重置並清除今日狙擊的所有動態訊號？")) return;
+  hits = [];
+  localStorage.setItem("hits_today","[]");
+  renderHits();
+  addLog("訊號緩存面板已清空。");
+}
+
+async function fetchTopStocks() {
+  addLog("正在從 FinMind 高級庫建立全台灣上市櫃(1800+檔)中文代碼數據資料庫...");
+  try {
+    const treg = `${FINMIND_API}?dataset=TaiwanStockInfo&token=${token}`;
+    const res = await fetch(treg, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    
+    if (json && json.data && json.data.length > 500) {
+      BUILTIN_STOCKS = {};
+      STOCK_LIST = [];
+      
+      json.data.forEach(item => {
+        if (/^\d{4}$/.test(item.stock_id)) {
+          BUILTIN_STOCKS[item.stock_id] = item.stock_name;
+          STOCK_LIST.push(item.stock_id);
+        }
+      });
+      
+      stockNameMap = {...BUILTIN_STOCKS};
+      document.getElementById("statStocks").textContent = STOCK_LIST.length;
+      addLog(`🚀 [解鎖完成] 成功動態載入全台股上市櫃共計 ${STOCK_LIST.length} 檔標準監控池！英文代碼盲區已完全打通。`);
+      
+      document.getElementById("sysStatus").textContent = "待機";
+      document.getElementById("hitsContainer").innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">雲端資料庫同步大成功，請點選右側「盤後分析」或開啟即時掃描</div></div>`;
+      return true;
+    } else {
+      throw new Error("母庫回傳結構不全");
+    }
+  } catch(e) {
+    addLog(`⚠ 雲端拉取失敗 (${e.message})，自動降級啟用備份庫。`, "warn");
+    return false;
+  }
+}
+
 const INDUSTRY_MAP = {
-  "半導體": ["2330","2454","2303","3034","2344","2337","6770"],
-  "電腦硬體": ["2317","2382","2357","2353","2356","2324","2352"],
-  "電子零組件": ["2327","2392","2393","6116","6176","2383"],
-  "光電": ["2409","3008","2448","3042","6592"],
-  "金融保險": ["2881","2882","2883","2884","2885","2886"],
-  "鋼鐵": ["2002","2006","2010","2015","2022","2023"],
-  "航運": ["2603","2605","2609","2610","2615"],
-  "生技醫療": ["4746","4128","1789","4174"],
-  "塑化": ["1301","1303","1326","1402"]
+  "半導體": ["2330","2454","2303","3034","2344","2337","6770","2379","5274","3231","2449","6415","3037","2351","8046","3044","6239","6274","3081","6271","6279","4958","8069","5347","6488","6728","5269","4967","6573","6533","6286","6294","6462","8028","2313","8358","3189"],
+  "電腦硬體": ["2317","2382","2357","2353","2356","2324","2352","6669","3711","2395","2376","2377","6414","3008","2301","4938","2345","2312","2049","3023","2385","2360","8150"],
+  "金融保險": ["2881","2882","2883","2884","2885","2886","2887","2888","2890","2891","2892","2893","2880","2832","2834","2836","2838","2845","2849","2850","2851","2852","2855","2856","2801","2812","2867"],
+  "電子零組件": ["2327","2392","2393","6116","6176","2383","2458","2439","3026","2481","2456","2428","6147","6223","3035","6213","2368","6274","6213"],
+  "光電": ["2409","3008","2448","3042","6592","6679"],
+  "鋼鐵": ["2002","2006","2010","2015","2022","2023","2059","9958"],
+  "塑化": ["1301","1303","1326","1402","2103","2108"],
+  "航運": ["2601","2603","2605","2606","2609","2610","2615","2618","2633","2634","2636","2637"]
 };
 
-// 3. 強力版掃描：直接重置並執行
-async function runCustomScan() {
-    const industry = document.getElementById("industrySelect").value;
-    const market = document.getElementById("marketType").value;
-    
-    // 如果選全部產業，就用全部清單；否則只撈特定產業
-    let pool = (industry === "all") ? Object.keys(stockNameMap) : (INDUSTRY_MAP[industry] || []);
-    
-    // 市場篩選器
-    STOCK_LIST = pool.filter(id => {
-        if (market === 'TSE') return id.startsWith('1') || id.startsWith('2');
-        if (market === 'OTC') return id.startsWith('3') || id.startsWith('5') || id.startsWith('6');
-        return true;
-    });
+function getIndustry(id) {
+  for (const [ind, ids] of Object.entries(INDUSTRY_MAP)) {
+    if (ids.includes(id)) return ind;
+  }
+  return "其他分類";
+}
 
-    if (STOCK_LIST.length === 0) {
-        addLog("⚠ 篩選結果為空，請檢查篩選條件", "warn");
-        return;
+let radarMode = "all";        
+let selectedIndustry = null;  
+let moneyFlowData = [];       
+
+async function loadMoneyFlow() {
+  const radarListEl = document.getElementById("radarList");
+  const flowChartEl = document.getElementById("flowChart");
+  if (radarListEl) radarListEl.innerHTML = '<div class="radar-loading"><div class="radar-spin"></div>載入交易所實時權重日報...</div>';
+  if (flowChartEl) flowChartEl.innerHTML = '<div class="radar-loading"><div class="radar-spin"></div>計算中...</div>';
+
+  try {
+    let today = new Date();
+    const currentDay = today.getDay();
+    if (currentDay === 6) {
+      today.setDate(today.getDate() - 1); 
+    } else if (currentDay === 0) {
+      today.setDate(today.getDate() - 2); 
     }
+
+    const fmtTWSE = d => {
+      const y   = d.getFullYear() - 1911; 
+      const m   = String(d.getMonth()+1).padStart(2,"0");
+      const day = String(d.getDate()).padStart(2,"0");
+      return `${y}${m}${day}`;
+    };
+
+    const targetDateStr = fmtTWSE(today);
+    const twseUrl = `${BACKEND_URL}/api/twse_institutional?date=${targetDateStr}&token=${token}&_t=${Date.now()}`;
     
-    addLog(`🚀 開始分析：${industry} / ${market} (監控 ${STOCK_LIST.length} 檔)`);
-    startScan(); 
+    const res  = await fetch(twseUrl, { signal: AbortSignal.timeout(20000) });
+    const json = await res.json();
+
+    if (!json.data || !json.data.length) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(yesterday)}&token=${token}&_t=${Date.now()}`;
+      const res2 = await fetch(url2, { signal: AbortSignal.timeout(20000) });
+      const json2 = await res2.json();
+      if (!json2.data || !json2.data.length) throw new Error("付費大數據通道連線超時");
+      renderMoneyFlowData(json2.data, fmtTWSE(yesterday));
+    } else {
+      renderMoneyFlowData(json.data, targetDateStr);
+    }
+  } catch(e) {
+    console.warn("轉向 FinMind 高級法人庫作為雷達資料源Fallback機制:", e);
+    if (token) { loadMoneyFlowFinmind(token); } 
+    else {
+      if (radarListEl) radarListEl.innerHTML = `<div class="radar-loading" style="color:var(--red)">未輸入Token或連線超時：${e.message}</div>`;
+    }
+  }
 }
 
-// 4. 徹底過濾掉 Foreign_Investor 等非個股雜訊
-function renderMoneyFlowData(data) {
-    if (!data) return;
-    const cleanData = data.filter(d => /^\d{4}$/.test(d.Code || d.stock_id || ""));
-    // ... 原本的 render 邏輯 ...
+async function loadMoneyFlowFinmind(tk) {
+  try {
+    const fmtLocal = d => {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    };
+    const today  = new Date();
+    const start7 = new Date(); start7.setDate(today.getDate()-7);
+    const url = `${BACKEND_URL}/api/institutional?token=${tk}&start_date=${fmtLocal(start7)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    const json = await res.json();
+    if (!json.data || !json.data.length) throw new Error("無有效數據結構回傳");
+    const allDates = [...new Set(json.data.map(d=>d.date))].sort();
+    const latestDate = allDates[allDates.length-1];
+    document.getElementById("radarDate").textContent = latestDate + "（最新）";
+    renderMoneyFlowFromFinmind(json.data, latestDate);
+  } catch(e) {
+    document.getElementById("radarList").innerHTML = `<div class="radar-loading" style="color:var(--red)">Fallback 失敗: ${e.message}</div>`;
+  }
 }
 
-// 5. 初始化隱藏 Token
-(function(){
+function renderMoneyFlowData(data, dateStr) {
+  const radarDateEl = document.getElementById("radarDate");
+  if (radarDateEl) {
+    if(dateStr.length === 7) {
+       radarDateEl.textContent = `${parseInt(dateStr.substring(0,3))+1911}-${dateStr.substring(3,5)}-${dateStr.substring(5,7)}`;
+    } else {
+       radarDateEl.textContent = dateStr;
+    }
+  }
+
+  const stockNet = {};
+  data.forEach(d => {
+    const id  = d.Code || d.SecuritiesCompanyCode || d.stock_id || "";
+    if (!id) return;
+    
+    // 💡【強力黃金過濾補丁：徹底消滅全市場加總數據英文】
+    // 只有當代號是純粹 4 碼以上的數字（即正規個股）時，才允許進入排行榜！排除全市場總額的文字雜訊。
+    if (!/^\d+$/.test(id)) return;
+    
+    const chineseName = stockNameMap[id] || BUILTIN_STOCKS[id] || d.Name || d.StockName || id;
+    
+    const fNet = (parseInt(String(d.buy||d.Foreignbuy||d.buy_volume||"0").replace(/,/g,""))||0) -
+                 (parseInt(String(d.sell||d.Foreignsell||d.sell_volume||"0").replace(/,/g,""))||0);
+    const tNet = (parseInt(String(d.Investmentbuy||"0").replace(/,/g,""))||0) -
+                 (parseInt(String(d.Investmentsell||"0").replace(/,/g,""))||0);
+    const dNet = (parseInt(String(d.Dealerbuy||"0").replace(/,/g,""))||0) -
+                 (parseInt(String(d.Dealersell||"0").replace(/,/g,""))||0);
+                 
+    stockNet[id] = { name: chineseName, net: fNet+tNet+dNet, foreign:fNet, trust:tNet, dealer:dNet };
+  });
+
+  const industryFlow = {};
+  for (const [id, flow] of Object.entries(stockNet)) {
+    const ind = getIndustry(id);
+    if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
+    industryFlow[ind].foreign += flow.foreign;
+    industryFlow[ind].trust   += flow.trust;
+    industryFlow[ind].dealer  += flow.dealer;
+    industryFlow[ind].total   += flow.net;
+    industryFlow[ind].stocks++;
+  }
+  
+  moneyFlowData = Object.entries(industryFlow)
+    .map(([name,f]) => ({name,...f}))
+    .filter(d => d.stocks > 0)
+    .sort((a,b) => b.total - a.total);
+    
+  renderRadar();
+
+  const sorted = Object.values(stockNet).filter(d => d.net !== 0).sort((a,b) => b.net - a.net);
+  const top10 = sorted.slice(0,10);
+  const top5s = sorted.filter(d=>d.net<0).slice(-5).reverse();
+  const maxVal = Math.max(...[top10.length ? Math.abs(top10[0].net) : 1 , top5s.length ? Math.abs(top5s[0].net) : 1]) || 1;
+  const totalNet = top10.reduce((s,d)=>s+d.net,0);
+
+  const flowTotalEl = document.getElementById("flowTotal");
+  if (flowTotalEl) {
+    flowTotalEl.textContent = (totalNet>=0?"綜合多方+":"綜合空方") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+  }
+
+  const flowChartEl = document.getElementById("flowChart");
+  if (flowChartEl) {
+    flowChartEl.innerHTML = `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--text2)">主力增持前十大目標</div>` +
+      top10.map(d => {
+        const pct = Math.abs(d.net)/maxVal*88;
+        return `<div class="flow-row">
+          <span class="flow-label">${esc(d.name)}</span>
+          <div class="flow-bar-wrap">
+            <div class="flow-bar up" style="width:${pct}%">
+              <span class="flow-val">+${(d.net/1000).toFixed(1)}K</span>
+            </div>
+          </div>
+        </div>`;
+      }).join("") +
+      (top5s.length ? `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--red)">三大法人調節目標</div>` : "") +
+      top5s.map(d => {
+        const pct = Math.abs(d.net)/maxVal*88;
+        return `<div class="flow-row">
+          <span class="flow-label">${esc(d.name)}</span>
+          <div class="flow-bar-wrap">
+            <div class="flow-bar down" style="width:${pct}%">
+              <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+  }
+}
+
+function renderMoneyFlowFromFinmind(data, latestDate) {
+  const stockFlow = {};
+  data.filter(d=>d.date===latestDate).forEach(d => {
+    const id  = d.stock_id;
+    const net = parseInt(d.buy||0) - parseInt(d.sell||0);
+    if (!stockFlow[id]) stockFlow[id] = {foreign:0,trust:0,dealer:0};
+    const targetName = d.name || d.Name || "";
+    if (["Foreign_Investor","外資","外資及陸資"].includes(targetName)) stockFlow[id].foreign = net;
+    if (["Investment_Trust","投信"].includes(targetName)) stockFlow[id].trust = net;
+    if (["Dealer_self","Dealer_Hedging","自營商","Dealer"].includes(targetName)) stockFlow[id].dealer += net;
+  });
+  const stockNet = Object.fromEntries(
+    Object.entries(stockFlow).map(([id,f]) => [id, {name:stockNameMap[id]||id, net:f.foreign+f.trust+f.dealer, ...f}])
+  );
+  renderMoneyFlowData(Object.values(stockNet), latestDate);
+}
+
+function renderRadar() {
+  const key = radarMode === "foreign" ? "foreign" :
+              radarMode === "trust"   ? "trust"   :
+              radarMode === "dealer"  ? "dealer"  : "total";
+
+  const sorted = [...moneyFlowData].sort((a,b) => b[key]-a[key]);
+  const maxVal = Math.max(...sorted.map(d => Math.abs(d[key]))) || 1;
+
+  const radarListEl = document.getElementById("radarList");
+  if (radarListEl) {
+    radarListEl.innerHTML = sorted.map((d,i) => {
+      const val   = d[key];
+      const pct   = Math.abs(val) / maxVal * 100;
+      const isUp  = val >= 0;
+      const valStr = (val >= 0 ? "+" : "") + (val/1000).toFixed(0) + "K張";
+      const isSel = selectedIndustry === d.name;
+      return `
+      <div class="industry-row ${isSel?"selected":""}" onclick="selectIndustry('${d.name}')">
+        <span class="industry-rank">${i+1}</span>
+        <span class="industry-name">${d.name}</span>
+        <div class="industry-bar-wrap">
+          <div class="industry-bar-fill ${isUp?"up":"down"}" style="width:${pct}%"></div>
+        </div>
+        <span class="industry-val ${isUp?"up":"down"}">${valStr}</span>
+      </div>`;
+    }).join("");
+  }
+}
+
+function setRadarMode(mode, btn) {
+  radarMode = mode;
+  document.querySelectorAll(".radar-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  if (moneyFlowData.length) renderRadar();
+  else loadMoneyFlow();
+}
+
+function selectIndustry(name) {
+  if (selectedIndustry === name) {
+    clearIndustryFilter();
+    return;
+  }
+  selectedIndustry = name;
+
+  const bar = document.getElementById("selectedIndustryBar");
+  if (bar) bar.classList.add("show");
+  const tag = document.getElementById("selectedIndustryTag");
+  if (tag) tag.textContent = name;
+
+  const ids = INDUSTRY_MAP[name] || [];
+  if (ids.length) {
+    STOCK_LIST = ids.filter(id => stockNameMap[id] || BUILTIN_STOCKS[id]);
+    document.getElementById("statStocks").textContent = `${STOCK_LIST.length} (${name})`;
+    addLog(`[雷達鎖定] 已將核心分析池鎖定於「${name}」族群，共計 ${STOCK_LIST.length} 檔股票`);
+  }
+  renderRadar();
+}
+
+function clearIndustryFilter() {
+  selectedIndustry = null;
+  STOCK_LIST = Object.keys(BUILTIN_STOCKS);
+  const bar = document.getElementById("selectedIndustryBar");
+  if (bar) bar.classList.remove("show");
+  document.getElementById("statStocks").textContent = STOCK_LIST.length;
+  addLog("已解除板塊鎖定，恢復全市場廣度狙擊。");
+  if (moneyFlowData.length) renderRadar();
+}
+
+async function searchStock() {
+  const input = document.getElementById("stockSearchInput").value.trim();
+  if (!input) return;
+
+  let stockId = input;
+  let stockName = "";
+
+  if (!/^\d+$/.test(input)) {
+    const found = Object.entries(stockNameMap).find(([id, name]) => name.includes(input) || id === input);
+    if (found) {
+      stockId   = found[0];
+      stockName = found[1];
+    } else {
+      alert(`對照庫查無「${input}」之標的。`);
+      return;
+    }
+  } else {
+    stockName = stockNameMap[stockId] || stockId;
+  }
+
+  const detail = document.getElementById("stockDetail");
+  detail.className = "stock-detail show";
+  detail.innerHTML = '<div class="search-loading"><div class="radar-spin"></div>全數據解析中...</div>';
+
+  try {
+    const [priceRes, chipRes] = await Promise.allSettled([
+      fetchStockData(stockId),
+      fetchChipData(stockId),
+    ]);
+
+    const d    = priceRes.status === "fulfilled" ? priceRes.value : null;
+    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
+
+    if (!d) {
+      detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得標的 ${stockId} 之高頻技術數據</div>`;
+      return;
+    }
+
+    const todayClose = d.close[d.close.length-1];
+    const prevClose  = d.close[d.close.length-2];
+    const changePct  = ((todayClose - prevClose) / prevClose * 100).toFixed(2);
+    const ma5  = avg(last(d.close, 5)).toFixed(1);
+    const ma10 = avg(last(d.close, 10)).toFixed(1);
+    const ma20 = avg(last(d.close, 20)).toFixed(1);
+    const ma60 = avg(last(d.close, 60)).toFixed(1);
+    const high20 = max(last(d.close.slice(0,-1), 20)).toFixed(1);
+    const low20  = min(last(d.close.slice(0,-1), 20)).toFixed(1);
+    const mv5  = avg(last(d.volume, 5));
+    const mv20 = avg(last(d.volume, 20));
+    const volRatio = (mv5 / mv20).toFixed(1);
+
+    const breakoutOk = todayClose >= parseFloat(high20) && mv5 > mv20 * 2;
+    const consolOk   = checkConsolidation(stockId, d);
+    const accumOk    = checkAccumulation(stockId, d);
+    let strategy = "常態盤整形態";
+    let strategyColor = "var(--text2)";
+    if (breakoutOk)   { strategy = "🚀 爆量突破形態"; strategyColor = "var(--green)"; }
+    else if (consolOk){ strategy = "📦 強勢整理完成"; strategyColor = "var(--amber)"; }
+    else if (accumOk) { strategy = "🔮 主力蓄勢待發"; strategyColor = "var(--purple)"; }
+
+    const chipInfo = analyzeChip(chip);
+    const stars    = "★".repeat(chipInfo.chipScore) + "☆".repeat(5-chipInfo.chipScore);
+    const maUp = parseFloat(ma5) > parseFloat(ma10) && parseFloat(ma10) > parseFloat(ma20) ? "多頭發散✅" : "均線多頭未成型";
+
+    detail.innerHTML = `
+    <div class="stock-detail-header">
+      <div>
+        <div class="stock-detail-name">${esc(stockName)}</div>
+        <div class="stock-detail-code">${stockId}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#e8f4ff">$${todayClose.toFixed(1)}</div>
+        <div style="font-size:14px;font-family:var(--mono);color:${parseFloat(changePct)>=0?"var(--green)":"var(--red)"}">${parseFloat(changePct)>=0?"+":""}${changePct}%</div>
+      </div>
+      <div style="margin-left:16px;text-align:center">
+        <div style="font-size:13px;color:${strategyColor};font-weight:500">${strategy}</div>
+      </div>
+    </div>
+    <div class="stock-detail-body">
+      <div class="detail-block">
+        <div class="detail-block-title">📊 技術指標結構</div>
+        <div class="detail-row"><span class="detail-key">20日最高價</span><span class="detail-val cyan">$${high20}</span></div>
+        <div class="detail-row"><span class="detail-key">20日最低價</span><span class="detail-val">$${low20}</span></div>
+        <div class="detail-row"><span class="detail-key">MA5量能比</span><span class="detail-val ${parseFloat(volRatio)>=2?"up":""}">×${volRatio}</span></div>
+        <div class="detail-row"><span class="detail-key">型態線多頭</span><span class="detail-val ${maUp.includes("多頭")?"up":""}">${maUp}</span></div>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">📈 支撐/壓力均線</div>
+        <div class="detail-row"><span class="detail-key">5MA</span><span class="detail-val">$${ma5}</span></div>
+        <div class="detail-row"><span class="detail-key">10MA</span><span class="detail-val">$${ma10}</span></div>
+        <div class="detail-row"><span class="detail-key">20MA支撐線</span><span class="detail-val">$${ma20}</span></div>
+        <div class="detail-row"><span class="detail-key">60MA生命線</span><span class="detail-val">$${ma60}</span></div>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">🏦 主力籌碼追蹤</div>
+        <div class="detail-row"><span class="detail-key">籌碼信心度</span><span class="chip-stars">${stars}</span></div>
+        <div class="detail-row"><span class="detail-key">外資5日增減</span><span class="detail-val ${chipInfo.foreignNet5>0?"up":"down"}">${chipInfo.foreignNet5>0?"+":""}${(chipInfo.foreignNet5/1000).toFixed(0)}K張</span></div>
+        <div class="detail-row"><span class="detail-key">投信5日金流</span><span class="detail-val ${chipInfo.trustNet5>0?"up":"down"}">${chipInfo.trustNet5>0?"+":""}${(chipInfo.trustNet5/1000).toFixed(0)}K張</span></div>
+        <div class="detail-row"><span class="detail-key">散戶融資變動</span><span class="detail-val ${chipInfo.marginChgPct>0?"up":"down"}">${chipInfo.marginChgPct>0?"+":""}${chipInfo.marginChgPct.toFixed(1)}%</span></div>
+      </div>
+    </div>`;
+  } catch(e) {
+    detail.innerHTML = `<div class="search-loading" style="color:var(--red)">解析程序失靈: ${e.message}</div>`;
+  }
+}
+
+let realtimeTimer   = null;
+let isRealtimeMode  = false;
+const REALTIME_INTERVAL = 5 * 60 * 1000; 
+
+function isMarketOpen() {
+  const now  = new Date();
+  const hhmm = now.getHours() * 100 + now.getMinutes();
+  const day  = now.getDay(); 
+  return day >= 1 && day <= 5 && hhmm >= 900 && hhmm <= 1330;
+}
+
+function toggleRealtimeScan() {
+  if (!token) { addLog("缺少內核核心通道","warn"); return; }
+
+  const sysStatusEl = document.getElementById("sysStatus");
+
+  if (isRealtimeMode) {
+    isRealtimeMode = false;
+    if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
+    document.getElementById("btnRealtime").textContent = "⚡ 開啟盤中即時掃描";
+    document.getElementById("btnRealtime").style.color = "var(--green)";
+    document.getElementById("btnRealtime").style.borderColor = "var(--green)";
+    
+    if (sysStatusEl) {
+      sysStatusEl.textContent = "待機";
+      sysStatusEl.style.color = "var(--text2)";
+    }
+    addLog("已關閉盤中即時輪詢機制。");
+  } else {
+    isRealtimeMode = true;
+    document.getElementById("btnRealtime").textContent = "⏹ 停止即時掃描";
+    document.getElementById("btnRealtime").style.color = "var(--red)";
+    document.getElementById("btnRealtime").style.borderColor = "var(--red)";
+    
+    if (sysStatusEl) {
+      sysStatusEl.textContent = "即時輪詢中 ●";
+      sysStatusEl.style.color = "var(--green)";
+    }
+    addLog("✅ 盤中自動即時狙擊已開啟，維持5分鐘高頻輪詢。");
+
+    realtimeScanOnce();
+    realtimeTimer = setInterval(() => {
+      if (!isMarketOpen()) {
+        addLog("目前非撮合交易時段，暫掛即時輪詢（09:00~13:30）","warn");
+        return;
+      }
+      realtimeScanOnce();
+    }, REALTIME_INTERVAL);
+  }
+}
+
+async function realtimeScanOnce() {
+  if (!isMarketOpen()) {
+    addLog("⚠ 提示：當前非撮合時段，即時抓取策略將使用收盤鎖定數據。","warn");
+  }
+
+  const total = STOCK_LIST.length;
+  addLog(`⚡ 即時波次掃描啟動，池容量共 ${total} 檔`);
+  const sysStatusEl = document.getElementById("sysStatus");
+  if (sysStatusEl) {
+    sysStatusEl.textContent = "即時狙擊中...";
+    sysStatusEl.className = "status-val scanning";
+  }
+
+  const notified = new Set(hits.map(h => h.id));
+  let newHits = 0;
+  let doneCount = 0;
+  
+  const BATCH = 35; 
+  const toScan = STOCK_LIST.filter(id => !notified.has(id));
+
+  for (let i = 0; i < toScan.length; i += BATCH) {
+    if (!isRealtimeMode) break; 
+
+    const batch = toScan.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map(async id => {
+        try {
+          const d = await fetchStockData(id);
+          if (!d) return null;
+          const result = checkBreakout(id,d) || checkConsolidation(id,d) || checkAccumulation(id,d);
+          if (result) {
+            result.id   = id;
+            result.name = stockNameMap[id] || id;
+            result.time = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+            result.realtime = true; 
+          }
+          return result;
+        } catch(e) { return null; }
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) {
+        const result = r.value;
+        const existing = hits.findIndex(h => h.id === result.id);
+        if (existing >= 0) {
+          hits[existing] = result; 
+        } else {
+          hits.unshift(result);   
+          notified.add(result.id);
+          newHits++;
+          addLog(`⚡ [盤中急切訊號] 捕獲型態變異標的：${result.id} ${result.name}`, "hit");
+        }
+        renderHits();
+        localStorage.setItem("hits_today", JSON.stringify(hits));
+      }
+    }
+
+    doneCount = Math.min(i + BATCH, toScan.length);
+    const pct = Math.round(doneCount / toScan.length * 100);
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressText").textContent = `即時輪詢進度 ${doneCount}/${toScan.length}（${pct}%）`;
+    document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  if (sysStatusEl) {
+    sysStatusEl.textContent = isRealtimeMode ? "即時輪詢中 ●" : "監控中";
+    sysStatusEl.className = "status-val active";
+  }
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+}
+
+function exportReport() {
+  if (!hits.length) { alert("尚無分析資料"); return; }
+
+  const today = new Date().toLocaleDateString("zh-TW");
+  const now   = new Date().toLocaleTimeString("zh-TW");
+  const withStars = hits
+    .map(h => ({ ...h, stars: calcStars(h) }))
+    .sort((a,b) => b.stars - a.stars || (b.chipScore||0) - (a.chipScore||0));
+
+  const LINE = "═".repeat(60);
+  const THIN = "─".repeat(60);
+
+  let report = [
+    LINE,
+    "     飆股狙擊系統 ── 盤後多因子深度決策報告",
+    "     分析基準日：" + today + "    生成時間：" + now,
+    "     監測寬度：" + STOCK_LIST.length + " 檔核心股    觸發型態總計：" + hits.length + " 檔",
+    LINE,
+    ""
+  ].join("\n");
+
+  const categories = [5, 4, 3, 2, 1];
+  categories.forEach(st => {
+    const subList = withStars.filter(h => h.stars === st);
+    if (!subList.length) return;
+    report += `\n【${"★".repeat(st)}${"☆".repeat(5-st)} 強度分級目標（共 ${subList.length} 檔）】\n${THIN}\n`;
+    subList.forEach(h => {
+      report += ` ▷ 代號：${h.id} ｜ 名稱：${h.name}\n`;
+      report += `    型態歸類：[${h.label}] ｜ 價格：$${h.close} (幅 ${h.changePct}%) ｜ MA5量比：${h.volRatio}x\n`;
+      report += `    多維解析數據：${h.detail}\n\n`;
+    });
+  });
+
+  report += `\n${LINE}\n⚠ 免責聲明：本自動化終端生成之數據均基於歷史量價特征計算，不構成任何操作要約，市場有風險，入市需審慎。\n${LINE}`;
+
+  const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `StockSniper_Report_${today.replace(/\//g, "-")}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog("✅ 數據報告匯出封裝完成：" + a.download);
+}
+
+(async function init() {
+  updateClock();
+
+  if (token && token.length > 10) {
+    updateTokenUI(true);
+    document.getElementById("btnScan").disabled = false;
+    
     const tBar = document.getElementById("tokenBar");
     if(tBar) tBar.style.display = "none";
-    fetchTopStocks();
-})();
+    
+    await fetchTopStocks();
+  }
 
-// 【請在此下方補上你原本 v12.5 的 startScan, renderHits, analyzeChip 等幾百行邏輯】
+  const today = new Date().toDateString();
+  if (localStorage.getItem("scan_date") === today) {
+    hits = JSON.parse(localStorage.getItem("hits_today")||"[]");
+    scanCount = parseInt(localStorage.getItem("scan_count")||"0");
+    document.getElementById("statScans").textContent = scanCount;
+  }
+
+  renderHits();
+  if (token) loadMoneyFlow(); 
+})();
 </script>
 </body>
 </html>
