@@ -1511,10 +1511,11 @@ async function loadMoneyFlow() {
     '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
   try {
-    // 1. 使用標準 YYYY-MM-DD 格式日期，對接你的 FinMind 後端
+    // 1. 使用標準 YYYY-MM-DD 格式日期 (FinMind API 需要的格式)
     const today = new Date().toISOString().split('T')[0]; 
     
     // 2. 呼叫你已經部署好、且已設定 Token 的後端 API
+    // 這裡直接用你的 Vercel 後端網址
     const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
     console.log("正在請求後端 API:", url);
 
@@ -1522,8 +1523,7 @@ async function loadMoneyFlow() {
     const json = await res.json();
 
     if (json && json.data) {
-        // 3. 直接使用 renderMoneyFlowData 處理資料
-        // 注意：dateStr 傳入標準日期即可
+        // 3. 成功取得資料，直接渲染
         renderMoneyFlowData(json.data, today);
         addLog("✅ 資金雷達更新成功");
     } else {
@@ -1536,7 +1536,6 @@ async function loadMoneyFlow() {
     addLog("資金雷達載入失敗", "err");
   }
 }
-
 async function loadMoneyFlowFinmind(tk) {
   try {
     const fmtLocal = d => {
