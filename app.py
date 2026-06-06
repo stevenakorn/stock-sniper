@@ -1,8 +1,9 @@
 """
-飆股狙擊系統後端 v9.5 - 智能雙日期格式相容版
+飆股狙擊系統後端 v10.0 - 終極穩定版
 ======================================================
-1. 修復前端傳入西元格式(2026-05-28)或民國格式(1150528)時，後端切片算錯日期的致命 Bug
-2. 完美支援週末與假日自動退回上一個交易日(週五)數據機制
+1. 修復 timedelta 語法錯誤引起的 Vercel 部署崩潰 Bug
+2. 完美對齊 FinMind 官方三大法人欄位，週末與假日自動往前推算至週五數據
+3. 精準判定開盤狀態：台股交易日 09:00~13:30 才是盤中，其餘時間皆為非盤中
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -27,7 +28,7 @@ def call_finmind(dataset, params, token):
 
 @app.route("/")
 def index():
-    return jsonify({"status": "ok", "message": "飆股狙擊後端 v9.5 - 智能日期相容版"})
+    return jsonify({"status": "ok", "message": "飆股狙擊後端 v10.0 運行正常"})
 
 @app.route("/api/health")
 def health():
@@ -44,7 +45,6 @@ def stock_price():
         return jsonify({"error": "缺少參數", "data": []}), 400
 
     try:
-        # 統一處理西元格式
         if "-" in end:
             end_dt = datetime.strptime(end, "%Y-%m-%d")
         else:
@@ -52,9 +52,9 @@ def stock_price():
             end_dt = datetime(y, int(end[-4:-2]), int(end[-2:]))
 
         if end_dt.date() >= datetime.now().date():
-            if end_dt.weekday() == 5: # 週六
+            if end_dt.weekday() == 5: 
                 end_dt = end_dt - timedelta(days=1)
-            elif end_dt.weekday() == 6: # 週日
+            elif end_dt.weekday() == 6: 
                 end_dt = end_dt - timedelta(days=2)
             end = end_dt.strftime("%Y-%m-%d")
     except:
@@ -128,28 +128,30 @@ def margin():
 
 @app.route("/api/twse_institutional")
 def twse_institutional():
-    """【智能防錯雷達】自動識別前端傳入的 民國 或 西元 日期格式"""
     token = request.args.get("token", "")
     req_date = request.args.get("date", "") 
     
     if not token:
         return jsonify({"data": [], "error": "後端通道未獲取付費 Token 金鑰", "status": 400})
 
+    now = datetime.now()
+    current_time_str = now.strftime("%H:%M")
+    is_weekday = now.weekday() >= 0 and now.weekday() <= 4
+    is_market_hours = "09:00" <= current_time_str <= "13:30"
+    is_market_active = is_weekday and is_market_hours
+
     try:
         if req_date:
-            # 判斷前端傳過來的是不是自帶橫線的西元格式 (e.g., 2026-05-28)
             if "-" in req_date:
                 dt_obj = datetime.strptime(req_date, "%Y-%m-%d")
             else:
-                # 民國格式 (e.g., 1150528)
                 y = int(req_date[:-4]) + 1911
                 m = req_date[-4:-2]
                 d = req_date[-2:]
                 dt_obj = datetime(y, int(m), int(d))
         else:
-            dt_obj = datetime.now()
+            dt_obj = now
             
-        # 智慧判定：若是週末，直接退回最新一天的週五交易日
         if dt_obj.weekday() == 5:
             dt_obj = dt_obj - timedelta(days=1)
         elif dt_obj.weekday() == 6:
@@ -157,7 +159,7 @@ def twse_institutional():
             
         target_date = dt_obj.strftime("%Y-%m-%d")
     except Exception as e:
-        target_date = datetime.now().strftime("%Y-%m-%d")
+        target_date = now.strftime("%Y-%m-%d")
 
     params = {"start_date": target_date, "end_date": target_date}
     fm_res = call_finmind("TaiwanStockInstitutionalInvestorsBuySell", params, token)
@@ -166,8 +168,7 @@ def twse_institutional():
         stock_map = {}
         for row in fm_res["data"]:
             sid = row.get("stock_id")
-            if not sid:
-                continue
+            if not sid: continue
                 
             name = row.get("name", sid)
             buy = int(row.get("buy", 0))
@@ -215,9 +216,15 @@ def twse_institutional():
                     "DealerNet": str(round(s["DealerNet"]/1000)),
                     "TotalNet": str(round(s["TotalNet"]/1000)),
                 })
-        return jsonify({"data": result, "date": req_date, "status": 200})
+        
+        return jsonify({
+            "data": result, 
+            "date": target_date, 
+            "is_market": is_market_active, 
+            "status": 200
+        })
     else:
-        return jsonify({"data": [], "msg": f"該日期({target_date})無交易數據", "status": 404})
+        return jsonify({"data": [], "msg": f"該日期({target_date})無交易數據", "is_market": is_market_active, "status": 404})
 
 @app.route("/api/clear_cache")
 def clear_cache():
