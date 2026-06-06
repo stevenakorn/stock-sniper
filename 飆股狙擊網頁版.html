@@ -1560,19 +1560,20 @@ async function loadMoneyFlowFinmind(tk) {
   }
 }
 
+// 這是已經修正完畢的完整函式，請直接覆蓋
 function renderMoneyFlowData(data, dateStr) {
   document.getElementById("radarDate").textContent = dateStr;
 
   const stockNet = {};
   data.forEach(d => {
-    // FinMind 格式對應
+    // 根據你的後端 API 回傳格式對應
     const id = d.stock_id; 
     const buy = parseInt(d.buy) || 0;
     const sell = parseInt(d.sell) || 0;
     const net = buy - sell;
 
     if (!stockNet[id]) {
-        stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+      stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
     }
     
     // 根據 name 分類 (這是 FinMind 資料集的特性)
@@ -1582,9 +1583,6 @@ function renderMoneyFlowData(data, dateStr) {
     
     stockNet[id].net += net;
   });
-
-  // ... 後續邏輯保持不變 ...
-}
 
   // 產業分類
   const industryFlow = {};
@@ -1601,9 +1599,10 @@ function renderMoneyFlowData(data, dateStr) {
     .map(([name,f]) => ({name,...f}))
     .filter(d => d.stocks > 0)
     .sort((a,b) => b.total - a.total);
+    
   renderRadar();
 
-  // 右側前10
+  // 右側前10名渲染
   const sorted = Object.values(stockNet)
     .filter(d => d.net !== 0)
     .sort((a,b) => b.net - a.net);
@@ -1642,8 +1641,7 @@ function renderMoneyFlowData(data, dateStr) {
         </div>
       </div>`;
     }).join("");
- }
-
+}
 function renderMoneyFlowFromFinmind(data, latestDate) {
   const stockFlow = {};
   data.filter(d=>d.date===latestDate).forEach(d => {
