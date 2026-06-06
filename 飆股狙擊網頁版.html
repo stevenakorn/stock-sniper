@@ -1183,7 +1183,7 @@ async function startScan() {
   let doneCount = 0;
 
   // 並行掃描：每次同時抓 BATCH_SIZE 檔，大幅提升速度
-  const BATCH_SIZE = 10; // 付費版提高並行數
+  const BATCH_SIZE = 35;
   const toScan = STOCK_LIST.filter(id => !notified.has(id));
 
   for (let i = 0; i < toScan.length; i += BATCH_SIZE) {
@@ -1406,26 +1406,55 @@ function clearHits() {
 // ════════════════════════════════════════
 // 抓取前 N 大市值股票清單
 // ════════════════════════════════════════
-function fetchTopStocks() {
-  // 直接使用內建清單，不需要 API 請求
-  STOCK_LIST   = Object.keys(BUILTIN_STOCKS);
-  stockNameMap = {...BUILTIN_STOCKS};
-  addLog(`✅ 已載入 ${STOCK_LIST.length} 檔台股清單`);
-  document.getElementById("statStocks").textContent = STOCK_LIST.length;
-  return true;
+async function fetchTopStocks() {
+  addLog("從 Finmind 動態載入完整上市櫃股票清單...");
+  try {
+    const url = `${FINMIND_API}?dataset=TaiwanStockInfo&token=${token}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (json && json.data && json.data.length > 500) {
+      stockNameMap = {};
+      STOCK_LIST   = [];
+      json.data.forEach(item => {
+        // 接受 4~6 碼數字代號（涵蓋上市、上櫃、興櫃）
+        if (/^\d{4,6}$/.test(item.stock_id)) {
+          stockNameMap[item.stock_id] = item.stock_name;
+          STOCK_LIST.push(item.stock_id);
+        }
+      });
+      // 合併內建清單（確保不漏）
+      Object.entries(BUILTIN_STOCKS).forEach(([id, name]) => {
+        if (!stockNameMap[id]) {
+          stockNameMap[id] = name;
+          STOCK_LIST.push(id);
+        }
+      });
+      // 去重
+      STOCK_LIST = [...new Set(STOCK_LIST)];
+      addLog(`✅ 動態載入完成：共 ${STOCK_LIST.length} 檔上市櫃股票`);
+      document.getElementById("statStocks").textContent = STOCK_LIST.length;
+      return true;
+    }
+    throw new Error("回傳資料不足");
+  } catch(e) {
+    addLog(`⚠ 動態載入失敗(${e.message})，使用內建清單`, "warn");
+    STOCK_LIST   = Object.keys(BUILTIN_STOCKS);
+    stockNameMap = {...BUILTIN_STOCKS};
+    addLog(`✅ 內建清單：${STOCK_LIST.length} 檔`);
+    document.getElementById("statStocks").textContent = STOCK_LIST.length;
+    return false;
+  }
 }
 
 (async function init() {
   updateClock();
 
-  // 還原 token
+  // Token 已內建，直接啟用
   if (token && token.length > 10) {
-    const inp = document.getElementById("tokenInput");
-    inp.value = token;
-    inp.type  = "password"; // 還原時隱藏
     updateTokenUI(true);
     document.getElementById("btnScan").disabled = false;
-    fetchTopStocks();
+    await fetchTopStocks();
+    loadMoneyFlow();
   }
 
   // 還原今日資料
@@ -2170,7 +2199,9 @@ function onScanSettingChange() {
   if (selectedIndustryPanel === "ALL") {
     pool = Object.keys(stockNameMap).filter(id => /^\d{4}$/.test(id));
   } else {
-    pool = FULL_INDUSTRY_MAP[selectedIndustryPanel] || [];
+    const industryStatic = FULL_INDUSTRY_MAP[selectedIndustryPanel] || [];
+    pool = industryStatic.filter(id => stockNameMap[id]);
+    if (pool.length < 10) pool = Object.keys(stockNameMap).filter(id => /^\d{4}$/.test(id));
   }
 
   if (selectedMarket === "TSE") {
@@ -2193,9 +2224,17 @@ async function startPanelScan() {
   // 建立掃描池
   let pool = [];
   if (selectedIndustryPanel === "ALL") {
+    // 全部：用完整動態清單
     pool = Object.keys(stockNameMap).filter(id => /^\d{4}$/.test(id));
   } else {
-    pool = FULL_INDUSTRY_MAP[selectedIndustryPanel] || [];
+    // 特定產業：先從動態清單，再補 FULL_INDUSTRY_MAP
+    const industryStatic = FULL_INDUSTRY_MAP[selectedIndustryPanel] || [];
+    // 從動態名稱清單找符合產業關鍵字的股票（用 Finmind 的 industry 欄位）
+    pool = industryStatic.filter(id => stockNameMap[id]); // 只保留清單裡有的
+    // 如果靜態清單不夠，補充所有動態清單中代碼範圍符合的
+    if (pool.length < 10) {
+      pool = Object.keys(stockNameMap).filter(id => /^\d{4}$/.test(id));
+    }
   }
 
   if (selectedMarket === "TSE") pool = pool.filter(isListed);
@@ -2206,8 +2245,7 @@ async function startPanelScan() {
     return;
   }
 
-  // 更新全域掃描池並開始掃描
-  STOCK_LIST = pool;
+  STOCK_LIST = [...new Set(pool)];
   document.getElementById("statStocks").textContent = pool.length;
 
   const mktLabel = selectedMarket === "TSE" ? "上市" : selectedMarket === "OTC" ? "上櫃" : "全市場";
