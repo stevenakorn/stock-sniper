@@ -2,7 +2,7 @@
 飆股狙擊系統後端 v9.0 - FinMind 官方精準欄位版
 ======================================================
 1. 修復 twse_institutional 路由因 FinMind 官方法人欄位名稱對齊錯誤導致回傳空資料的 Bug
-2. 完美支援週末自動退回週五數據機制
+2. 完美支援週末自動退回週五數據機制，不需依賴不穩定的證交所網頁爬蟲
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -46,9 +46,9 @@ def stock_price():
     try:
         end_dt = datetime.strptime(end, "%Y-%m-%d")
         if end_dt.date() >= datetime.now().date():
-            if end_dt.weekday() == 5: # 週六
+            if end_dt.weekday() == 5:  # 週六
                 end_dt = end_dt - timedelta(days=1)
-            elif end_dt.weekday() == 6: # 週日
+            elif end_dt.weekday() == 6:  # 週日
                 end_dt = end_dt - timedelta(days=2)
             end = end_dt.strftime("%Y-%m-%d")
     except:
@@ -112,7 +112,7 @@ def margin():
 
 @app.route("/api/twse_institutional")
 def twse_institutional():
-    """【全市場資金雷達】精確比對 FinMind 官方三大法人欄位結構"""
+    """【全市場資金雷達】精確比對 FinMind 官方三大法人欄位結構並加上週末回推機制"""
     token = request.args.get("token", "")
     req_date = request.args.get("date", "") 
     
@@ -128,7 +128,7 @@ def twse_institutional():
         else:
             dt_obj = datetime.now()
             
-        # 週末自動退回週五
+        # 智慧型防錯：若是週六或週日，自動將查詢目標指向週五最新交易日
         if dt_obj.weekday() == 5:
             dt_obj = dt_obj - timedelta(days=1)
         elif dt_obj.weekday() == 6:
@@ -161,7 +161,7 @@ def twse_institutional():
                     "Dealerbuy": 0, "Dealersell": 0, "DealerNet": 0, "TotalNet": 0
                 }
             
-            # 【關鍵修復】精確比對 FinMind 官方法人英文名稱
+            # 關鍵修正點：完全依照 FinMind 付費版官方文件映射格式提取
             legal_by = row.get("institutional_investors", "")
             
             if legal_by == "Foreign_Investor" or "外資" in legal_by:
@@ -172,7 +172,7 @@ def twse_institutional():
                 stock_map[sid]["Investmentbuy"] += buy
                 stock_map[sid]["Investmentsell"] += sell
                 stock_map[sid]["InvestmentNet"] += net
-            else: # 自營商 (Dealer / Dealer_Self / Dealer_Hedging)
+            else: 
                 stock_map[sid]["Dealerbuy"] += buy
                 stock_map[sid]["Dealersell"] += sell
                 stock_map[sid]["DealerNet"] += net
@@ -181,7 +181,6 @@ def twse_institutional():
 
         result = []
         for s in stock_map.values():
-            # 只有當三大法人當天有其中一項有動作時才放進清單，且股數轉張數（除以 1000）
             if s["TotalNet"] != 0 or s["ForeignNet"] != 0 or s["InvestmentNet"] != 0:
                 result.append({
                     "Code": s["Code"], "Name": s["Name"],
@@ -196,10 +195,9 @@ def twse_institutional():
                     "DealerNet": str(round(s["DealerNet"]/1000)),
                     "TotalNet": str(round(s["TotalNet"]/1000)),
                 })
-        
         return jsonify({"data": result, "date": req_date, "status": 200})
     else:
-        return jsonify({"data": [], "msg": f"該日期({target_date})FinMind無法人數據", "status": 404})
+        return jsonify({"data": [], "msg": f"該日期({target_date})無交易數據", "status": 404})
 
 @app.route("/api/clear_cache")
 def clear_cache():
