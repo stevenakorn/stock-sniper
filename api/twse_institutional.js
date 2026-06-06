@@ -1,20 +1,9 @@
+// api/twse_institutional.js
 export default async function handler(req, res) {
-  const token = process.env.FINMIND_TOKEN; 
-  
-  // 診斷用：直接告訴我你抓到了什麼
-  if (!token) {
-    return res.status(400).json({ 
-        error: "無效 Token", 
-        debug: "token 變數為空，請檢查環境變數是否已 Redeploy" 
-    });
-  }
-
-  // 診斷用：確認 Token 是不是長度正確 (不要印出完整 Token 以免外洩)
-  if (token.length < 10) {
-      return res.status(400).json({ error: "Token 長度異常，請檢查是否複製完整" });
-  }
-
   const { date } = req.query;
+  // 記得去 Vercel 設定頁面添加 FINMIND_TOKEN 這個環境變數
+  const token = process.env.FINMIND_TOKEN; 
+
   const url = `https://api.finmindtrade.com/api/v4/data?token=${token}&dataset=TaiwanStockInstitutionalInvestorsBuySell&start_date=${date}&end_date=${date}`;
 
   try {
