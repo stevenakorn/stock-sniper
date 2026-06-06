@@ -1561,21 +1561,30 @@ async function loadMoneyFlowFinmind(tk) {
 }
 
 function renderMoneyFlowData(data, dateStr) {
-  // TWSE 格式：{SecuritiesCompanyCode, StockName, Foreignbuy, Foreignsell, ...}
-  document.getElementById("radarDate").textContent = dateStr + "（最新）";
+  document.getElementById("radarDate").textContent = dateStr;
 
   const stockNet = {};
   data.forEach(d => {
-    const id  = d.Code || d.SecuritiesCompanyCode || d.stock_id || "";
-    if (!id) return;
-    const fNet = (parseInt((d.Foreignbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Foreignsell||"0").replace(/,/g,""))||0);
-    const tNet = (parseInt((d.Investmentbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Investmentsell||"0").replace(/,/g,""))||0);
-    const dNet = (parseInt((d.Dealerbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Dealersell||"0").replace(/,/g,""))||0);
-    stockNet[id] = { name: d.Name||d.StockName||id, net: fNet+tNet+dNet, foreign:fNet, trust:tNet, dealer:dNet };
+    // FinMind 格式對應
+    const id = d.stock_id; 
+    const buy = parseInt(d.buy) || 0;
+    const sell = parseInt(d.sell) || 0;
+    const net = buy - sell;
+
+    if (!stockNet[id]) {
+        stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+    }
+    
+    // 根據 name 分類 (這是 FinMind 資料集的特性)
+    if (d.name.includes("外資")) stockNet[id].foreign += net;
+    else if (d.name.includes("投信")) stockNet[id].trust += net;
+    else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+    
+    stockNet[id].net += net;
   });
+
+  // ... 後續邏輯保持不變 ...
+}
 
   // 產業分類
   const industryFlow = {};
