@@ -1504,61 +1504,94 @@ let radarMode = "all";        // all / foreign / trust / dealer
 let selectedIndustry = null;  // 目前選取的產業
 let moneyFlowData = [];       // 產業資金流向資料
 
+// ════════════════════════════════════════
+// [修復版] 資金流向載入與渲染
+// ════════════════════════════════════════
 async function loadMoneyFlow() {
   document.getElementById("radarList").innerHTML = 
-    '<div class="radar-loading"><div class="radar-spin"></div>載入產業資金流向...</div>';
+    '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
   document.getElementById("flowChart").innerHTML = 
     '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
-  try {
-    // 1. 使用標準 YYYY-MM-DD 格式日期 (FinMind API 需要的格式)
-    const today = new Date().toISOString().split('T')[0]; 
-    
-    // 2. 呼叫你已經部署好、且已設定 Token 的後端 API
-    // 這裡直接用你的 Vercel 後端網址
-    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
-    console.log("正在請求後端 API:", url);
+  const today = new Date().toISOString().split('T')[0]; 
+  const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
 
+  try {
     const res = await fetch(url);
     const json = await res.json();
-
     if (json && json.data) {
-        // 3. 成功取得資料，直接渲染
         renderMoneyFlowData(json.data, today);
         addLog("✅ 資金雷達更新成功");
     } else {
-        throw new Error("API 回傳資料格式異常，請檢查 Token 設定");
+        throw new Error("格式錯誤");
     }
   } catch(e) {
-    console.error("資金雷達錯誤:", e);
-    document.getElementById("radarList").innerHTML = 
-      `<div class="radar-loading" style="color:var(--red)">載入失敗，請確認 Token</div>`;
     addLog("資金雷達載入失敗", "err");
+    document.getElementById("radarList").innerHTML = "載入失敗";
   }
 }
-async function loadMoneyFlowFinmind(tk) {
-  try {
-    const fmtLocal = d => {
-      const y   = d.getFullYear();
-      const m   = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}-${m}-${day}`;
-    };
-    const today  = new Date();
-    const start7 = new Date(); start7.setDate(today.getDate()-7);
-    const url = `${BACKEND_URL}/api/institutional?token=${tk}&start_date=${fmtLocal(start7)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    const json = await res.json();
-    if (!json.data || !json.data.length) throw new Error("無資料");
-    const allDates = [...new Set(json.data.map(d=>d.date))].sort();
-    const latestDate = allDates[allDates.length-1];
-    document.getElementById("radarDate").textContent = latestDate + "（最新）";
-    renderMoneyFlowFromFinmind(json.data, latestDate);
-  } catch(e) {
-    document.getElementById("radarList").innerHTML =
-      `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
+
+function renderMoneyFlowData(data, dateStr) {
+  document.getElementById("radarDate").textContent = dateStr;
+
+  const stockNet = {};
+  data.forEach(d => {
+    const id = d.stock_id; 
+    const buy = parseInt(d.buy) || 0;
+    const sell = parseInt(d.sell) || 0;
+    const net = buy - sell;
+
+    if (!stockNet[id]) {
+        stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+    }
+    
+    if (d.name.includes("外資")) stockNet[id].foreign += net;
+    else if (d.name.includes("投信")) stockNet[id].trust += net;
+    else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+    
+    stockNet[id].net += net;
+  });
+
+  const industryFlow = {};
+  for (const [id, flow] of Object.entries(stockNet)) {
+    const ind = getIndustry(id);
+    if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
+    industryFlow[ind].foreign += flow.foreign;
+    industryFlow[ind].trust   += flow.trust;
+    industryFlow[ind].dealer  += flow.dealer;
+    industryFlow[ind].total   += flow.net;
+    industryFlow[ind].stocks++;
   }
-}
+  
+  moneyFlowData = Object.entries(industryFlow)
+    .map(([name,f]) => ({name,...f}))
+    .filter(d => d.stocks > 0)
+    .sort((a,b) => b.total - a.total);
+    
+  renderRadar();
+
+  const sorted = Object.values(stockNet)
+    .filter(d => d.net !== 0)
+    .sort((a,b) => b.net - a.net);
+  const top10 = sorted.slice(0,10);
+  const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
+  const totalNet = top10.reduce((s,d)=>s+d.net,0);
+
+  document.getElementById("flowTotal").textContent =
+    (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+
+  document.getElementById("flowChart").innerHTML = top10.map(d => {
+    const pct = Math.abs(d.net)/maxVal*88;
+    return `<div class="flow-row">
+        <span class="flow-label">${esc(d.name)}</span>
+        <div class="flow-bar-wrap">
+          <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
+            <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+          </div>
+        </div>
+    </div>`;
+  }).join("");
+} // <--- 這個括號非常重要，它確保 renderMoneyFlowData 結束了
 
 // 這是已經修正完畢的完整函式，請直接覆蓋
 function renderMoneyFlowData(data, dateStr) {
