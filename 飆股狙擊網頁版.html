@@ -1828,50 +1828,23 @@ function clearIndustryFilter() {
 // 匯出盤後分析報告
 // ════════════════════════════════════════
 function exportReport() {
-  if (!hits || hits.length === 0) { 
-    alert("尚無分析資料，請先執行盤後分析"); 
-    return; 
-  }
-
-  // 1. 建立簡單的代號轉中文對映表 (建議優先在後端處理，但前端這樣做最快)
-  const stockNameMap = { "2330": "台積電", "2317": "鴻海", "3023": "信邦" /*...請依序加入你的清單...*/ };
+  if (!hits.length) { alert("尚無分析資料，請先執行盤後分析"); return; }
 
   const today = new Date().toLocaleDateString("zh-TW");
   const now   = new Date().toLocaleTimeString("zh-TW");
-
-  // 2. 處理資料：加入名稱對應，並防止 undefined 造成斷裂
   const withStars = hits
-    .map(h => ({ 
-      ...h, 
-      stars: calcStars(h),
-      name: stockNameMap[h.id] || h.id // 這裡將代號轉為中文名稱
-    }))
+    .map(h => ({ ...h, stars: calcStars(h) }))
     .sort((a,b) => b.stars - a.stars || (b.chipScore||0) - (a.chipScore||0));
 
-  // 3. 分組邏輯
-  const groups = [
-    { title: "五星飆股", list: withStars.filter(h => h.stars === 5) },
-    { title: "四星潛力", list: withStars.filter(h => h.stars === 4) },
-    { title: "三星觀察", list: withStars.filter(h => h.stars === 3) }
-  ];
+  const s5 = withStars.filter(h => h.stars === 5);
+  const s4 = withStars.filter(h => h.stars === 4);
+  const s3 = withStars.filter(h => h.stars === 3);
+  const s2 = withStars.filter(h => h.stars === 2);
+  const s1 = withStars.filter(h => h.stars === 1);
 
-  // 4. 建立 CSV 格式內容 (避免用字串硬刻，用 CSV 格式更穩定)
-  let csvContent = "\ufeff代號,名稱,評分,籌碼分數,當日漲幅\n";
-  
-  withStars.forEach(h => {
-    csvContent += `${h.id},${h.name},${h.stars||0},${h.chipScore||0},${(h.change||0).toFixed(2)}%\n`;
-  });
+  const LINE = "═".repeat(60);
+  const THIN = "─".repeat(60);
 
-  // 5. 下載檔案
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `飆股狙擊報告_${today.replace(/\//g, '')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
   function fmtStock(h) {
     const stars   = "★".repeat(h.stars) + "☆".repeat(5-h.stars);
     const chipStr = h.chipScore !== undefined ? ("籌碼評分 " + h.chipScore + "/5") : "籌碼：未抓取";
