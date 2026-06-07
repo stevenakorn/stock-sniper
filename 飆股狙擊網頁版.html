@@ -1509,32 +1509,26 @@ let moneyFlowData = [];       // 產業資金流向資料
 // ════════════════════════════════════════
 // 重新確保資金雷達相關函式完整且無錯
 async function loadMoneyFlow() {
-    // 強制取得台灣時間的日期 (YYYY-MM-DD)
-    const now = new Date();
-    const offset = 8; // 台北時區 UTC+8
-    const taipeiDate = new Date(now.getTime() + (offset * 60 * 60 * 1000));
-    const today = taipeiDate.toISOString().split('T')[0];
-
-    // 顯示在 UI 上
-    document.getElementById("radarDate").textContent = today;
-    
-    // 輸出 URL 檢查：確保這串網址在 Console 中看到的日期是對的
+    const today = new Date().toISOString().split('T')[0]; // 取得今天的日期
     const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
-    console.log("正在請求後端 API (日期已校正):", url);
-
-    document.getElementById("radarList").innerHTML = '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
-
+    
+    document.getElementById("radarList").innerHTML = '<div class="radar-loading">載入中...</div>';
+    
     try {
         const res = await fetch(url);
-        const data = await res.json();
+        const json = await res.json();
         
-        // 檢查後端是否回傳了正確的資料日期
-        if (data && data.data) {
-            console.log("後端回傳資料日期:", data.date);
-            renderMoneyFlowData(data.data, data.date || today);
-            addLog("✅ 資金雷達更新成功");
+        console.log("後端回傳資料:", json);
+
+        // 改進：即便 json.date 是 undefined，我們就顯示 today
+        const displayDate = json.date || today; 
+        document.getElementById("radarDate").textContent = displayDate;
+
+        if (json && json.data && json.data.length > 0) {
+            renderMoneyFlowData(json.data, displayDate);
+            addLog(`✅ 資金雷達更新成功 (${displayDate})`);
         } else {
-            addLog("API 無資料", "warn");
+            addLog("今日無交易資料", "warn");
         }
     } catch (e) {
         addLog("資金雷達載入失敗", "err");
