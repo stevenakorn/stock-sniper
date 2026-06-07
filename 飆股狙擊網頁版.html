@@ -1509,35 +1509,39 @@ let moneyFlowData = [];       // 產業資金流向資料
 // ════════════════════════════════════════
 // 重新確保資金雷達相關函式完整且無錯
 async function loadMoneyFlow() {
+    // 強制取得台灣時間的日期 (YYYY-MM-DD)
     const now = new Date();
-    // 強制校正為台北時間
-    const taipeiDate = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const offset = 8; // 台北時區 UTC+8
+    const taipeiDate = new Date(now.getTime() + (offset * 60 * 60 * 1000));
     const today = taipeiDate.toISOString().split('T')[0];
 
-    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
+    // 顯示在 UI 上
+    document.getElementById("radarDate").textContent = today;
     
-    document.getElementById("radarList").innerHTML = '<div class="radar-loading">載入中...</div>';
+    // 輸出 URL 檢查：確保這串網址在 Console 中看到的日期是對的
+    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
+    console.log("正在請求後端 API (日期已校正):", url);
+
+    document.getElementById("radarList").innerHTML = '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
     try {
         const res = await fetch(url);
-        const json = await res.json();
+        const data = await res.json();
         
-        console.log("後端回傳完整資料:", json);
-
-        // 確保我們正確讀取後端回傳的 date 和 data
-        if (json && json.data) {
-            const displayDate = json.date || today; // 優先使用後端回推後的日期
-            console.log("後端回傳資料日期:", displayDate);
-            renderMoneyFlowData(json.data, displayDate);
-            addLog(`✅ 資金雷達更新成功 (${displayDate})`);
+        // 檢查後端是否回傳了正確的資料日期
+        if (data && data.data) {
+            console.log("後端回傳資料日期:", data.date);
+            renderMoneyFlowData(data.data, data.date || today);
+            addLog("✅ 資金雷達更新成功");
         } else {
-            throw new Error("API 無資料");
+            addLog("API 無資料", "warn");
         }
     } catch (e) {
         addLog("資金雷達載入失敗", "err");
         console.error(e);
     }
-}function renderMoneyFlowData(data, dateStr) {
+}
+function renderMoneyFlowData(data, dateStr) {
     document.getElementById("radarDate").textContent = dateStr;
     const stockNet = {};
     
