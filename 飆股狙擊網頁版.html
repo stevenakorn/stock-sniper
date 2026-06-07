@@ -1585,15 +1585,39 @@ function renderMoneyFlowData(data, dateStr) {
 
     document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
     document.getElementById("flowChart").innerHTML = top10.map(d => {
-        const pct = Math.abs(d.net)/maxVal*88;
+        // 1. 取得買超與賣超排行
+    const sorted = Object.values(stockNet)
+        .filter(d => d.net !== 0)
+        .sort((a, b) => b.net - a.net);
+    
+    const buyTop10 = sorted.slice(0, 10);
+    const sellTop10 = sorted.slice(-10).reverse(); // 賣超排行 (負值最大的在前面)
+    
+    // 2. 定義統一的渲染邏輯 (內嵌在裡面，確保不影響外部架構)
+    const renderBar = (d) => {
+        const pct = Math.abs(d.net) / (Math.max(...sorted.map(x => Math.abs(x.net))) || 1) * 88;
+        const isUp = d.net >= 0;
         return `<div class="flow-row">
             <span class="flow-label">${esc(d.name)}</span>
             <div class="flow-bar-wrap">
-              <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
-                <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
-              </div>
+                <div class="flow-bar ${isUp ? 'up' : 'down'}" style="width:${pct}%">
+                    <span class="flow-val">${(d.net / 1000).toFixed(1)}K</span>
+                </div>
             </div>
         </div>`;
+    };
+
+    // 3. 渲染進去
+    document.getElementById("flowChart").innerHTML = `
+        <div style="margin-bottom:15px">
+            <div style="font-size:11px; color:#ff3e3e; margin-bottom:5px;">🚀 買超前十大</div>
+            ${buyTop10.map(renderBar).join("")}
+        </div>
+        <div>
+            <div style="font-size:11px; color:#00c853; margin-bottom:5px;">📉 賣超前十大</div>
+            ${sellTop10.map(renderBar).join("")}
+        </div>
+    `;
     }).join("");
 }
 // 這是已經修正完畢的完整函式，請直接覆蓋
