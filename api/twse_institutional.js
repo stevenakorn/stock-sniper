@@ -1,27 +1,22 @@
+// 注意：請將 YOUR_ACTUAL_TOKEN_HERE 替換為你申請到的真實 FinMind Token
+const MY_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+
 export default async function handler(req, res) {
-  // 1. 取得日期與 Token
   let { date } = req.query;
-  // 確保這裡讀取的環境變數名稱與 Vercel 後台設定完全一致
-  const token = process.env.FINMIND_TOKEN;
+  
+  // 直接使用寫死的 Token，繞過環境變數問題
+  const token = MY_TOKEN;
 
-  // 2. 錯誤檢查：Token 是否設定
-  if (!token) {
-    return res.status(400).json({ 
-      error: "後端通道未獲取付費 Token 金鑰", 
-      status: 400 
-    });
-  }
-
-  // 若沒給日期，強制設為今天
+  // 若沒給日期，預設今天
   if (!date) {
     date = new Date().toISOString().split('T')[0];
   }
 
-  // 3. 核心功能：自動回推交易日機制
+  // 核心功能：若無資料，自動往前找最近的交易日
   async function fetchWithFallback(currentDate, retries = 5) {
     if (retries <= 0) return null;
 
-    // 使用 Authorization Header 請求，比網址參數更穩定
+    // 使用寫死的 token 進行請求
     const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&start_date=${currentDate}&end_date=${currentDate}`;
     
     try {
@@ -49,7 +44,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // 4. 執行與回應
+  // 執行撈取
   const result = await fetchWithFallback(date);
   
   if (!result) {
