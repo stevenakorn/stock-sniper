@@ -1551,49 +1551,37 @@ function renderMoneyFlowData(data, dateStr) {
         const buy = parseInt(d.buy) || 0;
         const sell = parseInt(d.sell) || 0;
         const net = buy - sell;
-        if (!stockNet[id]) stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
-        if (d.name.includes("外資")) stockNet[id].foreign += net;
-        else if (d.name.includes("投信")) stockNet[id].trust += net;
-        else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+        if (!stockNet[id]) stockNet[id] = { name: d.stock_name || id, net: 0 };
         stockNet[id].net += net;
     });
 
-    const industryFlow = {};
-    for (const [id, flow] of Object.entries(stockNet)) {
-        const ind = getIndustry(id);
-        if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
-        industryFlow[ind].foreign += flow.foreign;
-        industryFlow[ind].trust += flow.trust;
-        industryFlow[ind].dealer += flow.dealer;
-        industryFlow[ind].total += flow.net;
-        industryFlow[ind].stocks++;
-    }
+    const sorted = Object.values(stockNet).filter(d => d.net !== 0).sort((a,b) => b.net - a.net);
     
-    moneyFlowData = Object.entries(industryFlow)
-        .map(([name,f]) => ({name,...f}))
-        .filter(d => d.stocks > 0)
-        .sort((a,b) => b.total - a.total);
-        
-    renderRadar();
+    // 取買超前十大 與 賣超前十大
+    const buyTop10 = sorted.slice(0, 10);
+    const sellTop10 = sorted.slice(-10).reverse();
+    
+    // 渲染「法人合計淨買/賣超」區域
+    document.getElementById("flowChart").innerHTML = `
+        <div style="font-size:11px;color:var(--text2);margin-bottom:5px">🚀 買超前十大</div>
+        ${buyTop10.map(d => renderFlowRow(d, 'up')).join('')}
+        <div style="font-size:11px;color:var(--text2);margin:10px 0 5px">📉 賣超前十大</div>
+        ${sellTop10.map(d => renderFlowRow(d, 'down')).join('')}
+    `;
+}
 
-    const sorted = Object.values(stockNet)
-        .filter(d => d.net !== 0)
-        .sort((a,b) => b.net - a.net);
-    const top10 = sorted.slice(0,10);
-    const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
-    const totalNet = top10.reduce((s,d) => s + d.net, 0);
-
-    document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
-    document.getElementById("flowChart").innerHTML = top10.map(d => {
-        const pct = Math.abs(d.net)/maxVal*88;
-        return `<div class="flow-row">
-            <span class="flow-label">${esc(d.name)}</span>
-            <div class="flow-bar-wrap">
-              <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
+// 輔助函式：渲染長條圖
+function renderFlowRow(d, type) {
+    const val = Math.abs(d.net);
+    return `<div class="flow-row">
+        <span class="flow-label">${esc(d.name)}</span>
+        <div class="flow-bar-wrap">
+            <div class="flow-bar ${type}" style="width:50%">
                 <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
-              </div>
             </div>
-        </div>`;
+        </div>
+    </div>`;
+}
     }).join("");
 }
 // 這是已經修正完畢的完整函式，請直接覆蓋
