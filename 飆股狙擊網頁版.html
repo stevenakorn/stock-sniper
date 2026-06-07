@@ -1542,6 +1542,11 @@ async function loadMoneyFlow(targetDate = null) {
         addLog("雷達連線錯誤", "err");
     }
 }
+// ════════════════════════════════════════
+// [整合修正區] 請取代您原代碼中的對應函數
+// ════════════════════════════════════════
+
+// 1. 資金流向與買賣超十大渲染
 function renderMoneyFlowData(data, dateStr) {
     document.getElementById("radarDate").textContent = dateStr;
     const stockNet = {};
@@ -1551,62 +1556,109 @@ function renderMoneyFlowData(data, dateStr) {
         const buy = parseInt(d.buy) || 0;
         const sell = parseInt(d.sell) || 0;
         const net = buy - sell;
-        if (!stockNet[id]) stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
-        if (d.name.includes("外資")) stockNet[id].foreign += net;
-        else if (d.name.includes("投信")) stockNet[id].trust += net;
-        else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+        if (!stockNet[id]) stockNet[id] = { name: stockNameMap[id] || d.stock_name || id, net: 0 };
         stockNet[id].net += net;
     });
 
-    const industryFlow = {};
-    for (const [id, flow] of Object.entries(stockNet)) {
-        const ind = getIndustry(id);
-        if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
-        industryFlow[ind].foreign += flow.foreign;
-        industryFlow[ind].trust += flow.trust;
-        industryFlow[ind].dealer += flow.dealer;
-        industryFlow[ind].total += flow.net;
-        industryFlow[ind].stocks++;
-    }
+    const sorted = Object.values(stockNet).filter(d => d.net !== 0).sort((a,b) => b.net - a.net);
+    const buyTop10 = sorted.slice(0, 10);
+    const sellTop10 = sorted.slice(-10).reverse();
     
-    moneyFlowData = Object.entries(industryFlow)
-        .map(([name,f]) => ({name,...f}))
-        .filter(d => d.stocks > 0)
-        .sort((a,b) => b.total - a.total);
-        
-    renderRadar();
-
-    const sorted = Object.values(stockNet)
-        .filter(d => d.net !== 0)
-        .sort((a,b) => b.net - a.net);
-    const top10 = sorted.slice(0,10);
-    const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
-    const totalNet = top10.reduce((s,d) => s + d.net, 0);
-
-    document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
-    document.getElementById("flowChart").innerHTML = top10.map(d => {
-        // 1. 取得買超與賣超排行
-   // --- 取代你原本的渲染邏輯 ---
-const sorted = Object.values(stockNet)
-    .filter(d => d.net !== 0)
-    .sort((a, b) => b.net - a.net);
-
-const buyTop10 = sorted.slice(0, 10); // 買超前十
-const sellTop10 = sorted.slice(-10).reverse(); // 賣超前十 (負值最大排最前)
-
-// 定義一個通用的 Bar 渲染函式
-const renderBar = (d) => {
-    const pct = Math.abs(d.net) / (Math.max(...sorted.map(x => Math.abs(x.net))) || 1) * 88;
-    return `
-    <div class="flow-row">
-        <span class="flow-label">${esc(d.name)}</span>
-        <div class="flow-bar-wrap">
-            <div class="flow-bar ${d.net >= 0 ? 'up' : 'down'}" style="width:${pct}%">
-                <span class="flow-val">${(d.net / 1000).toFixed(1)}K</span>
+    const renderBar = (d) => {
+        const pct = Math.abs(d.net) / (Math.max(...sorted.map(x => Math.abs(x.net))) || 1) * 88;
+        return `<div class="flow-row">
+            <span class="flow-label">${esc(d.name)}</span>
+            <div class="flow-bar-wrap">
+                <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
+                    <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+                </div>
             </div>
-        </div>
-    </div>`;
-};
+        </div>`;
+    };
+
+    const totalNet = buyTop10.reduce((s,d) => s + d.net, 0);
+    document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+
+    document.getElementById("flowChart").innerHTML = `
+        <div style="margin-bottom:15px"><div style="font-size:11px; color:#ff3e3e; margin-bottom:5px;">🚀 買超前十大</div>${buyTop10.map(renderBar).join("")}</div>
+        <div><div style="font-size:11px; color:#00c853; margin-bottom:5px;">📉 賣超前十大</div>${sellTop10.map(renderBar).join("")}</div>
+    `;
+}
+
+// 2. 匯出分析報告 (修正亂碼與中文對映)
+function exportReport() {
+    if (!hits || hits.length === 0) { 
+        alert("尚無分析資料，請先執行盤後分析"); 
+        return; 
+    }
+
+    const today = new Date().toLocaleDateString("zh-TW").replace(/\//g, "-");
+    // 加入 \ufeff 解決 Excel 亂碼
+    let csvContent = "\ufeff代號,股票名稱,策略型態,評分,籌碼分數,當日漲幅,訊號詳情\n";
+    
+    const withStars = hits
+        .map(h => ({ ...h, stars: calcStars(h) }))
+        .sort((a, b) => b.stars - a.stars || (b.chipScore || 0) - (a.chipScore || 0));
+
+    withStars.forEach(h => {
+        // 使用 stockNameMap 確保輸出中文名稱
+        const name = stockNameMap[h.id] || h.name || h.id;
+        csvContent += `${h.id},${name},${h.label||""},${h.stars||0},${h.chipScore||0},${h.changePct||0}%,${(h.detail||"").replace(/,/g," ")}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `飆股狙擊報告_${today}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    addLog("✅ 報告已匯出");
+}
+
+// 3. 訊號清單渲染 (確保清單顯示中文)
+function renderHits() {
+    const c = document.getElementById("hitsContainer");
+    const withStars = hits.map(h => ({ ...h, stars: calcStars(h) }));
+
+    let filtered = withStars;
+    if (filterType !== "all") filtered = filtered.filter(h => h.type === filterType);
+    if (starFilter > 0) filtered = filtered.filter(h => h.stars >= starFilter);
+    filtered.sort((a,b) => b.stars - a.stars || b.chipScore - a.chipScore);
+
+    document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+    document.getElementById("statHits").textContent = hits.length;
+
+    if (!filtered.length) {
+        c.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">無符合訊號</div></div>`;
+        return;
+    }
+
+    c.innerHTML = filtered.map(h => {
+        const up = parseFloat(h.changePct) >= 0;
+        const stars = h.stars;
+        const starStr = "★".repeat(stars) + "☆".repeat(5-stars);
+        // 使用 stockNameMap 對映中文
+        const displayName = stockNameMap[h.id] || h.name || h.id;
+        
+        return `
+        <div class="hit-card ${h.type} s${stars}">
+          <div style="min-width:60px">
+            <div class="hit-type ${h.type}">${h.label}</div>
+            <div class="star-badge s${stars}" style="margin-top:4px;font-size:11px">${starStr}</div>
+          </div>
+          <div class="hit-info">
+            <div class="hit-name">${esc(displayName)}</div>
+            <div class="hit-code"><span>${h.id}</span></div>
+            <div class="hit-detail">${esc(h.detail)}</div>
+          </div>
+          <div class="hit-price">
+            <div class="hit-price-val">$${h.close}</div>
+            <div class="hit-change ${up?"up":"down"}">${up?"+":""}${h.changePct}%</div>
+          </div>
+        </div>`;
+    }).join("");
+}
 
 // 使用 Template Literal 同時渲染兩塊
 document.getElementById("flowChart").innerHTML = `
