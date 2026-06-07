@@ -1508,14 +1508,13 @@ let moneyFlowData = [];       // 產業資金流向資料
 // [修復版] 資金流向載入與渲染
 // ════════════════════════════════════════
 // 重新確保資金雷達相關函式完整且無錯
-async function loadMoneyFlow() {
-    // 取得今天的日期 (YYYY-MM-DD)
-    const today = new Date().toISOString().split('T')[0];
+async function loadMoneyFlow(targetDate = null) {
+    // 如果沒給日期，就預設今天
+    if (!targetDate) targetDate = new Date().toISOString().split('T')[0];
     
-    // 將日期作為參數傳送給後端，並加上時間戳防止快取
-    const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
+    const url = `${BACKEND_URL}/api/twse_institutional?date=${targetDate}&_t=${Date.now()}`;
     
-    document.getElementById("radarList").innerHTML = '<div class="radar-loading">載入中...</div>';
+    document.getElementById("radarList").innerHTML = '<div class="radar-loading">正在尋找最近交易日...</div>';
     
     try {
         const res = await fetch(url);
@@ -1523,20 +1522,24 @@ async function loadMoneyFlow() {
         
         console.log("後端回傳資料:", json);
 
-        // 如果後端回傳成功 (status 200)，使用後端回傳的 date
-        if (json && json.status === 200 && json.data) {
-            const displayDate = json.date || today;
+        if (json && json.data && json.data.length > 0) {
+            // 成功獲取資料
+            const displayDate = json.date || targetDate;
             document.getElementById("radarDate").textContent = displayDate;
             renderMoneyFlowData(json.data, displayDate);
-            addLog(`✅ 資金雷達更新成功 (${displayDate})`);
+            addLog(`✅ 資料載入成功 (${displayDate})`);
         } else {
-            // 如果後端回傳 404 (無資料)，顯示提示
-            document.getElementById("radarDate").textContent = today + " (無資料)";
-            addLog(json.msg || "今日無交易資料", "warn");
+            // 如果後端回傳無資料，自動將日期往前推一天並再次嘗試
+            addLog(`日期 ${targetDate} 無資料，嘗試往前尋找...`, "warn");
+            const d = new Date(targetDate);
+            d.setDate(d.getDate() - 1);
+            const prevDate = d.toISOString().split('T')[0];
+            
+            // 遞迴呼叫：嘗試前一天
+            loadMoneyFlow(prevDate);
         }
     } catch (e) {
-        addLog("資金雷達載入失敗", "err");
-        console.error(e);
+        addLog("雷達連線錯誤", "err");
     }
 }
 function renderMoneyFlowData(data, dateStr) {
