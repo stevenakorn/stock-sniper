@@ -1509,7 +1509,10 @@ let moneyFlowData = [];       // 產業資金流向資料
 // ════════════════════════════════════════
 // 重新確保資金雷達相關函式完整且無錯
 async function loadMoneyFlow() {
-    const today = new Date().toISOString().split('T')[0]; // 取得今天的日期
+    // 取得今天的日期 (YYYY-MM-DD)
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 將日期作為參數傳送給後端，並加上時間戳防止快取
     const url = `${BACKEND_URL}/api/twse_institutional?date=${today}&_t=${Date.now()}`;
     
     document.getElementById("radarList").innerHTML = '<div class="radar-loading">載入中...</div>';
@@ -1520,15 +1523,16 @@ async function loadMoneyFlow() {
         
         console.log("後端回傳資料:", json);
 
-        // 改進：即便 json.date 是 undefined，我們就顯示 today
-        const displayDate = json.date || today; 
-        document.getElementById("radarDate").textContent = displayDate;
-
-        if (json && json.data && json.data.length > 0) {
+        // 如果後端回傳成功 (status 200)，使用後端回傳的 date
+        if (json && json.status === 200 && json.data) {
+            const displayDate = json.date || today;
+            document.getElementById("radarDate").textContent = displayDate;
             renderMoneyFlowData(json.data, displayDate);
             addLog(`✅ 資金雷達更新成功 (${displayDate})`);
         } else {
-            addLog("今日無交易資料", "warn");
+            // 如果後端回傳 404 (無資料)，顯示提示
+            document.getElementById("radarDate").textContent = today + " (無資料)";
+            addLog(json.msg || "今日無交易資料", "warn");
         }
     } catch (e) {
         addLog("資金雷達載入失敗", "err");
