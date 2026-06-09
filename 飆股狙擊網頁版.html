@@ -1406,41 +1406,68 @@ function clearHits() {
 // 抓取前 N 大市值股票清單
 // ════════════════════════════════════════
 async function fetchTopStocks() {
-  addLog("從 Finmind 動態載入完整上市櫃股票清單...");
+  addLog("載入完整上市+上櫃+ETF 清單（Finmind + TWSE + TPEx）...");
   try {
-    const url = `${FINMIND_API}?dataset=TaiwanStockInfo&token=${token}`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    const json = await res.json();
-    if (json && json.data && json.data.length > 500) {
-      stockNameMap = {};
-      STOCK_LIST   = [];
-      json.data.forEach(item => {
-        // 接受 4~6 碼數字代號（涵蓋上市、上櫃、興櫃）
-        if (/^\d{4,6}$/.test(item.stock_id)) {
-          stockNameMap[item.stock_id] = item.stock_name;
-          STOCK_LIST.push(item.stock_id);
+    // 同時抓三個來源
+    const [finmindRes, twseRes, tpexRes] = await Promise.allSettled([
+      // 1. Finmind TaiwanStockInfo（含上市上櫃）
+      fetch(`${FINMIND_API}?dataset=TaiwanStockInfo&token=${token}`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
+      // 2. TWSE 上市股票清單（含ETF）
+      fetch(`${BACKEND_URL}/api/twse_stock_list?_t=${Date.now()}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json()),
+      // 3. TPEx 上櫃股票清單（含ETF）
+      fetch(`${BACKEND_URL}/api/tpex_stock_list?_t=${Date.now()}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json()),
+    ]);
+
+    // 先以內建為底
+    stockNameMap = {...BUILTIN_STOCKS};
+
+    // 合併 Finmind
+    if (finmindRes.status === "fulfilled" && finmindRes.value?.data) {
+      finmindRes.value.data.forEach(item => {
+        if (/^\d{4,6}$/.test(item.stock_id||"")) {
+          stockNameMap[item.stock_id] = item.stock_name || item.stock_id;
         }
       });
-      // 合併內建清單（確保不漏）
-      Object.entries(BUILTIN_STOCKS).forEach(([id, name]) => {
-        if (!stockNameMap[id]) {
-          stockNameMap[id] = name;
-          STOCK_LIST.push(id);
-        }
-      });
-      // 去重
-      STOCK_LIST = [...new Set(STOCK_LIST)];
-      addLog(`✅ 動態載入完成：共 ${STOCK_LIST.length} 檔上市櫃股票`);
-      document.getElementById("statStocks").textContent = STOCK_LIST.length;
-      return true;
+      addLog(`Finmind: ${finmindRes.value.data.length} 筆`);
     }
-    throw new Error("回傳資料不足");
+
+    // 合併 TWSE 上市
+    if (twseRes.status === "fulfilled" && twseRes.value?.data) {
+      twseRes.value.data.forEach(item => {
+        const id = item.id || item.code || item.stock_id || "";
+        const name = item.name || item.stock_name || id;
+        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = name;
+      });
+      addLog(`TWSE 上市: ${twseRes.value.data.length} 筆`);
+    }
+
+    // 合併 TPEx 上櫃
+    if (tpexRes.status === "fulfilled" && tpexRes.value?.data) {
+      tpexRes.value.data.forEach(item => {
+        const id = item.id || item.code || item.stock_id || "";
+        const name = item.name || item.stock_name || id;
+        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = name;
+      });
+      addLog(`TPEx 上櫃: ${tpexRes.value.data.length} 筆`);
+    }
+
+    STOCK_LIST = [...new Set(Object.keys(stockNameMap))].sort();
+    addLog(`✅ 合併完成：共 ${STOCK_LIST.length} 檔（上市+上櫃+ETF）`);
+    document.getElementById("statStocks").textContent = STOCK_LIST.length;
+    document.getElementById("sysStatus").textContent = "待機";
+    document.getElementById("btnScan").disabled = false;
+    document.getElementById("hitsContainer").innerHTML =
+      `<div class="empty-state"><div class="empty-icon">📡</div>
+       <div class="empty-text">已載入 ${STOCK_LIST.length} 檔，請選擇產業別開始掃描</div></div>`;
+    return true;
+
   } catch(e) {
-    addLog(`⚠ 動態載入失敗(${e.message})，使用內建清單`, "warn");
-    STOCK_LIST   = Object.keys(BUILTIN_STOCKS);
+    addLog(`⚠ 載入失敗(${e.message})，使用內建清單`, "warn");
+    STOCK_LIST   = Object.keys(BUILTIN_STOCKS).sort();
     stockNameMap = {...BUILTIN_STOCKS};
     addLog(`✅ 內建清單：${STOCK_LIST.length} 檔`);
     document.getElementById("statStocks").textContent = STOCK_LIST.length;
+    document.getElementById("btnScan").disabled = false;
     return false;
   }
 }
@@ -1582,20 +1609,55 @@ async function loadMoneyFlowFinmind(tk) {
 }
 
 function renderMoneyFlowData(data, dateStr) {
-  // TWSE 格式：{SecuritiesCompanyCode, StockName, Foreignbuy, Foreignsell, ...}
-  document.getElementById("radarDate").textContent = dateStr + "（最新）";
+  // 支援兩種格式：
+  // 1. TWSE後端格式: {Code, Name, Foreignbuy, Foreignsell, Investmentbuy, ...}
+  // 2. Finmind個股格式: {stock_id, name, buy, sell} (name = Foreign_Investor 等)
+  const radarDateEl = document.getElementById("radarDate");
+  if (radarDateEl) {
+    // 民國年轉西元
+    if (dateStr && dateStr.length === 7 && /^\d{7}$/.test(dateStr)) {
+      radarDateEl.textContent = `${parseInt(dateStr.substring(0,3))+1911}-${dateStr.substring(3,5)}-${dateStr.substring(5,7)}（最新）`;
+    } else {
+      radarDateEl.textContent = (dateStr||"--") + "（最新）";
+    }
+  }
 
   const stockNet = {};
+
   data.forEach(d => {
-    const id  = d.Code || d.SecuritiesCompanyCode || d.stock_id || "";
+    const id = d.Code || d.stock_id || "";
     if (!id) return;
-    const fNet = (parseInt((d.Foreignbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Foreignsell||"0").replace(/,/g,""))||0);
-    const tNet = (parseInt((d.Investmentbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Investmentsell||"0").replace(/,/g,""))||0);
-    const dNet = (parseInt((d.Dealerbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Dealersell||"0").replace(/,/g,""))||0);
-    stockNet[id] = { name: d.Name||d.StockName||id, net: fNet+tNet+dNet, foreign:fNet, trust:tNet, dealer:dNet };
+    if (!/^\d+$/.test(id)) return; // 過濾非數字代號
+
+    const chineseName = stockNameMap[id] || BUILTIN_STOCKS[id] || d.Name || d.stock_name || id;
+
+    if (!stockNet[id]) stockNet[id] = { name: chineseName, net: 0, foreign: 0, trust: 0, dealer: 0 };
+
+    // 格式一：TWSE 格式（有 Foreignbuy 欄位）
+    if (d.Foreignbuy !== undefined) {
+      const fNet = (parseInt(String(d.Foreignbuy||"0").replace(/,/g,""))||0) -
+                   (parseInt(String(d.Foreignsell||"0").replace(/,/g,""))||0);
+      const tNet = (parseInt(String(d.Investmentbuy||"0").replace(/,/g,""))||0) -
+                   (parseInt(String(d.Investmentsell||"0").replace(/,/g,""))||0);
+      const dNet = (parseInt(String(d.Dealerbuy||"0").replace(/,/g,""))||0) -
+                   (parseInt(String(d.Dealersell||"0").replace(/,/g,""))||0);
+      stockNet[id].foreign = fNet;
+      stockNet[id].trust   = tNet;
+      stockNet[id].dealer  = dNet;
+      stockNet[id].net     = fNet + tNet + dNet;
+    }
+    // 格式二：Finmind 個股格式（有 name 欄位標示法人種類）
+    else if (d.name !== undefined) {
+      const net = (parseInt(d.buy||0)) - (parseInt(d.sell||0));
+      const nm  = d.name || "";
+      if (["Foreign_Investor","外資","外資及陸資"].includes(nm))
+        stockNet[id].foreign += net;
+      else if (["Investment_Trust","投信"].includes(nm))
+        stockNet[id].trust += net;
+      else if (["Dealer_self","Dealer_Hedging","自營商"].includes(nm))
+        stockNet[id].dealer += net;
+      stockNet[id].net = stockNet[id].foreign + stockNet[id].trust + stockNet[id].dealer;
+    }
   });
 
   // 產業分類
@@ -1609,51 +1671,56 @@ function renderMoneyFlowData(data, dateStr) {
     industryFlow[ind].total   += flow.net;
     industryFlow[ind].stocks++;
   }
+
   moneyFlowData = Object.entries(industryFlow)
     .map(([name,f]) => ({name,...f}))
     .filter(d => d.stocks > 0)
     .sort((a,b) => b.total - a.total);
+
   renderRadar();
 
-  // 右側前10
+  // 右側：個股淨買超前10
   const sorted = Object.values(stockNet)
     .filter(d => d.net !== 0)
     .sort((a,b) => b.net - a.net);
-  const top10 = sorted.slice(0,10);
-  const top5s = sorted.filter(d=>d.net<0).slice(-5).reverse();
-  const maxVal = Math.max(...[...top10,...top5s].map(d=>Math.abs(d.net)))||1;
-  const totalNet = top10.reduce((s,d)=>s+d.net,0);
+  const top10  = sorted.slice(0, 10);
+  const top5s  = sorted.filter(d => d.net < 0).slice(-5).reverse();
+  const maxVal = Math.max(...[...top10,...top5s].map(d => Math.abs(d.net))) || 1;
+  const totalNet = top10.reduce((s,d) => s+d.net, 0);
 
-  document.getElementById("flowTotal").textContent =
-    (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+  const flowTotalEl = document.getElementById("flowTotal");
+  if (flowTotalEl) {
+    flowTotalEl.textContent = (totalNet>=0 ? "淨買+" : "淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+  }
 
-  document.getElementById("flowChart").innerHTML =
-    `<div style="padding:6px 12px;font-size:10px;font-family:var(--mono);color:var(--text2)">
-      📅 ${dateStr} 三大法人淨買超前10
-    </div>` +
-    top10.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
-        <span class="flow-label">${esc(d.name)}</span>
-        <div class="flow-bar-wrap">
-          <div class="flow-bar up" style="width:${pct}%">
-            <span class="flow-val">+${(d.net/1000).toFixed(1)}K</span>
+  const flowChartEl = document.getElementById("flowChart");
+  if (flowChartEl) {
+    flowChartEl.innerHTML =
+      `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--text2)">主力增持前十大目標</div>` +
+      top10.map(d => {
+        const pct = Math.abs(d.net)/maxVal*88;
+        return `<div class="flow-row">
+          <span class="flow-label">${esc(d.name)}</span>
+          <div class="flow-bar-wrap">
+            <div class="flow-bar up" style="width:${pct}%">
+              <span class="flow-val">+${(d.net/1000).toFixed(1)}K</span>
+            </div>
           </div>
-        </div>
-      </div>`;
-    }).join("") +
-    (top5s.length ? `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--red)">── 淨賣超 ──</div>` : "") +
-    top5s.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
-        <span class="flow-label">${esc(d.name)}</span>
-        <div class="flow-bar-wrap">
-          <div class="flow-bar down" style="width:${pct}%">
-            <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+        </div>`;
+      }).join("") +
+      (top5s.length ? `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--red)">三大法人調節目標</div>` : "") +
+      top5s.map(d => {
+        const pct = Math.abs(d.net)/maxVal*88;
+        return `<div class="flow-row">
+          <span class="flow-label">${esc(d.name)}</span>
+          <div class="flow-bar-wrap">
+            <div class="flow-bar down" style="width:${pct}%">
+              <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
+            </div>
           </div>
-        </div>
-      </div>`;
-    }).join("");
+        </div>`;
+      }).join("");
+  }
 }
 
 function renderMoneyFlowFromFinmind(data, latestDate) {
