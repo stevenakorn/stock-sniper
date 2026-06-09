@@ -1827,7 +1827,7 @@ function clearIndustryFilter() {
 // ════════════════════════════════════════
 // 匯出盤後分析報告
 // ════════════════════════════════════════
-function exportReport() {
+ffunction exportReport() {
   if (!hits.length) { alert("尚無分析資料，請先執行盤後分析"); return; }
 
   const today = new Date().toLocaleDateString("zh-TW");
@@ -1850,7 +1850,7 @@ function exportReport() {
     const chipStr = h.chipScore !== undefined ? ("籌碼評分 " + h.chipScore + "/5") : "籌碼：未抓取";
     const fNet    = (h.foreignNet5||0) > 0 ? ("外資近5日+" + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") :
                     (h.foreignNet5||0) < 0 ? ("外資近5日"  + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") : "";
-    const tNet    = (h.trustNet5||0)   > 0 ? ("投信近5日+" + ((h.trustNet5||0)/1000).toFixed(0)   + "K張") : "";
+    const tNet    = (h.trustNet5||0) > 0 ? ("投信近5日+" + ((h.trustNet5||0)/1000).toFixed(0) + "K張") : "";
     const sep     = " | ";
     let line3 = chipStr;
     if (fNet) line3 += sep + fNet;
@@ -1915,7 +1915,6 @@ function exportReport() {
   URL.revokeObjectURL(url);
   addLog("✅ 報告已匯出：" + a.download);
 }
-
 
 // ════════════════════════════════════════
 // 個股搜尋與深度分析
