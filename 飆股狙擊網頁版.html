@@ -1504,102 +1504,149 @@ let radarMode = "all";        // all / foreign / trust / dealer
 let selectedIndustry = null;  // 目前選取的產業
 let moneyFlowData = [];       // 產業資金流向資料
 
-async function loadMoneyFlow() {
-  document.getElementById("radarList").innerHTML =
-    '<div class="radar-loading"><div class="radar-spin"></div>載入產業資金流向...</div>';
-  document.getElementById("flowChart").innerHTML =
-    '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
+// ════════════════════════════════════════
+// [修復版] 資金流向載入與渲染
+// ════════════════════════════════════════
+// 重新確保資金雷達相關函式完整且無錯
+async function loadMoneyFlow(targetDate = null) {
+    // 如果沒給日期，就預設今天
+    if (!targetDate) targetDate = new Date().toISOString().split('T')[0];
+    
+    const url = `${BACKEND_URL}/api/twse_institutional?date=${targetDate}&_t=${Date.now()}`;
+    
+    document.getElementById("radarList").innerHTML = '<div class="radar-loading">正在尋找最近交易日...</div>';
+    
+    try {
+        const res = await fetch(url);
+        const json = await res.json();
+        
+        console.log("後端回傳資料:", json);
 
-  try {
-    // 使用 TWSE 證交所免費 API（不需 Token）
-    // 透過後端轉發解決 CORS 問題
-    const today = new Date();
-    const fmtTWSE = d => {
-      const y   = d.getFullYear() - 1911; // 民國年
-      const m   = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}${m}${day}`;
-    };
-
-    // TWSE 三大法人買賣超日報（上市）
-    // 用後端轉發
-    const twseUrl = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(today)}&_t=${Date.now()}`;
-    console.log("TWSE URL:", twseUrl);
-
-    const res  = await fetch(twseUrl, { signal: AbortSignal.timeout(20000) });
-    const json = await res.json();
-    console.log("TWSE 回傳:", JSON.stringify(json).substring(0, 200));
-
-    if (!json.data || !json.data.length) {
-      // 嘗試前一個交易日
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(yesterday)}&_t=${Date.now()}`;
-      const res2 = await fetch(url2, { signal: AbortSignal.timeout(20000) });
-      const json2 = await res2.json();
-      if (!json2.data || !json2.data.length) {
-        throw new Error("TWSE 無資料");
-      }
-      renderMoneyFlowData(json2.data, fmtTWSE(yesterday));
-    } else {
-      renderMoneyFlowData(json.data, fmtTWSE(today));
+        if (json && json.data && json.data.length > 0) {
+            // 成功獲取資料
+            const displayDate = json.date || targetDate;
+            document.getElementById("radarDate").textContent = displayDate;
+            renderMoneyFlowData(json.data, displayDate);
+            addLog(`✅ 資料載入成功 (${displayDate})`);
+        } else {
+            // 如果後端回傳無資料，自動將日期往前推一天並再次嘗試
+            addLog(`日期 ${targetDate} 無資料，嘗試往前尋找...`, "warn");
+            const d = new Date(targetDate);
+            d.setDate(d.getDate() - 1);
+            const prevDate = d.toISOString().split('T')[0];
+            
+            // 遞迴呼叫：嘗試前一天
+            loadMoneyFlow(prevDate);
+        }
+    } catch (e) {
+        addLog("雷達連線錯誤", "err");
     }
-
-  } catch(e) {
-    console.error("資金雷達錯誤:", e);
-    // fallback：用 Finmind（需要 Token）
-    const tk = localStorage.getItem("finmind_token") || token || "";
-    if (tk) {
-      loadMoneyFlowFinmind(tk);
-    } else {
-      document.getElementById("radarList").innerHTML =
-        `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
-    }
-  }
 }
-
-async function loadMoneyFlowFinmind(tk) {
-  try {
-    const fmtLocal = d => {
-      const y   = d.getFullYear();
-      const m   = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}-${m}-${day}`;
-    };
-    const today  = new Date();
-    const start7 = new Date(); start7.setDate(today.getDate()-7);
-    const url = `${BACKEND_URL}/api/institutional?token=${tk}&start_date=${fmtLocal(start7)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    const json = await res.json();
-    if (!json.data || !json.data.length) throw new Error("無資料");
-    const allDates = [...new Set(json.data.map(d=>d.date))].sort();
-    const latestDate = allDates[allDates.length-1];
-    document.getElementById("radarDate").textContent = latestDate + "（最新）";
-    renderMoneyFlowFromFinmind(json.data, latestDate);
-  } catch(e) {
-    document.getElementById("radarList").innerHTML =
-      `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
-  }
-}
-
 function renderMoneyFlowData(data, dateStr) {
-  // TWSE 格式：{SecuritiesCompanyCode, StockName, Foreignbuy, Foreignsell, ...}
-  document.getElementById("radarDate").textContent = dateStr + "（最新）";
+    document.getElementById("radarDate").textContent = dateStr;
+    const stockNet = {};
+    
+    data.forEach(d => {
+        const id = d.stock_id; 
+        const buy = parseInt(d.buy) || 0;
+        const sell = parseInt(d.sell) || 0;
+        const net = buy - sell;
+        if (!stockNet[id]) stockNet[id] = { name: d.name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+        if (d.name.includes("外資")) stockNet[id].foreign += net;
+        else if (d.name.includes("投信")) stockNet[id].trust += net;
+        else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+        stockNet[id].net += net;
+    });
+
+    const industryFlow = {};
+    for (const [id, flow] of Object.entries(stockNet)) {
+        const ind = getIndustry(id);
+        if (!industryFlow[ind]) industryFlow[ind] = { foreign:0, trust:0, dealer:0, total:0, stocks:0 };
+        industryFlow[ind].foreign += flow.foreign;
+        industryFlow[ind].trust += flow.trust;
+        industryFlow[ind].dealer += flow.dealer;
+        industryFlow[ind].total += flow.net;
+        industryFlow[ind].stocks++;
+    }
+    
+    moneyFlowData = Object.entries(industryFlow)
+        .map(([name,f]) => ({name,...f}))
+        .filter(d => d.stocks > 0)
+        .sort((a,b) => b.total - a.total);
+        
+    renderRadar();
+
+    const sorted = Object.values(stockNet)
+        .filter(d => d.net !== 0)
+        .sort((a,b) => b.net - a.net);
+    const top10 = sorted.slice(0,10);
+    const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
+    const totalNet = top10.reduce((s,d) => s + d.net, 0);
+
+    document.getElementById("flowTotal").textContent = (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+    document.getElementById("flowChart").innerHTML = top10.map(d => {
+        // 1. 取得買超與賣超排行
+   // --- 取代你原本的渲染邏輯 ---
+const sorted = Object.values(stockNet)
+    .filter(d => d.net !== 0)
+    .sort((a, b) => b.net - a.net);
+
+const buyTop10 = sorted.slice(0, 10); // 買超前十
+const sellTop10 = sorted.slice(-10).reverse(); // 賣超前十 (負值最大排最前)
+
+// 定義一個通用的 Bar 渲染函式
+const renderBar = (d) => {
+    const pct = Math.abs(d.net) / (Math.max(...sorted.map(x => Math.abs(x.net))) || 1) * 88;
+    return `
+    <div class="flow-row">
+        <span class="flow-label">${esc(d.name)}</span>
+        <div class="flow-bar-wrap">
+            <div class="flow-bar ${d.net >= 0 ? 'up' : 'down'}" style="width:${pct}%">
+                <span class="flow-val">${(d.net / 1000).toFixed(1)}K</span>
+            </div>
+        </div>
+    </div>`;
+};
+
+// 使用 Template Literal 同時渲染兩塊
+document.getElementById("flowChart").innerHTML = `
+    <div style="margin-bottom:15px">
+        <div style="font-size:11px; color:#ff3e3e; margin-bottom:5px;">🚀 買超前十大</div>
+        ${buyTop10.map(renderBar).join("")}
+    </div>
+    <div>
+        <div style="font-size:11px; color:#00c853; margin-bottom:5px;">📉 賣超前十大</div>
+        ${sellTop10.map(renderBar).join("")}
+    </div>
+`;
+    }).join("");
+}
+// 這是已經修正完畢的完整函式，請直接覆蓋
+function renderMoneyFlowData(data, dateStr) {
+  document.getElementById("radarDate").textContent = dateStr;
 
   const stockNet = {};
   data.forEach(d => {
-    const id  = d.Code || d.SecuritiesCompanyCode || d.stock_id || "";
-    if (!id) return;
-    const fNet = (parseInt((d.Foreignbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Foreignsell||"0").replace(/,/g,""))||0);
-    const tNet = (parseInt((d.Investmentbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Investmentsell||"0").replace(/,/g,""))||0);
-    const dNet = (parseInt((d.Dealerbuy||"0").replace(/,/g,""))||0) -
-                 (parseInt((d.Dealersell||"0").replace(/,/g,""))||0);
-    stockNet[id] = { name: d.Name||d.StockName||id, net: fNet+tNet+dNet, foreign:fNet, trust:tNet, dealer:dNet };
+    // 根據 FinMind API 回傳的真實欄位進行調整
+    // d.stock_id 是代號，d.name 是法人名稱，d.buy/d.sell 是買賣張數
+    const id = d.stock_id; 
+    const buy = parseInt(d.buy) || 0;
+    const sell = parseInt(d.sell) || 0;
+    const net = buy - sell;
+
+    if (!stockNet[id]) {
+        stockNet[id] = { name: d.stock_name || id, net: 0, foreign: 0, trust: 0, dealer: 0 };
+    }
+    
+    // 分類累加 (注意名稱要與 API 回傳的 name 欄位一致)
+    if (d.name.includes("外資")) stockNet[id].foreign += net;
+    else if (d.name.includes("投信")) stockNet[id].trust += net;
+    else if (d.name.includes("自營商")) stockNet[id].dealer += net;
+    
+    stockNet[id].net += net;
   });
 
-  // 產業分類
+  // 產業分類渲染邏輯
   const industryFlow = {};
   for (const [id, flow] of Object.entries(stockNet)) {
     const ind = getIndustry(id);
@@ -1610,54 +1657,37 @@ function renderMoneyFlowData(data, dateStr) {
     industryFlow[ind].total   += flow.net;
     industryFlow[ind].stocks++;
   }
+  
   moneyFlowData = Object.entries(industryFlow)
     .map(([name,f]) => ({name,...f}))
     .filter(d => d.stocks > 0)
     .sort((a,b) => b.total - a.total);
+    
   renderRadar();
 
-  // 右側前10
+  // 右側法人買超前10名
   const sorted = Object.values(stockNet)
     .filter(d => d.net !== 0)
     .sort((a,b) => b.net - a.net);
   const top10 = sorted.slice(0,10);
-  const top5s = sorted.filter(d=>d.net<0).slice(-5).reverse();
-  const maxVal = Math.max(...[...top10,...top5s].map(d=>Math.abs(d.net)))||1;
-  const totalNet = top10.reduce((s,d)=>s+d.net,0);
+  const maxVal = Math.max(...top10.map(d=>Math.abs(d.net))) || 1;
+  const totalNet = top10.reduce((s,d) => s + d.net, 0);
 
   document.getElementById("flowTotal").textContent =
-    (totalNet>=0?"淨買+":"淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
+    (totalNet>=0 ? "淨買+" : "淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
 
-  document.getElementById("flowChart").innerHTML =
-    `<div style="padding:6px 12px;font-size:10px;font-family:var(--mono);color:var(--text2)">
-      📅 ${dateStr} 三大法人淨買超前10
-    </div>` +
-    top10.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
+  document.getElementById("flowChart").innerHTML = top10.map(d => {
+    const pct = Math.abs(d.net)/maxVal*88;
+    return `<div class="flow-row">
         <span class="flow-label">${esc(d.name)}</span>
         <div class="flow-bar-wrap">
-          <div class="flow-bar up" style="width:${pct}%">
-            <span class="flow-val">+${(d.net/1000).toFixed(1)}K</span>
-          </div>
-        </div>
-      </div>`;
-    }).join("") +
-    (top5s.length ? `<div style="padding:4px 12px;font-size:10px;font-family:var(--mono);color:var(--red)">── 淨賣超 ──</div>` : "") +
-    top5s.map(d => {
-      const pct = Math.abs(d.net)/maxVal*88;
-      return `<div class="flow-row">
-        <span class="flow-label">${esc(d.name)}</span>
-        <div class="flow-bar-wrap">
-          <div class="flow-bar down" style="width:${pct}%">
+          <div class="flow-bar ${d.net>=0?'up':'down'}" style="width:${pct}%">
             <span class="flow-val">${(d.net/1000).toFixed(1)}K</span>
           </div>
         </div>
-      </div>`;
-    }).join("");
-}
-
-function renderMoneyFlowFromFinmind(data, latestDate) {
+    </div>`;
+  }).join("");
+}function renderMoneyFlowFromFinmind(data, latestDate) {
   const stockFlow = {};
   data.filter(d=>d.date===latestDate).forEach(d => {
     const id  = d.stock_id;
@@ -1716,18 +1746,39 @@ function renderFlowChart(stockFlow, date) {
     (totalNet >= 0 ? "淨買+" : "淨賣") + (Math.abs(totalNet)/1000).toFixed(0) + "K張";
 
   document.getElementById("flowChart").innerHTML = top10.map(d => {
-    const pct   = Math.abs(d.total) / maxVal * 90;
-    const isUp  = d.total >= 0;
-    const valStr = (d.total>=0?"+":"") + (d.total/1000).toFixed(1) + "K";
-    return `
-    <div class="flow-row">
-      <span class="flow-label">${d.name}</span>
-      <div class="flow-bar-wrap">
-        <div class="flow-bar ${isUp?"up":"down"}" style="width:${pct}%">
-          <span class="flow-val">${valStr}</span>
+    // 1. 取得買超與賣超排行
+    const sorted = Object.values(stockNet)
+        .filter(d => d.net !== 0)
+        .sort((a, b) => b.net - a.net);
+    
+    const buyTop10 = sorted.slice(0, 10);
+    const sellTop10 = sorted.slice(-10).reverse(); // 賣超排行 (負值最大的在前面)
+    
+    // 2. 定義統一的渲染邏輯 (內嵌在裡面，確保不影響外部架構)
+    const renderBar = (d) => {
+        const pct = Math.abs(d.net) / (Math.max(...sorted.map(x => Math.abs(x.net))) || 1) * 88;
+        const isUp = d.net >= 0;
+        return `<div class="flow-row">
+            <span class="flow-label">${esc(d.name)}</span>
+            <div class="flow-bar-wrap">
+                <div class="flow-bar ${isUp ? 'up' : 'down'}" style="width:${pct}%">
+                    <span class="flow-val">${(d.net / 1000).toFixed(1)}K</span>
+                </div>
+            </div>
+        </div>`;
+    };
+
+    // 3. 渲染進去
+    document.getElementById("flowChart").innerHTML = `
+        <div style="margin-bottom:15px">
+            <div style="font-size:11px; color:#ff3e3e; margin-bottom:5px;">🚀 買超前十大</div>
+            ${buyTop10.map(renderBar).join("")}
         </div>
-      </div>
-    </div>`;
+        <div>
+            <div style="font-size:11px; color:#00c853; margin-bottom:5px;">📉 賣超前十大</div>
+            ${sellTop10.map(renderBar).join("")}
+        </div>
+    `;
   }).join("");
 }
 
@@ -1799,7 +1850,7 @@ function exportReport() {
     const chipStr = h.chipScore !== undefined ? ("籌碼評分 " + h.chipScore + "/5") : "籌碼：未抓取";
     const fNet    = (h.foreignNet5||0) > 0 ? ("外資近5日+" + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") :
                     (h.foreignNet5||0) < 0 ? ("外資近5日"  + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") : "";
-    const tNet    = (h.trustNet5||0) > 0 ? ("投信近5日+" + ((h.trustNet5||0)/1000).toFixed(0) + "K張") : "";
+    const tNet    = (h.trustNet5||0)   > 0 ? ("投信近5日+" + ((h.trustNet5||0)/1000).toFixed(0)   + "K張") : "";
     const sep     = " | ";
     let line3 = chipStr;
     if (fNet) line3 += sep + fNet;
