@@ -1995,7 +1995,7 @@ async function searchStock() {
     ]);
 
     const d    = priceRes.status === "fulfilled" ? priceRes.value : null;
-    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
+    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null, broker: null };
 
     if (!d) {
       detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得 ${stockId} 的資料</div>`;
@@ -2374,7 +2374,7 @@ async function startPanelScan() {
 
 
 function renderBrokerBlock(brokerRes) {
-  const bd = brokerRes && brokerRes.data;
+  const bd = brokerRes ? (brokerRes.data || brokerRes) : null;
   if (!bd) return "<div style=\"color:var(--text2);font-size:10px;padding:4px 0\">載入中...</div>";
   const buyList  = bd.top_buy  || [];
   const sellList = bd.top_sell || [];
