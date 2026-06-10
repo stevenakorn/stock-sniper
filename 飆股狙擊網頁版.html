@@ -1568,16 +1568,24 @@ async function loadMoneyFlow() {
     console.log("TWSE 回傳:", JSON.stringify(json).substring(0, 200));
 
     if (!json.data || !json.data.length) {
-      // 嘗試前一個交易日
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(yesterday)}&_t=${Date.now()}`;
-      const res2 = await fetch(url2, { signal: AbortSignal.timeout(20000) });
-      const json2 = await res2.json();
-      if (!json2.data || !json2.data.length) {
-        throw new Error("TWSE 無資料");
+      // 往前最多找5個交易日
+      let found = false;
+      for (let back = 1; back <= 5; back++) {
+        const prev = new Date(today);
+        prev.setDate(prev.getDate() - back);
+        // 跳過週末
+        if (prev.getDay() === 0) prev.setDate(prev.getDate() - 2);
+        if (prev.getDay() === 6) prev.setDate(prev.getDate() - 1);
+        const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(prev)}&_t=${Date.now()}`;
+        const res2 = await fetch(url2, { signal: AbortSignal.timeout(15000) });
+        const json2 = await res2.json();
+        if (json2.data && json2.data.length) {
+          renderMoneyFlowData(json2.data, fmtTWSE(prev));
+          found = true;
+          break;
+        }
       }
-      renderMoneyFlowData(json2.data, fmtTWSE(yesterday));
+      if (!found) throw new Error("TWSE 無資料（近5個交易日）");
     } else {
       renderMoneyFlowData(json.data, fmtTWSE(today));
     }
