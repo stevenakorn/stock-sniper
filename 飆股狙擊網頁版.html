@@ -1288,7 +1288,7 @@ async function startScan() {
   document.getElementById("connStatus").textContent = "Finmind API 連線正常";
   document.getElementById("statHits").textContent = hits.length;
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-
+document.getElementById("btnExport").disabled = false;
   addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
   document.getElementById("statNextScan").textContent = "盤後模式";
 }
