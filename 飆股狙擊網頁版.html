@@ -985,8 +985,8 @@ function analyzeChip(chip) {
     const today  = sorted[sorted.length-1];
     const prev   = sorted[sorted.length-2];
     if (today && prev) {
-      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
-      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
+      const todayM = parseInt(today.MarginPurchaseTodayBalance||today.MarginPurchase||0);
+const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYesterdayBalance||prev.MarginPurchase||0);
       result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
       result.marginToday  = todayM;   // 當日融資餘額
       result.marginChg    = todayM - prevM; // 當日增減張數
