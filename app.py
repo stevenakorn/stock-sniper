@@ -5,6 +5,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
+import re
 import os
 from datetime import datetime
 
@@ -77,59 +78,62 @@ def twse_institutional():
     """TWSE 三大法人買賣超（免費，不需 Token）"""
     date = request.args.get("date", "")
     from datetime import datetime, timedelta
-    # 轉換日期格式：支援民國年(7碼)和西元年(8碼)
     if not date:
         today = datetime.now()
-        date = today.strftime("%Y%m%d")  # 西元年 YYYYMMDD
+        date = today.strftime("%Y%m%d")
     elif len(date) == 7 and date.isdigit():
-        # 民國年轉西元年
         roc_year = int(date[:3])
         date = str(roc_year + 1911) + date[3:]
-    # 如果是週六週日，往前找最近交易日
     try:
         dt = datetime.strptime(date, "%Y%m%d")
-        if dt.weekday() == 5:  # 週六
+        if dt.weekday() == 5:
             dt -= timedelta(days=1)
-        elif dt.weekday() == 6:  # 週日
+        elif dt.weekday() == 6:
             dt -= timedelta(days=2)
         date = dt.strftime("%Y%m%d")
     except:
         pass
+
+    def safe_str(val):
+        """安全轉字串並移除逗號，None 或空值回傳 '0'"""
+        if val is None:
+            return "0"
+        return str(val).replace(",", "").strip() or "0"
+
     try:
-        # TWSE 個股三大法人買賣超日報
         url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date}&selectType=ALL&response=json"
         headers = {"User-Agent": "Mozilla/5.0"}
         res = requests.get(url, headers=headers, timeout=15)
         data = res.json()
         if data.get("stat") == "OK" and data.get("data"):
-            fields = data.get("fields", [])
             result = []
             for row in data["data"]:
+                # 確保 row 長度足夠
+                while len(row) < 12:
+                    row.append(None)
                 result.append({
-                    "Code": row[0].strip(),
-                    "Name": row[1].strip(),
-                    "Foreignbuy": row[2].replace(",",""),
-                    "Foreignsell": row[3].replace(",",""),
-                    "ForeignNet": row[4].replace(",",""),
-                    "Investmentbuy": row[5].replace(",",""),
-                    "Investmentsell": row[6].replace(",",""),
-                    "InvestmentNet": row[7].replace(",",""),
-                    "Dealerbuy": row[8].replace(",",""),
-                    "Dealersell": row[9].replace(",",""),
-                    "DealerNet": row[10].replace(",",""),
-                    "TotalNet": row[11].replace(",",""),
+                    "Code":           safe_str(row[0]),
+                    "Name":           safe_str(row[1]),
+                    "Foreignbuy":     safe_str(row[2]),
+                    "Foreignsell":    safe_str(row[3]),
+                    "ForeignNet":     safe_str(row[4]),
+                    "Investmentbuy":  safe_str(row[5]),
+                    "Investmentsell": safe_str(row[6]),
+                    "InvestmentNet":  safe_str(row[7]),
+                    "Dealerbuy":      safe_str(row[8]),
+                    "Dealersell":     safe_str(row[9]),
+                    "DealerNet":      safe_str(row[10]),
+                    "TotalNet":       safe_str(row[11]),
                 })
             return jsonify({"data": result, "date": date, "status": 200})
         else:
-            return jsonify({"data": [], "msg": data.get("stat","無資料"), "status": 404})
+            return jsonify({"data": [], "msg": data.get("stat", "無資料"), "status": 404})
     except Exception as e:
         return jsonify({"data": [], "error": str(e), "status": 500})
 
 
-
 @app.route("/api/stock_list")
 def stock_list():
-    """從 Finmind 抓完整股票清單（走後端避免 CORS）"""
     token = request.args.get("token", "")
     if not token:
         return jsonify({"data": [], "error": "缺少 token"})
@@ -151,9 +155,7 @@ def stock_list():
 
 @app.route("/api/twse_stock_list")
 def twse_stock_list():
-    """TWSE 上市股票完整清單（含ETF）"""
     try:
-        # 用上市個股行情（不需要日期參數）
         url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
         headers = {"User-Agent": "Mozilla/5.0", "accept": "application/json"}
         res = requests.get(url, headers=headers, timeout=15)
@@ -166,7 +168,6 @@ def twse_stock_list():
                 result.append({"id": code, "name": name})
         return jsonify({"data": result, "count": len(result)})
     except Exception as e:
-        # fallback：用 TWSE 上市公司基本資料
         try:
             url2 = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
             res2 = requests.get(url2, headers={"User-Agent":"Mozilla/5.0"}, timeout=15)
@@ -183,15 +184,12 @@ def twse_stock_list():
 
 @app.route("/api/tpex_stock_list")
 def tpex_stock_list():
-    """TPEx 上櫃股票完整清單（含ETF）"""
     try:
-        # TPEx OpenAPI
         url = "https://openapi.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430"
         headers = {"User-Agent": "Mozilla/5.0", "accept": "application/json"}
         res = requests.get(url, headers=headers, timeout=15)
         data = res.json()
         result = []
-        # 嘗試解析各種可能的格式
         items = data if isinstance(data, list) else data.get("data", data.get("aaData", []))
         for item in items:
             if isinstance(item, dict):
@@ -206,7 +204,6 @@ def tpex_stock_list():
                 result.append({"id": code, "name": name})
         if result:
             return jsonify({"data": result, "count": len(result)})
-        # fallback：TPEx 上櫃公司基本資料
         url2 = "https://openapi.tpex.org.tw/web/stock/statistics/listed_companies_info"
         res2 = requests.get(url2, headers=headers, timeout=15)
         data2 = res2.json()
@@ -225,7 +222,6 @@ def tpex_stock_list():
 
 @app.route("/api/broker_trading")
 def broker_trading():
-    """五大熱點券商買賣超（Finmind TaiwanStockTopHolders or BrokerSale）"""
     token    = request.args.get("token", "")
     stock_id = request.args.get("stock_id", "")
     start    = request.args.get("start_date", "")
@@ -233,7 +229,6 @@ def broker_trading():
     if not all([token, stock_id]):
         return jsonify({"error": "缺少參數", "data": []}), 400
     try:
-        # 抓券商買賣超
         params = {
             "dataset": "TaiwanStockBrokerBuySell",
             "data_id": stock_id,
@@ -246,14 +241,10 @@ def broker_trading():
         data = res.json()
         if not data.get("data"):
             return jsonify({"data": [], "msg": data.get("msg","")})
-
         rows = data["data"]
-        # 取最新日期
         dates = sorted(set(r["date"] for r in rows), reverse=True)
         latest = dates[0] if dates else ""
         today_rows = [r for r in rows if r["date"] == latest]
-
-        # 統計買超前5 / 賣超前5
         broker_net = {}
         for r in today_rows:
             bid = r.get("broker_id","")
@@ -266,24 +257,15 @@ def broker_trading():
             broker_net[bid]["buy"]  += buy
             broker_net[bid]["sell"] += sell
             broker_net[bid]["net"]  += net
-
         sorted_brokers = sorted(broker_net.values(), key=lambda x: x["net"], reverse=True)
         top5_buy  = sorted_brokers[:5]
         top5_sell = sorted_brokers[-5:][::-1] if len(sorted_brokers) >= 5 else []
-
-        return jsonify({
-            "data": {
-                "date": latest,
-                "top_buy": top5_buy,
-                "top_sell": top5_sell
-            }
-        })
+        return jsonify({"data": {"date": latest, "top_buy": top5_buy, "top_sell": top5_sell}})
     except Exception as e:
         return jsonify({"data": [], "error": str(e)})
 
 @app.route("/api/margin_today")
 def margin_today():
-    """當日融資增減（Finmind TaiwanStockMarginPurchaseShortSale）"""
     token    = request.args.get("token", "")
     stock_id = request.args.get("stock_id", "")
     start    = request.args.get("start_date", "")
