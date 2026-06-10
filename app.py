@@ -76,10 +76,25 @@ def margin():
 def twse_institutional():
     """TWSE 三大法人買賣超（免費，不需 Token）"""
     date = request.args.get("date", "")
+    from datetime import datetime, timedelta
+    # 轉換日期格式：支援民國年(7碼)和西元年(8碼)
     if not date:
-        from datetime import datetime
         today = datetime.now()
-        date = f"{today.year-1911}{today.month:02d}{today.day:02d}"
+        date = today.strftime("%Y%m%d")  # 西元年 YYYYMMDD
+    elif len(date) == 7 and date.isdigit():
+        # 民國年轉西元年
+        roc_year = int(date[:3])
+        date = str(roc_year + 1911) + date[3:]
+    # 如果是週六週日，往前找最近交易日
+    try:
+        dt = datetime.strptime(date, "%Y%m%d")
+        if dt.weekday() == 5:  # 週六
+            dt -= timedelta(days=1)
+        elif dt.weekday() == 6:  # 週日
+            dt -= timedelta(days=2)
+        date = dt.strftime("%Y%m%d")
+    except:
+        pass
     try:
         # TWSE 個股三大法人買賣超日報
         url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date}&selectType=ALL&response=json"
