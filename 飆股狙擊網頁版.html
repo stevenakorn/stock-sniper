@@ -210,7 +210,7 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 .stock-detail-name{font-size:16px;font-weight:700;color:#e8f4ff}
 .stock-detail-code{font-size:12px;font-family:var(--mono);color:var(--text2)}
 .stock-detail-price{margin-left:auto;text-align:right}
-.stock-detail-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.stock-detail-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
 .detail-block{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px 14px}
 .detail-block-title{font-size:10px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:8px}
 .detail-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
@@ -239,6 +239,17 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 .btn-start-scan.ready{opacity:1;pointer-events:auto;box-shadow:0 0 10px rgba(0,229,255,.2)}
 .btn-start-scan.ready:hover{background:rgba(0,229,255,.15)}
 .scan-hint{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:6px}
+
+
+/* ── 五大券商 ── */
+.broker-block{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px 14px}
+.broker-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)}
+.broker-row:last-child{border-bottom:none}
+.broker-name{color:var(--text2);font-family:var(--mono);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.broker-val{font-family:var(--mono);font-size:10px;min-width:55px;text-align:right}
+.broker-tabs{display:flex;gap:4px;margin-bottom:6px}
+.broker-tab{padding:2px 8px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:9px;font-family:var(--mono);cursor:pointer;transition:all .2s}
+.broker-tab.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
 
 @media(max-width:900px){
   .main-grid{grid-template-columns:1fr}
@@ -894,8 +905,8 @@ async function fetchChipData(stockId) {
   start.setDate(start.getDate() - 30);
   const fmt = d => d.toISOString().split("T")[0];
 
-  // 平行抓三大法人＋融資
-  const [instData, marginData] = await Promise.allSettled([
+  // 平行抓三大法人＋融資＋券商
+  const [instData, marginData, brokerData] = await Promise.allSettled([
     callFinmind(
       `${FINMIND_API}?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`,
       `/api/institutional?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
@@ -904,12 +915,15 @@ async function fetchChipData(stockId) {
       `${FINMIND_API}?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`,
       `/api/margin?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
     ),
+    // 券商買賣超（走後端）
+    fetch(`${BACKEND_URL}/api/broker_trading?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`, { signal: AbortSignal.timeout(12000) }).then(r=>r.json()).catch(()=>null),
   ]);
 
   const inst   = instData.status   === "fulfilled" ? instData.value   : null;
   const margin = marginData.status === "fulfilled" ? marginData.value : null;
+  const broker = brokerData.status === "fulfilled" ? brokerData.value : null;
 
-  return { inst, margin };
+  return { inst, margin, broker };
 }
 
 // 分析籌碼指標
@@ -971,12 +985,15 @@ function analyzeChip(chip) {
     const today  = sorted[sorted.length-1];
     const prev   = sorted[sorted.length-2];
     if (today && prev) {
-      const todayM = parseInt(today.MarginPurchase||0);
-      const prevM  = parseInt(prev.MarginPurchase||0);
+      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
+      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
       result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
+      result.marginToday  = todayM;   // 當日融資餘額
+      result.marginChg    = todayM - prevM; // 當日增減張數
+      result.marginDate   = today.date || "";
     }
     // 5日融資趨勢
-    const last5 = sorted.slice(-5).map(d => parseInt(d.MarginPurchase||0));
+    const last5 = sorted.slice(-5).map(d => parseInt(d.MarginPurchase||d.margin_purchase||0));
     if (last5.length >= 2) {
       result.marginTrend = last5[last5.length-1] - last5[0];
     }
@@ -1406,15 +1423,12 @@ function clearHits() {
 // 抓取前 N 大市值股票清單
 // ════════════════════════════════════════
 async function fetchTopStocks() {
-  addLog("載入完整上市+上櫃+ETF 清單（Finmind + TWSE + TPEx）...");
+  addLog("載入完整上市+上櫃+ETF 清單...");
   try {
-    // 同時抓三個來源
+    // 全部走後端（避免 CORS）
     const [finmindRes, twseRes, tpexRes] = await Promise.allSettled([
-      // 1. Finmind TaiwanStockInfo（含上市上櫃）
-      fetch(`${FINMIND_API}?dataset=TaiwanStockInfo&token=${token}`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
-      // 2. TWSE 上市股票清單（含ETF）
+      fetch(`${BACKEND_URL}/api/stock_list?token=${token}&_t=${Date.now()}`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
       fetch(`${BACKEND_URL}/api/twse_stock_list?_t=${Date.now()}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json()),
-      // 3. TPEx 上櫃股票清單（含ETF）
       fetch(`${BACKEND_URL}/api/tpex_stock_list?_t=${Date.now()}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json()),
     ]);
 
@@ -1422,37 +1436,34 @@ async function fetchTopStocks() {
     stockNameMap = {...BUILTIN_STOCKS};
 
     // 合併 Finmind
-    if (finmindRes.status === "fulfilled" && finmindRes.value?.data) {
+    if (finmindRes.status === "fulfilled" && finmindRes.value?.data?.length) {
       finmindRes.value.data.forEach(item => {
-        if (/^\d{4,6}$/.test(item.stock_id||"")) {
-          stockNameMap[item.stock_id] = item.stock_name || item.stock_id;
-        }
+        const id = item.stock_id || item.id || "";
+        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = item.stock_name || item.name || id;
       });
       addLog(`Finmind: ${finmindRes.value.data.length} 筆`);
     }
 
     // 合併 TWSE 上市
-    if (twseRes.status === "fulfilled" && twseRes.value?.data) {
+    if (twseRes.status === "fulfilled" && twseRes.value?.data?.length) {
       twseRes.value.data.forEach(item => {
-        const id = item.id || item.code || item.stock_id || "";
-        const name = item.name || item.stock_name || id;
-        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = name;
+        const id = item.id || item.code || "";
+        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = item.name || id;
       });
       addLog(`TWSE 上市: ${twseRes.value.data.length} 筆`);
     }
 
     // 合併 TPEx 上櫃
-    if (tpexRes.status === "fulfilled" && tpexRes.value?.data) {
+    if (tpexRes.status === "fulfilled" && tpexRes.value?.data?.length) {
       tpexRes.value.data.forEach(item => {
-        const id = item.id || item.code || item.stock_id || "";
-        const name = item.name || item.stock_name || id;
-        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = name;
+        const id = item.id || item.code || "";
+        if (/^\d{4,6}$/.test(id)) stockNameMap[id] = item.name || id;
       });
       addLog(`TPEx 上櫃: ${tpexRes.value.data.length} 筆`);
     }
 
     STOCK_LIST = [...new Set(Object.keys(stockNameMap))].sort();
-    addLog(`✅ 合併完成：共 ${STOCK_LIST.length} 檔（上市+上櫃+ETF）`);
+    addLog(`✅ 合併完成：共 ${STOCK_LIST.length} 檔`);
     document.getElementById("statStocks").textContent = STOCK_LIST.length;
     document.getElementById("sysStatus").textContent = "待機";
     document.getElementById("btnScan").disabled = false;
@@ -2050,7 +2061,12 @@ async function searchStock() {
         <div class="detail-row"><span class="detail-key">籌碼評分</span><span class="chip-stars">${stars}</span></div>
         <div class="detail-row"><span class="detail-key">外資近5日</span><span class="detail-val ${chipInfo.foreignNet5>0?"up":"down"}">${chipInfo.foreignNet5>0?"+":""}${(chipInfo.foreignNet5/1000).toFixed(0)}K張</span></div>
         <div class="detail-row"><span class="detail-key">投信近5日</span><span class="detail-val ${chipInfo.trustNet5>0?"up":"down"}">${chipInfo.trustNet5>0?"+":""}${(chipInfo.trustNet5/1000).toFixed(0)}K張</span></div>
-        <div class="detail-row"><span class="detail-key">融資增減</span><span class="detail-val ${chipInfo.marginChgPct>0?"up":"down"}">${chipInfo.marginChgPct>0?"+":""}${chipInfo.marginChgPct.toFixed(1)}%</span></div>
+        <div class="detail-row"><span class="detail-key">融資增減(張)</span><span class="detail-val ${(chipInfo.marginChg||0)>0?"up":"down"}">${(chipInfo.marginChg||0)>0?"+":""}${(chipInfo.marginChg||0).toLocaleString()}</span></div>
+        <div class="detail-row"><span class="detail-key">融資增減(%)</span><span class="detail-val ${chipInfo.marginChgPct>0?"up":"down"}">${chipInfo.marginChgPct>0?"+":""}${chipInfo.marginChgPct.toFixed(2)}%</span></div>
+      </div>
+      <div class="broker-block">
+        <div class="detail-block-title">🏢 五大熱點券商</div>
+        ${renderBrokerBlock(chip.broker)}
       </div>
     </div>`;
 
@@ -2345,6 +2361,60 @@ async function startPanelScan() {
 
   // 呼叫主掃描
   await startScan();
+}
+
+
+
+function renderBrokerBlock(brokerRes) {
+  const bd = brokerRes && brokerRes.data;
+  if (!bd) return "<div style=\"color:var(--text2);font-size:10px;padding:4px 0\">載入中...</div>";
+  const buyList  = bd.top_buy  || [];
+  const sellList = bd.top_sell || [];
+  const allNets  = [...buyList,...sellList].map(b => Math.abs(b.net||0));
+  const maxNet   = allNets.length ? Math.max(...allNets) : 1;
+
+  const barHtml = (list, isUp) => list.map(b => {
+    const pct = Math.abs(b.net||0)/maxNet*70;
+    const col = isUp ? "var(--green)" : "var(--red)";
+    const val = ((b.net||0)/1000).toFixed(1);
+    const sign = isUp ? "+" : "";
+    return "<div class=\"broker-row\">" +
+      "<span class=\"broker-name\">" + esc(b.name||"") + "</span>" +
+      "<div style=\"flex:1;margin:0 4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden\">" +
+        "<div style=\"width:" + pct + "%;height:100%;background:" + col + ";border-radius:2px\"></div>" +
+      "</div>" +
+      "<span class=\"broker-val " + (isUp?"up":"down") + "\">" + sign + val + "K</span>" +
+    "</div>";
+  }).join("");
+
+  const dateStr = bd.date ? "<div style=\"font-size:9px;color:var(--text2);margin-top:4px;font-family:var(--mono)\">" + bd.date + "</div>" : "";
+
+  return "<div class=\"broker-tabs\">" +
+    "<span class=\"broker-tab active\" id=\"btab-buy\" onclick=\"switchBrokerTab(&apos;buy&apos;)\">買超</span>" +
+    "<span class=\"broker-tab\" id=\"btab-sell\" onclick=\"switchBrokerTab(&apos;sell&apos;)\">賣超</span>" +
+    "</div>" +
+    "<div id=\"broker-buy-list\">" + barHtml(buyList, true) + "</div>" +
+    "<div id=\"broker-sell-list\" style=\"display:none\">" + barHtml(sellList, false) + "</div>" +
+    dateStr;
+}
+
+function switchBrokerTab(tab) {
+  const buyEl  = document.getElementById("broker-buy-list");
+  const sellEl = document.getElementById("broker-sell-list");
+  const buyTab  = document.getElementById("btab-buy");
+  const sellTab = document.getElementById("btab-sell");
+  if (!buyEl || !sellEl) return;
+  if (tab === "buy") {
+    buyEl.style.display  = "";
+    sellEl.style.display = "none";
+    buyTab?.classList.add("active");
+    sellTab?.classList.remove("active");
+  } else {
+    buyEl.style.display  = "none";
+    sellEl.style.display = "";
+    buyTab?.classList.remove("active");
+    sellTab?.classList.add("active");
+  }
 }
 
 </script>
