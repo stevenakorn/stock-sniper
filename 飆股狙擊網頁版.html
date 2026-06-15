@@ -489,7 +489,7 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
         </button>
       </div>
       <div class="btn-row" style="padding-top:0">
-        <button class="btn" id="btnExport" onclick="exportReport()"
+        <button class="btn" id="btnExport" onclick="exportReport()" disabled
           style="color:var(--amber);border-color:var(--amber);flex:1">
           ↓ 匯出分析報告
         </button>
@@ -985,8 +985,8 @@ function analyzeChip(chip) {
     const today  = sorted[sorted.length-1];
     const prev   = sorted[sorted.length-2];
     if (today && prev) {
-      const todayM = parseInt(today.MarginPurchaseTodayBalance||today.MarginPurchase||0);
-const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYesterdayBalance||prev.MarginPurchase||0);
+      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
+      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
       result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
       result.marginToday  = todayM;   // 當日融資餘額
       result.marginChg    = todayM - prevM; // 當日增減張數
@@ -1288,7 +1288,7 @@ async function startScan() {
   document.getElementById("connStatus").textContent = "Finmind API 連線正常";
   document.getElementById("statHits").textContent = hits.length;
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-document.getElementById("btnExport").disabled = false;
+
   addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
   document.getElementById("statNextScan").textContent = "盤後模式";
 }
@@ -1995,7 +1995,7 @@ async function searchStock() {
     ]);
 
     const d    = priceRes.status === "fulfilled" ? priceRes.value : null;
-    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null, broker: null };
+    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
 
     if (!d) {
       detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得 ${stockId} 的資料</div>`;
@@ -2102,23 +2102,21 @@ function toggleRealtimeScan() {
   if (!token) { addLog("請先設定 Token","warn"); return; }
 
   if (isRealtimeMode) {
-    // 關閉即時掃描
     isRealtimeMode = false;
     if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
     document.getElementById("btnRealtime").textContent = "⚡ 開啟盤中即時掃描";
     document.getElementById("btnRealtime").style.color = "var(--green)";
     document.getElementById("btnRealtime").style.borderColor = "var(--green)";
-    document.getElementById("scanModeLabel").textContent = "盤後分析";
-    document.getElementById("scanModeLabel").style.color = "var(--amber)";
+    document.getElementById("sysStatus").textContent = "待機";
+    document.getElementById("sysStatus").className = "status-val";
     addLog("已關閉盤中即時掃描");
   } else {
-    // 開啟即時掃描
     isRealtimeMode = true;
     document.getElementById("btnRealtime").textContent = "⏹ 停止即時掃描";
     document.getElementById("btnRealtime").style.color = "var(--red)";
     document.getElementById("btnRealtime").style.borderColor = "var(--red)";
-    document.getElementById("scanModeLabel").textContent = "盤中即時 ●";
-    document.getElementById("scanModeLabel").style.color = "var(--green)";
+    document.getElementById("sysStatus").textContent = "即時輪詢中 ●";
+    document.getElementById("sysStatus").className = "status-val active";
     addLog("✅ 盤中即時掃描已開啟，每5分鐘自動執行");
 
     // 立即執行一次
@@ -2374,7 +2372,7 @@ async function startPanelScan() {
 
 
 function renderBrokerBlock(brokerRes) {
-  const bd = brokerRes ? (brokerRes.data || brokerRes) : null;
+  const bd = brokerRes && brokerRes.data;
   if (!bd) return "<div style=\"color:var(--text2);font-size:10px;padding:4px 0\">載入中...</div>";
   const buyList  = bd.top_buy  || [];
   const sellList = bd.top_sell || [];
