@@ -985,15 +985,15 @@ function analyzeChip(chip) {
     const today  = sorted[sorted.length-1];
     const prev   = sorted[sorted.length-2];
     if (today && prev) {
-      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
-      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
+     const todayM = parseInt(today.MarginPurchaseTodayBalance||today.MarginPurchase||today.margin_purchase||0);
+const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYesterdayBalance||prev.MarginPurchase||prev.margin_purchase||0);
       result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
       result.marginToday  = todayM;   // 當日融資餘額
       result.marginChg    = todayM - prevM; // 當日增減張數
       result.marginDate   = today.date || "";
     }
     // 5日融資趨勢
-    const last5 = sorted.slice(-5).map(d => parseInt(d.MarginPurchase||d.margin_purchase||0));
+    const last5 = sorted.slice(-5).map(d => parseInt(d.MarginPurchaseTodayBalance||d.MarginPurchase||0));
     if (last5.length >= 2) {
       result.marginTrend = last5[last5.length-1] - last5[0];
     }
