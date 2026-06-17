@@ -227,7 +227,7 @@ def broker_trading():
 
     def fetch_day(date_str):
         params = {
-            "dataset": "TaiwanStockTradingDailyReportSecIdAgg",
+            "dataset": "TaiwanStockTradingDailyReport",
             "data_id": stock_id,
             "start_date": date_str,
             "token": token
@@ -238,7 +238,7 @@ def broker_trading():
     try:
         today = datetime.now()
         result = None
-        for back in range(6):
+        for back in range(1, 8):
             d = today - timedelta(days=back)
             if d.weekday() >= 5:
                 continue
@@ -254,8 +254,8 @@ def broker_trading():
         rows = result["data"]
         broker_net = {}
         for r in rows:
-            bid   = r.get("broker_id", "")
-            bname = r.get("broker_name", bid)
+            bid   = r.get("securities_trader_id", r.get("broker_id", ""))
+            bname = r.get("securities_trader", r.get("broker_name", bid))
             buy   = int(r.get("buy", 0))
             sell  = int(r.get("sell", 0))
             if bid not in broker_net:
