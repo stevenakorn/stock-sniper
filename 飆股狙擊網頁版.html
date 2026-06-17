@@ -489,7 +489,7 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
         </button>
       </div>
       <div class="btn-row" style="padding-top:0">
-        <button class="btn" id="btnExport" onclick="exportReport()"
+        <button class="btn" id="btnExport" onclick="exportReport()" disabled
           style="color:var(--amber);border-color:var(--amber);flex:1">
           ↓ 匯出分析報告
         </button>
@@ -789,7 +789,7 @@ let stockNameMap = {...BUILTIN_STOCKS};
 // 系統內核認證通道
 const _a = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ";
 const _b = "1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjo";
-const _c = "ic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+const _c = "ic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6M30.mKQypMoJAkh9x9C6-cFDIJdFriFuCURqw9H5AqebALE";
 let token = localStorage.getItem("finmind_token") || (_a+_b+_c);
 let hits       = JSON.parse(localStorage.getItem("hits_today") || "[]");
 let scanCount  = parseInt(localStorage.getItem("scan_count") || "0");
@@ -985,8 +985,8 @@ function analyzeChip(chip) {
     const today  = sorted[sorted.length-1];
     const prev   = sorted[sorted.length-2];
     if (today && prev) {
-      const todayM = parseInt(today.MarginPurchaseTodayBalance||today.MarginPurchase||0);
-const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYesterdayBalance||prev.MarginPurchase||0);
+      const todayM = parseInt(today.MarginPurchase||today.margin_purchase||0);
+      const prevM  = parseInt(prev.MarginPurchase||prev.margin_purchase||0);
       result.marginChgPct = prevM > 0 ? (todayM - prevM) / prevM * 100 : 0;
       result.marginToday  = todayM;   // 當日融資餘額
       result.marginChg    = todayM - prevM; // 當日增減張數
@@ -1288,7 +1288,7 @@ async function startScan() {
   document.getElementById("connStatus").textContent = "Finmind API 連線正常";
   document.getElementById("statHits").textContent = hits.length;
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-document.getElementById("btnExport").disabled = false;
+
   addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
   document.getElementById("statNextScan").textContent = "盤後模式";
 }
@@ -1995,7 +1995,7 @@ async function searchStock() {
     ]);
 
     const d    = priceRes.status === "fulfilled" ? priceRes.value : null;
-    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null, broker: null };
+    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
 
     if (!d) {
       detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得 ${stockId} 的資料</div>`;
@@ -2102,23 +2102,21 @@ function toggleRealtimeScan() {
   if (!token) { addLog("請先設定 Token","warn"); return; }
 
   if (isRealtimeMode) {
-    // 關閉即時掃描
     isRealtimeMode = false;
     if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
     document.getElementById("btnRealtime").textContent = "⚡ 開啟盤中即時掃描";
     document.getElementById("btnRealtime").style.color = "var(--green)";
     document.getElementById("btnRealtime").style.borderColor = "var(--green)";
-    document.getElementById("scanModeLabel").textContent = "盤後分析";
-    document.getElementById("scanModeLabel").style.color = "var(--amber)";
+    document.getElementById("sysStatus").textContent = "待機";
+    document.getElementById("sysStatus").className = "status-val";
     addLog("已關閉盤中即時掃描");
   } else {
-    // 開啟即時掃描
     isRealtimeMode = true;
     document.getElementById("btnRealtime").textContent = "⏹ 停止即時掃描";
     document.getElementById("btnRealtime").style.color = "var(--red)";
     document.getElementById("btnRealtime").style.borderColor = "var(--red)";
-    document.getElementById("scanModeLabel").textContent = "盤中即時 ●";
-    document.getElementById("scanModeLabel").style.color = "var(--green)";
+    document.getElementById("sysStatus").textContent = "即時輪詢中 ●";
+    document.getElementById("sysStatus").className = "status-val active";
     addLog("✅ 盤中即時掃描已開啟，每5分鐘自動執行");
 
     // 立即執行一次
@@ -2373,37 +2371,59 @@ async function startPanelScan() {
 
 
 
+// 隔日沖券商關鍵字清單
+const DAYTRADER_KEYWORDS = [
+  "凱基-台北","凱基-新店","凱基-板橋","凱基-中和","凱基-三重","凱基-永和","凱基-土城",
+  "元大-土城","元大-永和","元大-新店","元大-中和","元大-三重","元大-板橋","元大-松山",
+  "富邦-台北","富邦-信義","富邦-松山","富邦-南港","富邦-板橋",
+  "國泰-板橋","國泰-台北","國泰-中和","國泰-永和",
+  "統一-台北","統一-板橋","統一-中和","統一-三重",
+  "永豐金-內湖","永豐金-板橋","群益-台北","群益-板橋","群益-中和",
+  "大昌","網路","富果","沛文","鑫豐","臻融","日盛-台北"
+];
+
+function isDayTrader(name) {
+  return DAYTRADER_KEYWORDS.some(kw => (name||"").includes(kw));
+}
+
 function renderBrokerBlock(brokerRes) {
-  const bd = brokerRes ? (brokerRes.data || brokerRes) : null;
-  if (!bd) return "<div style=\"color:var(--text2);font-size:10px;padding:4px 0\">載入中...</div>";
+  const bd = brokerRes && brokerRes.data;
+  if (!bd) return '<div style="color:var(--text2);font-size:10px;padding:4px 0">載入中...</div>';
   const buyList  = bd.top_buy  || [];
   const sellList = bd.top_sell || [];
   const allNets  = [...buyList,...sellList].map(b => Math.abs(b.net||0));
   const maxNet   = allNets.length ? Math.max(...allNets) : 1;
 
   const barHtml = (list, isUp) => list.map(b => {
-    const pct = Math.abs(b.net||0)/maxNet*70;
-    const col = isUp ? "var(--green)" : "var(--red)";
-    const val = ((b.net||0)/1000).toFixed(1);
+    const pct  = Math.abs(b.net||0)/maxNet*70;
+    const col  = isUp ? "var(--green)" : "var(--red)";
+    const val  = ((b.net||0)/1000).toFixed(1);
     const sign = isUp ? "+" : "";
-    return "<div class=\"broker-row\">" +
-      "<span class=\"broker-name\">" + esc(b.name||"") + "</span>" +
-      "<div style=\"flex:1;margin:0 4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden\">" +
-        "<div style=\"width:" + pct + "%;height:100%;background:" + col + ";border-radius:2px\"></div>" +
+    const isDT = isDayTrader(b.name||"");
+    const nameHtml = isDT
+      ? '<span style="color:var(--red);font-weight:bold">\u26a1' + esc(b.name||"") + "</span>"
+      : esc(b.name||"");
+    return '<div class="broker-row">' +
+      '<span class="broker-name">' + nameHtml + "</span>" +
+      '<div style="flex:1;margin:0 4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">' +
+        '<div style="width:' + pct + '%;height:100%;background:' + col + ';border-radius:2px"></div>' +
       "</div>" +
-      "<span class=\"broker-val " + (isUp?"up":"down") + "\">" + sign + val + "K</span>" +
+      '<span class="broker-val ' + (isUp?"up":"down") + '">' + sign + val + "K</span>" +
     "</div>";
   }).join("");
 
-  const dateStr = bd.date ? "<div style=\"font-size:9px;color:var(--text2);margin-top:4px;font-family:var(--mono)\">" + bd.date + "</div>" : "";
+  const dateStr = bd.date
+    ? '<div style="font-size:9px;color:var(--text2);margin-top:4px;font-family:var(--mono)">' + bd.date + "</div>"
+    : "";
+  const dtNote = '<div style="font-size:9px;color:var(--red);margin-top:2px;font-family:var(--mono)">\u26a1= 常見隔日沖分點</div>';
 
-  return "<div class=\"broker-tabs\">" +
-    "<span class=\"broker-tab active\" id=\"btab-buy\" onclick=\"switchBrokerTab(&apos;buy&apos;)\">買超</span>" +
-    "<span class=\"broker-tab\" id=\"btab-sell\" onclick=\"switchBrokerTab(&apos;sell&apos;)\">賣超</span>" +
+  return '<div class="broker-tabs">' +
+    '<span class="broker-tab active" id="btab-buy" onclick="switchBrokerTab(\'buy\')">買超</span>' +
+    '<span class="broker-tab" id="btab-sell" onclick="switchBrokerTab(\'sell\')">賣超</span>' +
     "</div>" +
-    "<div id=\"broker-buy-list\">" + barHtml(buyList, true) + "</div>" +
-    "<div id=\"broker-sell-list\" style=\"display:none\">" + barHtml(sellList, false) + "</div>" +
-    dateStr;
+    '<div id="broker-buy-list">' + barHtml(buyList, true) + "</div>" +
+    '<div id="broker-sell-list" style="display:none">' + barHtml(sellList, false) + "</div>" +
+    dateStr + dtNote;
 }
 
 function switchBrokerTab(tab) {
