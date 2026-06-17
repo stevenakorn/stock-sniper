@@ -227,7 +227,7 @@ def broker_trading():
         return jsonify({"error": "缺少參數", "data": []}), 400
     try:
         params = {
-            "dataset": "TaiwanStockBrokerBuySell",
+            "dataset": "TaiwanStockTradingDailyReport",
             "data_id": stock_id,
             "start_date": start,
             "end_date": end,
