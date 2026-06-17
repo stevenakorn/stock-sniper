@@ -219,45 +219,55 @@ def tpex_stock_list():
 
 @app.route("/api/broker_trading")
 def broker_trading():
+    from datetime import timedelta
     token    = request.args.get("token", "")
     stock_id = request.args.get("stock_id", "")
-    start    = request.args.get("start_date", "")
-    end      = request.args.get("end_date", "")
     if not all([token, stock_id]):
         return jsonify({"error": "缺少參數", "data": []}), 400
-    try:
+
+    def fetch_day(date_str):
         params = {
             "dataset": "TaiwanStockTradingDailyReport",
             "data_id": stock_id,
-            "start_date": start,
-            "end_date": end,
+            "start_date": date_str,
             "token": token
         }
-        res  = requests.get("https://api.finmindtrade.com/api/v4/data",
-                           params=params, timeout=15)
-        data = res.json()
-        if not data.get("data"):
-            return jsonify({"data": [], "msg": data.get("msg","")})
-        rows = data["data"]
-        dates = sorted(set(r["date"] for r in rows), reverse=True)
-        latest = dates[0] if dates else ""
-        today_rows = [r for r in rows if r["date"] == latest]
+        r = requests.get("https://api.finmindtrade.com/api/v4/data", params=params, timeout=15)
+        return r.json()
+
+    try:
+        today = datetime.now()
+        result = None
+        for back in range(6):
+            d = today - timedelta(days=back)
+            if d.weekday() >= 5:
+                continue
+            date_str = d.strftime("%Y-%m-%d")
+            data = fetch_day(date_str)
+            if data.get("data"):
+                result = {"data": data["data"], "date": date_str}
+                break
+
+        if not result:
+            return jsonify({"data": [], "msg": "近期無分點資料"})
+
+        rows = result["data"]
         broker_net = {}
-        for r in today_rows:
-            bid = r.get("broker_id","")
+        for r in rows:
+            bid   = r.get("broker_id", "")
             bname = r.get("broker_name", bid)
-            buy  = int(r.get("buy",0))
-            sell = int(r.get("sell",0))
-            net  = buy - sell
+            buy   = int(r.get("buy", 0))
+            sell  = int(r.get("sell", 0))
             if bid not in broker_net:
                 broker_net[bid] = {"name": bname, "buy": 0, "sell": 0, "net": 0}
             broker_net[bid]["buy"]  += buy
             broker_net[bid]["sell"] += sell
-            broker_net[bid]["net"]  += net
+            broker_net[bid]["net"]  += buy - sell
+
         sorted_brokers = sorted(broker_net.values(), key=lambda x: x["net"], reverse=True)
         top5_buy  = sorted_brokers[:5]
         top5_sell = sorted_brokers[-5:][::-1] if len(sorted_brokers) >= 5 else []
-        return jsonify({"data": {"date": latest, "top_buy": top5_buy, "top_sell": top5_sell}})
+        return jsonify({"data": {"date": result["date"], "top_buy": top5_buy, "top_sell": top5_sell}})
     except Exception as e:
         return jsonify({"data": [], "error": str(e)})
 
