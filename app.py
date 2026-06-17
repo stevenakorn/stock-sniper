@@ -17,9 +17,8 @@ FINMIND_API = "https://api.finmindtrade.com/api/v4/data"
 def call_finmind(dataset, params, token):
     params["dataset"] = dataset
     params["token"]   = token
-    headers = {"Authorization": f"Bearer {token}"}
     try:
-        res = requests.get(FINMIND_API, params=params, headers=headers, timeout=30)
+        res = requests.get(FINMIND_API, params=params, timeout=30)
         return res.json()
     except Exception as e:
         return {"status": 0, "error": str(e), "data": []}
@@ -95,7 +94,6 @@ def twse_institutional():
         pass
 
     def safe_str(val):
-        """安全轉字串並移除逗號，None 或空值回傳 '0'"""
         if val is None:
             return "0"
         return str(val).replace(",", "").strip() or "0"
@@ -108,7 +106,6 @@ def twse_institutional():
         if data.get("stat") == "OK" and data.get("data"):
             result = []
             for row in data["data"]:
-                # 確保 row 長度足夠
                 while len(row) < 12:
                     row.append(None)
                 result.append({
