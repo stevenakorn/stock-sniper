@@ -1,5 +1,5 @@
 // 注意：請將 YOUR_ACTUAL_TOKEN_HERE 替換為你申請到的真實 FinMind Token
-const MY_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6Mn0.skA0AbGBSnuH4aji-E7NQPKDNd-G31K7g_sq772bg5w";
+const MY_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjoic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6M30.mKQypMoJAkh9x9C6-cFDIJdFriFuCURqw9H5AqebALE";
 
 export default async function handler(req, res) {
   let { date } = req.query;
