@@ -227,7 +227,7 @@ def broker_trading():
 
     def fetch_day(date_str):
         params = {
-            "dataset": "TaiwanStockTradingDailyReport",
+            "dataset": "TaiwanStockTradingDailyReportSecIdAgg",
             "data_id": stock_id,
             "start_date": date_str,
             "token": token
