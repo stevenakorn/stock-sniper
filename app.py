@@ -252,12 +252,12 @@ def broker_trading():
         brokers = []
         for row in result["data"]:
             try:
-                if len(row) < 5:
+                if len(row) < 6:
                     continue
-                name = str(row[1]).strip()
-                buy_s  = str(row[2]).replace(",","").strip()
-                sell_s = str(row[3]).replace(",","").strip()
-                net_s  = str(row[4]).replace(",","").strip()
+                name = str(row[2]).strip()
+                buy_s  = str(row[3]).replace(",","").strip()
+                sell_s = str(row[4]).replace(",","").strip()
+                net_s  = str(row[5]).replace(",","").strip()
                 if not buy_s.lstrip("-").isdigit(): continue
                 if not sell_s.lstrip("-").isdigit(): continue
                 if not net_s.lstrip("-").isdigit(): continue
