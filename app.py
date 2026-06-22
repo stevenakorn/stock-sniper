@@ -251,12 +251,23 @@ def broker_trading():
 
         brokers = []
         for row in result["data"]:
-            name = str(row[1]).strip() if len(row) > 1 else ""
-            buy  = round(int(str(row[2]).replace(",","") or 0) / 1000)
-            sell = round(int(str(row[3]).replace(",","") or 0) / 1000)
-            net  = round(int(str(row[4]).replace(",","") or 0) / 1000)
-            if name and net != 0:
-                brokers.append({"name": name, "buy": buy, "sell": sell, "net": net})
+            try:
+                if len(row) < 5:
+                    continue
+                name = str(row[1]).strip()
+                buy_s  = str(row[2]).replace(",","").strip()
+                sell_s = str(row[3]).replace(",","").strip()
+                net_s  = str(row[4]).replace(",","").strip()
+                if not buy_s.lstrip("-").isdigit(): continue
+                if not sell_s.lstrip("-").isdigit(): continue
+                if not net_s.lstrip("-").isdigit(): continue
+                buy  = round(int(buy_s)  / 1000)
+                sell = round(int(sell_s) / 1000)
+                net  = round(int(net_s)  / 1000)
+                if name and net != 0:
+                    brokers.append({"name": name, "buy": buy, "sell": sell, "net": net})
+            except Exception:
+                continue
 
         sorted_brokers = sorted(brokers, key=lambda x: x["net"], reverse=True)
         date_fmt = f"{result['date'][:4]}-{result['date'][4:6]}-{result['date'][6:8]}"
