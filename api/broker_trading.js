@@ -37,15 +37,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: [], msg: "TWSE 近期無分點資料" });
     }
 
-    // fields: ["券商代號","券商名稱","買進股數","賣出股數","買賣超股數"]
+    // 實際欄位：["","券商代號","券商名稱","買進股數","賣出股數","買賣超股數"]
+    // row[0]=空, row[1]=代號, row[2]=名稱, row[3]=買進, row[4]=賣出, row[5]=買賣超
     const brokers = [];
     for (const row of result.data) {
       try {
-        if (row.length < 5) continue;
-        const name  = String(row[1]).trim();
-        const buyS  = String(row[2]).replace(/,/g, "").trim();
-        const sellS = String(row[3]).replace(/,/g, "").trim();
-        const netS  = String(row[4]).replace(/,/g, "").trim();
+        if (row.length < 6) continue;
+        const name  = String(row[2]).trim();
+        const buyS  = String(row[3]).replace(/,/g, "").trim();
+        const sellS = String(row[4]).replace(/,/g, "").trim();
+        const netS  = String(row[5]).replace(/,/g, "").trim();
         if (!/^-?\d+$/.test(buyS) || !/^-?\d+$/.test(netS)) continue;
         const buy  = Math.round(parseInt(buyS)  / 1000);
         const sell = Math.round(parseInt(sellS) / 1000);
@@ -55,8 +56,8 @@ export default async function handler(req, res) {
     }
 
     const sorted = brokers.sort((a, b) => b.net - a.net);
-    const dateStr = result.date;
-    const fmtedDate = `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`;
+    const ds = result.date;
+    const fmtedDate = `${ds.slice(0,4)}-${ds.slice(4,6)}-${ds.slice(6,8)}`;
 
     return res.status(200).json({
       data: {
