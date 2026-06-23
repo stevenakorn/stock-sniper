@@ -968,8 +968,8 @@ function analyzeChip(chip) {
       return filtered.reduce((s,d) => {
         const b = parseInt(d.buy||0) || parseInt(d.Buy||0) || parseInt(d.buy_volume||0) || 0;
         const sl = parseInt(d.sell||0) || parseInt(d.Sell||0) || parseInt(d.sell_volume||0) || 0;
-        return s + b - sl;
-      }, 0);
+        return s + (b - sl);
+      }, 0) / 1000; // FinMind 單位是股，除以1000轉張
     };
 
     result.foreignNet5  = sumNet(chip.inst, "外資", 6);
@@ -1006,13 +1006,13 @@ const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYest
   // 1. 外資近5日淨買超（短線主力訊號）
   if (result.foreignNet5 > 0) {
     score++;
-    details.push(`外資買+${(result.foreignNet5/1000).toFixed(0)}K`);
+    details.push(`外資買+${result.foreignNet5.toFixed(0)}張`);
   }
 
   // 2. 投信近5日淨買超（中期法人認同）
   if (result.trustNet5 > 0) {
     score++;
-    details.push(`投信買+${(result.trustNet5/1000).toFixed(0)}K`);
+    details.push(`投信買+${result.trustNet5.toFixed(0)}張`);
   }
 
   // 3. 三大法人合計近5日為正（多方共識）
@@ -1547,33 +1547,47 @@ async function loadMoneyFlow() {
   document.getElementById("flowChart").innerHTML =
     '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
+  const fmtLocal = d => {
+    const y   = d.getFullYear();
+    const m   = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  };
+  const fmtTWSE = d => {
+    const y   = d.getFullYear() - 1911;
+    const m   = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}${m}${day}`;
+  };
+
+  // ── 優先用 FinMind（通常盤後即有資料）──
   try {
-    // 使用 TWSE 證交所免費 API（不需 Token）
-    // 透過後端轉發解決 CORS 問題
+    const today  = new Date();
+    const start2 = new Date(); start2.setDate(today.getDate() - 2);
+    const url = `${BACKEND_URL}/api/institutional?token=${token}&start_date=${fmtLocal(start2)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const json = await res.json();
+    if (json.data && json.data.length) {
+      const allDates = [...new Set(json.data.map(d=>d.date))].sort();
+      const latestDate = allDates[allDates.length-1];
+      renderMoneyFlowFromFinmind(json.data, latestDate);
+      return;
+    }
+  } catch(e) {
+    console.warn("FinMind 資金雷達失敗，改用 TWSE:", e);
+  }
+
+  // ── Fallback：TWSE（免費但更新較慢）──
+  try {
     const today = new Date();
-    const fmtTWSE = d => {
-      const y   = d.getFullYear() - 1911; // 民國年
-      const m   = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}${m}${day}`;
-    };
-
-    // TWSE 三大法人買賣超日報（上市）
-    // 用後端轉發
     const twseUrl = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(today)}&_t=${Date.now()}`;
-    console.log("TWSE URL:", twseUrl);
-
     const res  = await fetch(twseUrl, { signal: AbortSignal.timeout(20000) });
     const json = await res.json();
-    console.log("TWSE 回傳:", JSON.stringify(json).substring(0, 200));
-
     if (!json.data || !json.data.length) {
-      // 往前最多找5個交易日
       let found = false;
       for (let back = 1; back <= 5; back++) {
         const prev = new Date(today);
         prev.setDate(prev.getDate() - back);
-        // 跳過週末
         if (prev.getDay() === 0) prev.setDate(prev.getDate() - 2);
         if (prev.getDay() === 6) prev.setDate(prev.getDate() - 1);
         const url2 = `${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(prev)}&_t=${Date.now()}`;
@@ -1585,21 +1599,14 @@ async function loadMoneyFlow() {
           break;
         }
       }
-      if (!found) throw new Error("TWSE 無資料（近5個交易日）");
+      if (!found) throw new Error("FinMind 及 TWSE 均無資料");
     } else {
       renderMoneyFlowData(json.data, fmtTWSE(today));
     }
-
   } catch(e) {
-    console.error("資金雷達錯誤:", e);
-    // fallback：用 Finmind（需要 Token）
-    const tk = localStorage.getItem("finmind_token") || token || "";
-    if (tk) {
-      loadMoneyFlowFinmind(tk);
-    } else {
-      document.getElementById("radarList").innerHTML =
-        `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
-    }
+    console.error("資金雷達全部失敗:", e);
+    document.getElementById("radarList").innerHTML =
+      `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
   }
 }
 
@@ -1882,9 +1889,9 @@ function exportReport() {
   function fmtStock(h) {
     const stars   = "★".repeat(h.stars) + "☆".repeat(5-h.stars);
     const chipStr = h.chipScore !== undefined ? ("籌碼評分 " + h.chipScore + "/5") : "籌碼：未抓取";
-    const fNet    = (h.foreignNet5||0) > 0 ? ("外資近5日+" + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") :
-                    (h.foreignNet5||0) < 0 ? ("外資近5日"  + ((h.foreignNet5||0)/1000).toFixed(0) + "K張") : "";
-    const tNet    = (h.trustNet5||0) > 0 ? ("投信近5日+" + ((h.trustNet5||0)/1000).toFixed(0) + "K張") : "";
+    const fNet    = (h.foreignNet5||0) > 0 ? ("外資近5日+" + (h.foreignNet5||0).toFixed(0) + "張") :
+                    (h.foreignNet5||0) < 0 ? ("外資近5日"  + (h.foreignNet5||0).toFixed(0) + "張") : "";
+    const tNet    = (h.trustNet5||0) > 0 ? ("投信近5日+" + (h.trustNet5||0).toFixed(0) + "張") : "";
     const sep     = " | ";
     let line3 = chipStr;
     if (fNet) line3 += sep + fNet;
@@ -2067,8 +2074,8 @@ async function searchStock() {
       <div class="detail-block">
         <div class="detail-block-title">🏦 籌碼面</div>
         <div class="detail-row"><span class="detail-key">籌碼評分</span><span class="chip-stars">${stars}</span></div>
-        <div class="detail-row"><span class="detail-key">外資近5日</span><span class="detail-val ${chipInfo.foreignNet5>0?"up":"down"}">${chipInfo.foreignNet5>0?"+":""}${(chipInfo.foreignNet5/1000).toFixed(0)}K張</span></div>
-        <div class="detail-row"><span class="detail-key">投信近5日</span><span class="detail-val ${chipInfo.trustNet5>0?"up":"down"}">${chipInfo.trustNet5>0?"+":""}${(chipInfo.trustNet5/1000).toFixed(0)}K張</span></div>
+        <div class="detail-row"><span class="detail-key">外資近5日</span><span class="detail-val ${chipInfo.foreignNet5>0?"up":"down"}">${chipInfo.foreignNet5>0?"+":""}${chipInfo.foreignNet5.toFixed(0)}張</span></div>
+        <div class="detail-row"><span class="detail-key">投信近5日</span><span class="detail-val ${chipInfo.trustNet5>0?"up":"down"}">${chipInfo.trustNet5>0?"+":""}${chipInfo.trustNet5.toFixed(0)}張</span></div>
         <div class="detail-row"><span class="detail-key">融資增減(張)</span><span class="detail-val ${(chipInfo.marginChg||0)>0?"up":"down"}">${(chipInfo.marginChg||0)>0?"+":""}${(chipInfo.marginChg||0).toLocaleString()}</span></div>
         <div class="detail-row"><span class="detail-key">融資增減(%)</span><span class="detail-val ${chipInfo.marginChgPct>0?"up":"down"}">${chipInfo.marginChgPct>0?"+":""}${chipInfo.marginChgPct.toFixed(2)}%</span></div>
       </div>
