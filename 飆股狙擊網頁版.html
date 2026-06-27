@@ -1247,9 +1247,10 @@ function checkAccumulation(id, d) {
 let scanIdx = 0;
 
 async function startScan() {
-  if (scanning) return;
+  if (scanning) { addLog("⚠ 掃描中，請稍候…","warn"); return; }
   if (!token) { addLog("請先設定 Token！","warn"); return; }
   scanning = true;
+  document.getElementById("btnScan").disabled = true;
 
   // 每天重置
   const today = new Date().toDateString();
@@ -1266,7 +1267,6 @@ async function startScan() {
   document.getElementById("statScans").textContent = scanCount;
   document.getElementById("sysStatus").textContent = "掃描中...";
   document.getElementById("sysStatus").className = "status-val scanning";
-  // Token 已內建，掃描按鈕直接啟用
   document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
 
   const total = STOCK_LIST.length;
@@ -1275,6 +1275,8 @@ async function startScan() {
 
   let newHits = 0;
   let doneCount = 0;
+
+  try {
 
   // 並行掃描：每次同時抓 BATCH_SIZE 檔，大幅提升速度
   const BATCH_SIZE = 35;
@@ -1362,18 +1364,23 @@ async function startScan() {
     await new Promise(r => setTimeout(r, 50));
   }
 
-  scanning = false;
-  document.getElementById("sysStatus").textContent = "監控中";
-  document.getElementById("sysStatus").className = "status-val active";
-  document.getElementById("btnScan").disabled = false;
-  document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
-  document.getElementById("connDot").className = "sb-dot";
-  document.getElementById("connStatus").textContent = "Finmind API 連線正常";
-  document.getElementById("statHits").textContent = hits.length;
-  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-
-  addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
-  document.getElementById("statNextScan").textContent = "盤後模式";
+    document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
+    document.getElementById("statHits").textContent = hits.length;
+    document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+    renderSignalDist();
+    addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
+    document.getElementById("statNextScan").textContent = "盤後模式";
+  } catch(e) {
+    addLog(`❌ 掃描錯誤：${e.message}`, "err");
+    console.error("startScan error:", e);
+  } finally {
+    scanning = false;
+    document.getElementById("btnScan").disabled = false;
+    document.getElementById("sysStatus").textContent = "監控中";
+    document.getElementById("sysStatus").className = "status-val active";
+    document.getElementById("connDot").className = "sb-dot";
+    document.getElementById("connStatus").textContent = "Finmind API 連線正常";
+  }
 }
 
 // ════════════════════════════════════════
