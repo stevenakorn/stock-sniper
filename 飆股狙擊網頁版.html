@@ -1335,6 +1335,11 @@ async function startScan() {
     for (const r of results) {
       if (r.status === "fulfilled" && r.value) {
         const result = r.value;
+        // 套用快速篩選條件
+        if (!passQuickFilter(result)) {
+          addLog(`⊘ 濾除：${result.id} ${result.label}（量/籌碼/外資不符條件）`);
+          continue;
+        }
         hits.unshift(result);
         notified.add(result.id);
         newHits++;
@@ -2487,6 +2492,7 @@ async function realtimeScanOnce() {
     for (const r of results) {
       if (r.status === "fulfilled" && r.value) {
         const result = r.value;
+        if (!passQuickFilter(result)) continue; // 套用快速篩選條件
         // 即時掃描：同一檔如果已有訊號則更新，沒有則新增
         const existing = hits.findIndex(h => h.id === result.id);
         if (existing >= 0) {
