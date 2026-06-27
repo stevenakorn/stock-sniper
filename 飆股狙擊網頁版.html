@@ -1066,7 +1066,7 @@ function checkBreakout(id, d) {
   if (volRatio >= 2.0 && todayClose >= high20 && ma5 > ma20 && changePct >= 1.0) {
     return {
       type: "breakout", label: "爆量突破",
-      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      close: todayClose.toFixed(2), changePct: changePct.toFixed(2),
       volRatio: volRatio.toFixed(1),
       detail: `創20日新高｜量能${volRatio.toFixed(1)}倍｜漲幅${changePct.toFixed(1)}%`,
     };
@@ -1104,7 +1104,7 @@ function checkConsolidation(id, d) {
   if (cAvgVol < blastVol*0.6 && drop < 0.06 && todayVol > cAvgVol*1.5 && todayClose >= cHigh && changePct >= 0.5) {
     return {
       type:"consolidation", label:"強勢整理",
-      close: todayClose.toFixed(1), changePct: changePct.toFixed(2),
+      close: todayClose.toFixed(2), changePct: changePct.toFixed(2),
       volRatio: vr.toFixed(1),
       detail: `整理${CONSOL_DAYS}日後突破｜回撤${(drop*100).toFixed(1)}%｜量能${vr.toFixed(1)}倍`,
     };
@@ -1163,7 +1163,7 @@ function checkAccumulation(id, d) {
 
   return {
     type:"accumulation", label:"主力蓄勢",
-    close: priceNow.toFixed(1), changePct: changePct.toFixed(2),
+    close: priceNow.toFixed(2), changePct: changePct.toFixed(2),
     volRatio: vr, score,
     detail: `箱型${(boxRange*100).toFixed(1)}%｜均線糾結${(maSpread*100).toFixed(1)}%｜${waveHint}｜評分${score}/4`,
   };
@@ -2145,12 +2145,12 @@ async function searchStock() {
     const todayClose = d.close[d.close.length-1];
     const prevClose  = d.close[d.close.length-2];
     const changePct  = ((todayClose - prevClose) / prevClose * 100).toFixed(2);
-    const ma5  = avg(last(d.close, 5)).toFixed(1);
-    const ma10 = avg(last(d.close, 10)).toFixed(1);
-    const ma20 = avg(last(d.close, 20)).toFixed(1);
-    const ma60 = avg(last(d.close, 60)).toFixed(1);
-    const high20 = max(last(d.close.slice(0,-1), 20)).toFixed(1);
-    const low20  = min(last(d.close.slice(0,-1), 20)).toFixed(1);
+    const ma5  = avg(last(d.close, 5)).toFixed(2);
+    const ma10 = avg(last(d.close, 10)).toFixed(2);
+    const ma20 = avg(last(d.close, 20)).toFixed(2);
+    const ma60 = avg(last(d.close, 60)).toFixed(2);
+    const high20 = max(last(d.close.slice(0,-1), 20)).toFixed(2);
+    const low20  = min(last(d.close.slice(0,-1), 20)).toFixed(2);
     const mv5  = avg(last(d.volume, 5));
     const mv20 = avg(last(d.volume, 20));
     const volRatio = (mv5 / mv20).toFixed(1);
@@ -2181,7 +2181,7 @@ async function searchStock() {
         <div class="stock-detail-code">${stockId}</div>
       </div>
       <div style="margin-left:auto;text-align:right">
-        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#e8f4ff">$${todayClose.toFixed(1)}</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#e8f4ff">$${todayClose.toFixed(2)}</div>
         <div style="font-size:14px;font-family:var(--mono);color:${parseFloat(changePct)>=0?"var(--green)":"var(--red)"}">${parseFloat(changePct)>=0?"+":""}${changePct}%</div>
       </div>
       <div style="margin-left:16px;text-align:center">
