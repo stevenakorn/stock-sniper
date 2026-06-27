@@ -175,6 +175,12 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 .flow-val{font-size:9px;font-family:var(--mono);color:var(--text);white-space:nowrap}
 .radar-loading{display:flex;align-items:center;justify-content:center;height:120px;color:var(--text2);font-family:var(--mono);font-size:11px;gap:8px}
 .radar-spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
+.treemap-wrap{position:relative;width:100%;height:290px;overflow:hidden}
+.tm-block{position:absolute;box-sizing:border-box;border:2px solid var(--bg);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;transition:filter .15s,outline .1s}
+.tm-block:hover{filter:brightness(1.3);z-index:10}
+.tm-block.tm-selected{outline:2px solid var(--cyan);outline-offset:-2px;z-index:11}
+.tm-name{font-size:11px;font-weight:500;text-align:center;padding:0 4px;line-height:1.3;pointer-events:none;color:#fff}
+.tm-val{font-size:9px;margin-top:2px;pointer-events:none;opacity:.85;color:#fff}
 @keyframes spin{to{transform:rotate(360deg)}}
 .selected-industry-bar{padding:8px 12px;background:rgba(0,229,255,.05);border-bottom:1px solid var(--border);display:none;align-items:center;gap:8px;font-size:11px}
 .selected-industry-bar.show{display:flex}
@@ -385,8 +391,8 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
         <button class="radar-btn" onclick="setRadarMode('trust',this)">🏦 投信</button>
         <button class="radar-btn" onclick="setRadarMode('dealer',this)">🏢 自營商</button>
       </div>
-      <div id="radarList" class="radar-list">
-        <div class="radar-loading"><div class="radar-spin"></div>載入資金流向中...</div>
+      <div class="treemap-wrap" id="treemapWrap">
+        <div class="radar-loading" id="treemapLoading"><div class="radar-spin"></div>載入資金流向中...</div>
       </div>
     </div>
 
@@ -1521,6 +1527,60 @@ function getIndustry(id) {
   for (const [ind, ids] of Object.entries(FULL_INDUSTRY_MAP)) {
     if (ids.includes(id)) return ind;
   }
+  // ── fallback：用代號前綴推斷產業，大幅減少「其他」桶 ──
+  const n = parseInt(id);
+  if (n >= 1101 && n <= 1110) return "水泥工業";
+  if (n >= 1201 && n <= 1299) return "食品工業";
+  if (n >= 1301 && n <= 1399) return "塑膠工業";
+  if (n >= 1402 && n <= 1499) return "紡織纖維";
+  if (n >= 1503 && n <= 1560) return "電機機械";
+  if (n >= 1601 && n <= 1699) return "電器電纜";
+  if (n >= 1702 && n <= 1799) return "化學工業";
+  if (n >= 1800 && n <= 1819) return "玻璃陶瓷";
+  if (n >= 1900 && n <= 1999) return "造紙工業";
+  if (n >= 2001 && n <= 2099) return "鋼鐵工業";
+  if (n >= 2101 && n <= 2199) return "橡膠工業";
+  if (n >= 2201 && n <= 2299) return "汽車工業";
+  if (n >= 2300 && n <= 2319) return "電腦及週邊設備";
+  if (n >= 2320 && n <= 2399) return "電子零組件業";
+  if (n >= 2400 && n <= 2469) return "電子零組件業";
+  if (n >= 2470 && n <= 2499) return "其他電子業";
+  if (n >= 2501 && n <= 2599) return "建材營造";
+  if (n >= 2600 && n <= 2699) return "航運業";
+  if (n >= 2700 && n <= 2799) return "觀光餐旅";
+  if (n >= 2800 && n <= 2899) return "金融保險";
+  if (n >= 2900 && n <= 2999) return "貿易百貨";
+  if (n >= 3000 && n <= 3099) return "其他電子業";
+  if (n >= 3100 && n <= 3199) return "電子零組件業";
+  if (n >= 3200 && n <= 3399) return "其他電子業";
+  if (n >= 3400 && n <= 3499) return "電子通路業";
+  if (n >= 3500 && n <= 3699) return "電機機械";
+  if (n >= 3700 && n <= 3799) return "電機機械";
+  if (n >= 4100 && n <= 4299) return "生技醫療";
+  if (n >= 4700 && n <= 4999) return "生技醫療";
+  if (n >= 5000 && n <= 5099) return "建材營造";
+  if (n >= 5200 && n <= 5399) return "電子零組件業";
+  if (n >= 5600 && n <= 5699) return "航運業";
+  if (n >= 5800 && n <= 5899) return "金融保險";
+  if (n >= 5900 && n <= 5999) return "貿易百貨";
+  if (n >= 6000 && n <= 6049) return "金融保險";
+  if (n >= 6050 && n <= 6099) return "資訊服務業";
+  if (n >= 6100 && n <= 6199) return "電子通路業";
+  if (n >= 6200 && n <= 6299) return "電子零組件業";
+  if (n >= 6300 && n <= 6399) return "通信網路業";
+  if (n >= 6400 && n <= 6499) return "半導體";
+  if (n >= 6500 && n <= 6599) return "光電業";
+  if (n >= 6600 && n <= 6699) return "電子零組件業";
+  if (n >= 6700 && n <= 6799) return "電機機械";
+  if (n >= 6800 && n <= 6999) return "其他電子業";
+  if (n >= 8000 && n <= 8099) return "半導體";
+  if (n >= 8100 && n <= 8199) return "電子零組件業";
+  if (n >= 8200 && n <= 8299) return "其他電子業";
+  if (n >= 8300 && n <= 8399) return "生技醫療";
+  if (n >= 9100 && n <= 9199) return "航運業";
+  if (n >= 9700 && n <= 9799) return "觀光餐旅";
+  if (n >= 9900 && n <= 9944) return "綜合";
+  if (n >= 9945 && n <= 9960) return "油電燃氣";
   return "其他";
 }
 
@@ -1529,8 +1589,9 @@ let selectedIndustry = null;  // 目前選取的產業
 let moneyFlowData = [];       // 產業資金流向資料
 
 async function loadMoneyFlow() {
-  document.getElementById("radarList").innerHTML =
-    '<div class="radar-loading"><div class="radar-spin"></div>載入產業資金流向...</div>';
+  const tmLoading = document.getElementById("treemapLoading");
+  if (tmLoading) { tmLoading.style.display="flex"; }
+  Array.from(document.querySelectorAll(".tm-block")).forEach(el=>el.remove());
   document.getElementById("flowChart").innerHTML =
     '<div class="radar-loading"><div class="radar-spin"></div>載入中...</div>';
 
@@ -1592,8 +1653,8 @@ async function loadMoneyFlow() {
     }
   } catch(e) {
     console.error("資金雷達全部失敗:", e);
-    document.getElementById("radarList").innerHTML =
-      `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
+    const tmL = document.getElementById("treemapLoading");
+    if (tmL) { tmL.style.display="flex"; tmL.innerHTML=`<span style="color:var(--red)">載入失敗：${e.message}</span>`; }
   }
 }
 
@@ -1616,8 +1677,8 @@ async function loadMoneyFlowFinmind(tk) {
     document.getElementById("radarDate").textContent = latestDate + "（最新）";
     renderMoneyFlowFromFinmind(json.data, latestDate);
   } catch(e) {
-    document.getElementById("radarList").innerHTML =
-      `<div class="radar-loading" style="color:var(--red)">載入失敗：${e.message}</div>`;
+    const tmL = document.getElementById("treemapLoading");
+    if (tmL) { tmL.style.display="flex"; tmL.innerHTML=`<span style="color:var(--red)">載入失敗：${e.message}</span>`; }
   }
 }
 
@@ -1641,6 +1702,9 @@ function renderMoneyFlowData(data, dateStr) {
     const id = d.Code || d.stock_id || "";
     if (!id) return;
     if (!/^\d+$/.test(id)) return; // 過濾非數字代號
+    // 過濾 ETF、權證、可轉債等非個股（代號非4碼、或0開頭ETF）
+    if (id.length !== 4) return;
+    if (id.startsWith("0")) return;
 
     const chineseName = stockNameMap[id] || BUILTIN_STOCKS[id] || d.Name || d.stock_name || id;
 
@@ -1689,6 +1753,16 @@ function renderMoneyFlowData(data, dateStr) {
     .map(([name,f]) => ({name,...f}))
     .filter(d => d.stocks > 0)
     .sort((a,b) => b.total - a.total);
+
+  // Debug：印出掉進「其他」的股票，方便補分類
+  if (industryFlow["其他"]) {
+    const othersDetail = Object.entries(stockNet)
+      .filter(([id]) => getIndustry(id) === "其他")
+      .sort((a,b) => Math.abs(b[1].net) - Math.abs(a[1].net))
+      .slice(0, 30)
+      .map(([id, f]) => `${id}(${f.name}) ${f.net>0?"+":""}${Math.round(f.net/1000)}K`);
+    console.warn("【其他】前30大：", othersDetail.join(" | "));
+  }
 
   renderRadar();
 
@@ -1755,30 +1829,101 @@ function renderMoneyFlowFromFinmind(data, latestDate) {
   }, {}), latestDate);
 }
 
+// ── Squarify Treemap ──────────────────────────────
+function squarifyLayout(items, x, y, w, h) {
+  if (!items.length) return [];
+  const results = [];
+  let rem = [...items];
+  let rx = x, ry = y, rw = w, rh = h;
+  while (rem.length) {
+    const short = Math.min(rw, rh);
+    let row = [], rowArea = 0, best = Infinity;
+    for (let i = 0; i < rem.length; i++) {
+      row.push(rem[i]);
+      rowArea += rem[i].area;
+      const worst = Math.max(
+        (short * short * row[0].area) / (rowArea * rowArea),
+        (rowArea * rowArea) / (short * short * row[row.length-1].area)
+      );
+      if (worst > best) { row.pop(); break; }
+      best = worst;
+    }
+    const rowTotal = row.reduce((s,d) => s + d.area, 0);
+    const longLen  = rowTotal / short;
+    const isWide   = rw >= rh;
+    let pos = isWide ? ry : rx;
+    row.forEach(item => {
+      const side = (item.area / rowTotal) * short;
+      if (isWide) { results.push({...item, x:rx, y:pos, w:longLen, h:side}); pos += side; }
+      else        { results.push({...item, x:pos, y:ry, w:side, h:longLen}); pos += side; }
+    });
+    rem = rem.filter(d => !row.includes(d));
+    if (isWide) { rx += longLen; rw -= longLen; }
+    else        { ry += longLen; rh -= longLen; }
+  }
+  return results;
+}
+
+function tmColor(val, maxAbs) {
+  const r = Math.min(Math.abs(val) / maxAbs, 1);
+  if (val < 0) {
+    if (r > 0.4)  return "#b71c1c";
+    if (r > 0.15) return "#e53935";
+    if (r > 0.05) return "#ef5350";
+    return "#e57373";
+  } else {
+    if (r > 0.15) return "#00695c";
+    if (r > 0.05) return "#00897b";
+    return "#26a69a";
+  }
+}
+
 function renderRadar() {
   const key = radarMode === "foreign" ? "foreign" :
               radarMode === "trust"   ? "trust"   :
               radarMode === "dealer"  ? "dealer"  : "total";
 
-  const sorted = [...moneyFlowData].sort((a,b) => b[key]-a[key]);
-  const maxVal = Math.max(...sorted.map(d => Math.abs(d[key]))) || 1;
+  const wrap    = document.getElementById("treemapWrap");
+  const loading = document.getElementById("treemapLoading");
+  if (loading) loading.style.display = "none";
 
-  document.getElementById("radarList").innerHTML = sorted.map((d,i) => {
-    const val   = d[key];
-    const pct   = Math.abs(val) / maxVal * 100;
-    const isUp  = val >= 0;
-    const valStr = (val >= 0 ? "+" : "") + (val/1000).toFixed(0) + "K張";
-    const isSel = selectedIndustry === d.name;
-    return `
-    <div class="industry-row ${isSel?"selected":""}" onclick="selectIndustry('${d.name}')">
-      <span class="industry-rank">${i+1}</span>
-      <span class="industry-name">${d.name}</span>
-      <div class="industry-bar-wrap">
-        <div class="industry-bar-fill ${isUp?"up":"down"}" style="width:${pct}%"></div>
-      </div>
-      <span class="industry-val ${isUp?"up":"down"}">${valStr}</span>
-    </div>`;
-  }).join("");
+  const W = wrap.offsetWidth  || 400;
+  const H = wrap.offsetHeight || 290;
+
+  // 清除舊 block
+  Array.from(wrap.querySelectorAll(".tm-block")).forEach(el => el.remove());
+
+  const data    = moneyFlowData.filter(d => d[key] !== 0);
+  const totalAbs = data.reduce((s,d) => s + Math.abs(d[key]), 0) || 1;
+  const maxAbs   = Math.max(...data.map(d => Math.abs(d[key])));
+
+  const items = data
+    .map(d => ({ name: d.name, val: d[key], area: (Math.abs(d[key]) / totalAbs) * W * H }))
+    .sort((a,b) => b.area - a.area);
+
+  const layout = squarifyLayout(items, 0, 0, W, H);
+
+  layout.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "tm-block" + (selectedIndustry === item.name ? " tm-selected" : "");
+    el.style.cssText = `left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;background:${tmColor(item.val, maxAbs)}`;
+    el.onclick = () => selectIndustry(item.name);
+
+    if (item.w >= 44 && item.h >= 24) {
+      const nm = document.createElement("div");
+      nm.className = "tm-name";
+      nm.style.fontSize = item.w > 80 ? "11px" : "9px";
+      nm.textContent = item.name;
+      el.appendChild(nm);
+      if (item.h > 42) {
+        const vl = document.createElement("div");
+        vl.className = "tm-val";
+        vl.textContent = (item.val > 0 ? "+" : "") + Math.round(item.val / 1000) + "K";
+        el.appendChild(vl);
+      }
+    }
+    wrap.appendChild(el);
+  });
 }
 
 function renderFlowChart(stockFlow, date) {
