@@ -231,29 +231,20 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 
 
 /* ── 盤後分析選股面板 ── */
-.scan-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px 18px;margin-bottom:16px}
-.scan-panel-title{font-size:11px;font-family:var(--mono);color:var(--cyan);letter-spacing:2px;margin-bottom:10px}
-.scan-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.scan-row:last-child{margin-bottom:0}
-.scan-section-label{font-size:9px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;min-width:52px}
-.scan-select{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:12px;cursor:pointer;min-width:180px}
+.scan-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;margin-bottom:16px}
+.scan-panel-title{font-size:11px;font-family:var(--mono);color:var(--cyan);letter-spacing:2px;margin-bottom:12px}
+.scan-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.scan-select{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:7px 12px;color:var(--text);font-family:var(--mono);font-size:12px;cursor:pointer;min-width:200px}
 .scan-select:focus{outline:none;border-color:var(--cyan)}
 .market-toggle{display:flex;gap:4px}
-.market-btn{padding:5px 12px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s}
+.market-btn{padding:6px 14px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s}
 .market-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
 .market-btn.listed.active{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
 .market-btn.otc.active{background:rgba(255,171,0,.1);border-color:var(--amber);color:var(--amber)}
-.cond-toggle{display:flex;gap:4px;flex-wrap:wrap}
-.cond-btn{padding:4px 10px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:10px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:.5px}
-.cond-btn:hover{border-color:var(--cyan2);color:var(--cyan)}
-.cond-btn.active{background:rgba(0,229,255,.12);border-color:var(--cyan);color:var(--cyan)}
-.cond-btn.c-green.active{background:rgba(0,230,118,.12);border-color:var(--green);color:var(--green)}
-.cond-btn.c-amber.active{background:rgba(255,171,0,.12);border-color:var(--amber);color:var(--amber)}
-.cond-btn.c-purple.active{background:rgba(124,77,255,.12);border-color:var(--purple);color:var(--purple)}
-.btn-start-scan{padding:7px 22px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(0,229,255,.05);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px;opacity:.4;pointer-events:none;white-space:nowrap}
+.btn-start-scan{padding:7px 20px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(0,229,255,.05);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px;opacity:.4;pointer-events:none}
 .btn-start-scan.ready{opacity:1;pointer-events:auto;box-shadow:0 0 10px rgba(0,229,255,.2)}
 .btn-start-scan.ready:hover{background:rgba(0,229,255,.15)}
-.scan-hint{font-size:10px;font-family:var(--mono);color:var(--text2);padding-top:2px}
+.scan-hint{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:6px}
 
 
 /* ── 五大券商 ── */
@@ -314,9 +305,9 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
     <div class="stat-sub">監控股票數</div>
   </div>
   <div class="stat-card" style="--accent:var(--purple)">
-    <div class="stat-label">FOREIGN TOP</div>
-    <div class="stat-value" style="font-size:16px;letter-spacing:0" id="statTopIndustry">--</div>
-    <div class="stat-sub">外資淨買最強產業｜<span id="statTopFlow" style="color:var(--green)">--</span></div>
+    <div class="stat-label">LAST SCAN</div>
+    <div class="stat-value" style="font-size:18px" id="statLastScan">--:--</div>
+    <div class="stat-sub">下次：<span id="statNextScan">--</span></div>
   </div>
 </div>
 
@@ -325,11 +316,9 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 
 <!-- 盤後分析選股面板 -->
 <div class="scan-panel">
-  <div class="scan-panel-title">◈ 盤後分析設定 — 產業 · 市場 · 篩選條件</div>
-
-  <!-- 第一列：產業 + 市場 + 掃描按鈕 -->
-  <div class="scan-row">
-    <span class="scan-section-label">產業別</span>
+  <div class="scan-panel-title">◈ 盤後分析設定 — 請選擇產業別與市場後開始掃描</div>
+  <div class="scan-controls">
+    <!-- 產業別下拉 -->
     <select class="scan-select" id="industrySelect" onchange="onScanSettingChange()">
       <option value="">── 選擇產業別 ──</option>
       <option value="ALL">🌐 全部產業</option>
@@ -370,39 +359,17 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
         <option value="綜合">綜合</option>
       </optgroup>
     </select>
-    <span class="scan-section-label" style="margin-left:4px">市場</span>
+
+    <!-- 上市/上櫃切換 -->
     <div class="market-toggle">
       <button class="market-btn active" data-market="ALL" onclick="setMarket('ALL',this)">全部</button>
       <button class="market-btn listed" data-market="TSE" onclick="setMarket('TSE',this)">上市 TSE</button>
       <button class="market-btn otc" data-market="OTC" onclick="setMarket('OTC',this)">上櫃 OTC</button>
     </div>
-    <button class="btn-start-scan" id="btnPanelScan" onclick="startPanelScan()" style="margin-left:auto">▶ 開始掃描</button>
-  </div>
 
-  <!-- 第二列：量能條件 -->
-  <div class="scan-row">
-    <span class="scan-section-label">量能</span>
-    <div class="cond-toggle" id="volCondGroup">
-      <button class="cond-btn c-green" data-cond="vol" data-val="0" onclick="toggleCond(this)" title="不限量能">不限</button>
-      <button class="cond-btn c-green active" data-cond="vol" data-val="1.5" onclick="toggleCond(this)">≥1.5倍均量</button>
-      <button class="cond-btn c-green" data-cond="vol" data-val="2" onclick="toggleCond(this)">≥2倍均量</button>
-      <button class="cond-btn c-green" data-cond="vol" data-val="3" onclick="toggleCond(this)">≥3倍均量</button>
-    </div>
-    <span class="scan-section-label" style="margin-left:8px">外資連買</span>
-    <div class="cond-toggle" id="foreignCondGroup">
-      <button class="cond-btn" data-cond="foreign" data-val="0" onclick="toggleCond(this)">不限</button>
-      <button class="cond-btn active" data-cond="foreign" data-val="1" onclick="toggleCond(this)">≥1日</button>
-      <button class="cond-btn" data-cond="foreign" data-val="3" onclick="toggleCond(this)">≥3日</button>
-      <button class="cond-btn" data-cond="foreign" data-val="5" onclick="toggleCond(this)">≥5日</button>
-    </div>
-    <span class="scan-section-label" style="margin-left:8px">籌碼評分</span>
-    <div class="cond-toggle" id="chipCondGroup">
-      <button class="cond-btn c-purple" data-cond="chip" data-val="0" onclick="toggleCond(this)">不限</button>
-      <button class="cond-btn c-purple active" data-cond="chip" data-val="2" onclick="toggleCond(this)">≥2分</button>
-      <button class="cond-btn c-purple" data-cond="chip" data-val="4" onclick="toggleCond(this)">≥4分</button>
-    </div>
+    <!-- 掃描按鈕 -->
+    <button class="btn-start-scan" id="btnPanelScan" onclick="startPanelScan()">▶ 開始掃描</button>
   </div>
-
   <div class="scan-hint" id="scanHint">請先選擇產業別，再按開始掃描</div>
 </div>
 
@@ -479,7 +446,6 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
     <div class="selected-industry-bar" id="selectedIndustryBar">
       <span style="color:var(--text2);font-family:var(--mono);font-size:10px">篩選族群：</span>
       <span class="sel-tag" id="selectedIndustryTag"></span>
-      <span id="industryFlowSummary" style="font-size:10px;font-family:var(--mono);color:var(--text2);display:flex;gap:10px;margin-left:8px"></span>
       <span class="sel-clear" onclick="clearIndustryFilter()">✕ 清除篩選</span>
     </div>
     <div class="hits-container" id="hitsContainer">
@@ -537,26 +503,9 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
     </div>
 
     <div class="panel" style="flex:1">
-      <div class="panel-header">
-        <span class="panel-title">◈ SCAN LOG</span>
-        <span class="panel-badge" id="logBadge">0 筆</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;height:calc(100% - 38px)">
-        <div class="log-container" id="logContainer" style="border-right:1px solid var(--border);max-height:none">
-          <div class="log-entry">飆股狙擊系統初始化完成</div>
-        </div>
-        <div style="padding:10px 12px">
-          <div style="font-size:9px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:10px">訊號分佈</div>
-          <div id="signalDistChart" style="display:flex;flex-direction:column;gap:8px">
-            <div style="font-size:10px;font-family:var(--mono);color:var(--text2)">尚無訊號資料</div>
-          </div>
-          <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
-            <div style="font-size:9px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:8px">星級分佈</div>
-            <div id="starDistChart" style="display:flex;flex-direction:column;gap:6px">
-              <div style="font-size:10px;font-family:var(--mono);color:var(--text2)">尚無訊號資料</div>
-            </div>
-          </div>
-        </div>
+      <div class="panel-header"><span class="panel-title">◈ SCAN LOG</span></div>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry">飆股狙擊系統初始化完成</div>
       </div>
     </div>
 
@@ -855,27 +804,6 @@ let filterType = "all";
 let scanTimer  = null;
 let logs       = [];
 const SCAN_INTERVAL = 0; // 盤後模式：不自動重複掃描
-
-// ── 快速篩選條件 ──
-let scanConds = { vol: 1.5, foreign: 1, chip: 2 };
-
-function toggleCond(btn) {
-  const cond = btn.dataset.cond;
-  const val  = parseFloat(btn.dataset.val);
-  scanConds[cond] = val;
-  // 同群組 active 切換
-  btn.closest(".cond-toggle").querySelectorAll(".cond-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  onScanSettingChange();
-}
-
-// 判斷一筆 hit 是否符合篩選條件
-function passQuickFilter(h) {
-  if (scanConds.vol > 0   && (parseFloat(h.volRatio)||0)  < scanConds.vol)    return false;
-  if (scanConds.chip > 0  && (h.chipScore||0)              < scanConds.chip)   return false;
-  if (scanConds.foreign > 0 && (h.foreignNet5||0)          < scanConds.foreign) return false;
-  return true;
-}
 
 // ════════════════════════════════════════
 // Token 管理
@@ -1247,10 +1175,9 @@ function checkAccumulation(id, d) {
 let scanIdx = 0;
 
 async function startScan() {
-  if (scanning) { addLog("⚠ 掃描中，請稍候…","warn"); return; }
+  if (scanning) return;
   if (!token) { addLog("請先設定 Token！","warn"); return; }
   scanning = true;
-  document.getElementById("btnScan").disabled = true;
 
   // 每天重置
   const today = new Date().toDateString();
@@ -1267,6 +1194,7 @@ async function startScan() {
   document.getElementById("statScans").textContent = scanCount;
   document.getElementById("sysStatus").textContent = "掃描中...";
   document.getElementById("sysStatus").className = "status-val scanning";
+  // Token 已內建，掃描按鈕直接啟用
   document.getElementById("statLastScan").textContent = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
 
   const total = STOCK_LIST.length;
@@ -1275,8 +1203,6 @@ async function startScan() {
 
   let newHits = 0;
   let doneCount = 0;
-
-  try {
 
   // 並行掃描：每次同時抓 BATCH_SIZE 檔，大幅提升速度
   const BATCH_SIZE = 35;
@@ -1337,11 +1263,6 @@ async function startScan() {
     for (const r of results) {
       if (r.status === "fulfilled" && r.value) {
         const result = r.value;
-        // 套用快速篩選條件
-        if (!passQuickFilter(result)) {
-          addLog(`⊘ 濾除：${result.id} ${result.label}（量/籌碼/外資不符條件）`);
-          continue;
-        }
         hits.unshift(result);
         notified.add(result.id);
         newHits++;
@@ -1364,23 +1285,18 @@ async function startScan() {
     await new Promise(r => setTimeout(r, 50));
   }
 
-    document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
-    document.getElementById("statHits").textContent = hits.length;
-    document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-    renderSignalDist();
-    addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
-    document.getElementById("statNextScan").textContent = "盤後模式";
-  } catch(e) {
-    addLog(`❌ 掃描錯誤：${e.message}`, "err");
-    console.error("startScan error:", e);
-  } finally {
-    scanning = false;
-    document.getElementById("btnScan").disabled = false;
-    document.getElementById("sysStatus").textContent = "監控中";
-    document.getElementById("sysStatus").className = "status-val active";
-    document.getElementById("connDot").className = "sb-dot";
-    document.getElementById("connStatus").textContent = "Finmind API 連線正常";
-  }
+  scanning = false;
+  document.getElementById("sysStatus").textContent = "監控中";
+  document.getElementById("sysStatus").className = "status-val active";
+  document.getElementById("btnScan").disabled = false;
+  document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
+  document.getElementById("connDot").className = "sb-dot";
+  document.getElementById("connStatus").textContent = "Finmind API 連線正常";
+  document.getElementById("statHits").textContent = hits.length;
+  document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
+
+  addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
+  document.getElementById("statNextScan").textContent = "盤後模式";
 }
 
 // ════════════════════════════════════════
@@ -1430,7 +1346,6 @@ function renderHits() {
 
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
   document.getElementById("statHits").textContent = hits.length;
-  renderSignalDist();
 
   if (!filtered.length) {
     c.innerHTML = `<div class="empty-state">
@@ -1490,8 +1405,6 @@ function addLog(msg, type="") {
   lc.innerHTML = logs.map(l =>
     `<div class="log-entry ${l.type}">[${l.ts}] ${esc(l.msg)}</div>`
   ).join("");
-  const lb = document.getElementById("logBadge");
-  if (lb) lb.textContent = logs.length + " 筆";
 }
 
 function setFilter(type, btn) {
@@ -1852,7 +1765,6 @@ function renderMoneyFlowData(data, dateStr) {
   }
 
   renderRadar();
-  updateStatTopIndustry();
 
   // 右側：個股淨買超前10
   const sorted = Object.values(stockNet)
@@ -1975,33 +1887,18 @@ function renderRadar() {
   const loading = document.getElementById("treemapLoading");
   if (loading) loading.style.display = "none";
 
-  // offsetWidth 有時在重繪前為 0，用 getBoundingClientRect 補
-  const rect = wrap.getBoundingClientRect();
-  const W = rect.width  || wrap.offsetWidth  || 420;
-  const H = rect.height || wrap.offsetHeight || 290;
+  const W = wrap.offsetWidth  || 400;
+  const H = wrap.offsetHeight || 290;
 
   // 清除舊 block
-  Array.from(wrap.querySelectorAll(".tm-block,.tm-empty")).forEach(el => el.remove());
+  Array.from(wrap.querySelectorAll(".tm-block")).forEach(el => el.remove());
 
-  // trust/dealer 可能是 undefined，補 0
-  const data = moneyFlowData
-    .map(d => ({ ...d, val: Number(d[key]) || 0 }))
-    .filter(d => d.val !== 0);
-
-  if (!data.length) {
-    const msg = document.createElement("div");
-    msg.className = "tm-empty";
-    msg.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text2);font-family:var(--mono);font-size:11px";
-    msg.textContent = "今日無" + (radarMode==="trust"?"投信":radarMode==="dealer"?"自營商":"外資") + "資料";
-    wrap.appendChild(msg);
-    return;
-  }
-
-  const totalAbs = data.reduce((s,d) => s + Math.abs(d.val), 0) || 1;
-  const maxAbs   = Math.max(...data.map(d => Math.abs(d.val))) || 1;
+  const data    = moneyFlowData.filter(d => d[key] !== 0);
+  const totalAbs = data.reduce((s,d) => s + Math.abs(d[key]), 0) || 1;
+  const maxAbs   = Math.max(...data.map(d => Math.abs(d[key])));
 
   const items = data
-    .map(d => ({ name: d.name, val: d.val, area: (Math.abs(d.val) / totalAbs) * W * H }))
+    .map(d => ({ name: d.name, val: d[key], area: (Math.abs(d[key]) / totalAbs) * W * H }))
     .sort((a,b) => b.area - a.area);
 
   const layout = squarifyLayout(items, 0, 0, W, H);
@@ -2086,91 +1983,8 @@ function selectIndustry(name) {
     addLog(`✅ 已鎖定產業：${name}，共 ${STOCK_LIST.length} 檔`);
   }
 
-  // 顯示該產業資金流向摘要
-  const flowInfo = moneyFlowData.find(d => d.name === name);
-  const summaryEl = document.getElementById("industryFlowSummary");
-  if (summaryEl && flowInfo) {
-    const fmt = v => (v >= 0 ? "+" : "") + Math.round(v/1000) + "K";
-    const col = v => v >= 0 ? "var(--green)" : "var(--red)";
-    summaryEl.innerHTML = [
-      ["外資", flowInfo.foreign],
-      ["投信", flowInfo.trust],
-      ["自營", flowInfo.dealer]
-    ].map(([label, v]) =>
-      `<span>${label}：<span style="color:${col(v)}">${fmt(v)}</span></span>`
-    ).join("");
-  } else if (summaryEl) {
-    summaryEl.innerHTML = "";
-  }
-
   // 重新渲染雷達（高亮選取）
   renderRadar();
-}
-
-// ── 更新第4張卡片：外資最強產業 ──
-function updateStatTopIndustry() {
-  if (!moneyFlowData.length) return;
-  const top = [...moneyFlowData].sort((a,b) => b.foreign - a.foreign)[0];
-  if (!top) return;
-  const el  = document.getElementById("statTopIndustry");
-  const el2 = document.getElementById("statTopFlow");
-  if (el)  el.textContent  = top.name;
-  if (el2) el2.textContent = (top.foreign >= 0 ? "+" : "") + Math.round(top.foreign/1000) + "K張";
-  if (el2) el2.style.color = top.foreign >= 0 ? "var(--green)" : "var(--red)";
-}
-
-// ── 訊號分佈橫條圖 ──
-function renderSignalDist() {
-  const typeChart = document.getElementById("signalDistChart");
-  const starChart = document.getElementById("starDistChart");
-  if (!typeChart || !starChart) return;
-
-  if (!hits.length) {
-    typeChart.innerHTML = '<div style="font-size:10px;font-family:var(--mono);color:var(--text2)">尚無訊號資料</div>';
-    starChart.innerHTML = '<div style="font-size:10px;font-family:var(--mono);color:var(--text2)">尚無訊號資料</div>';
-    const lb = document.getElementById("logBadge");
-    if (lb) lb.textContent = "0 筆";
-    return;
-  }
-
-  // 類型分佈
-  const typeCounts = { breakout: 0, consolidation: 0, accumulation: 0 };
-  hits.forEach(h => { if (typeCounts[h.type] !== undefined) typeCounts[h.type]++; });
-  const typeTotal = hits.length || 1;
-  const typeLabels = { breakout: "🚀 爆量突破", consolidation: "📦 強勢整理", accumulation: "🔮 主力蓄勢" };
-  const typeColors = { breakout: "var(--green)", consolidation: "var(--amber)", accumulation: "var(--purple)" };
-  typeChart.innerHTML = Object.entries(typeCounts).map(([t, n]) => {
-    const pct = Math.round(n / typeTotal * 100);
-    return `<div>
-      <div style="display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);color:var(--text2);margin-bottom:3px">
-        <span>${typeLabels[t]}</span><span style="color:${typeColors[t]}">${n} (${pct}%)</span>
-      </div>
-      <div style="height:5px;background:var(--bg3);border-radius:2px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${typeColors[t]};border-radius:2px;transition:width .5s"></div>
-      </div>
-    </div>`;
-  }).join("");
-
-  // 星級分佈
-  const starCounts = {5:0,4:0,3:0,2:0,1:0};
-  hits.forEach(h => { const s = calcStars(h); if (starCounts[s] !== undefined) starCounts[s]++; });
-  starChart.innerHTML = [5,4,3,2,1].map(s => {
-    const n   = starCounts[s];
-    const pct = Math.round(n / typeTotal * 100);
-    const col = s >= 4 ? "var(--amber)" : s >= 3 ? "#b8960a" : "var(--text2)";
-    return `<div>
-      <div style="display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);color:var(--text2);margin-bottom:2px">
-        <span style="color:${col}">${"★".repeat(s)}${"☆".repeat(5-s)}</span><span>${n}</span>
-      </div>
-      <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .5s"></div>
-      </div>
-    </div>`;
-  }).join("");
-
-  // log badge
-  const lb = document.getElementById("logBadge");
-  if (lb) lb.textContent = logs.length + " 筆";
 }
 
 function clearIndustryFilter() {
@@ -2499,7 +2313,6 @@ async function realtimeScanOnce() {
     for (const r of results) {
       if (r.status === "fulfilled" && r.value) {
         const result = r.value;
-        if (!passQuickFilter(result)) continue; // 套用快速篩選條件
         // 即時掃描：同一檔如果已有訊號則更新，沒有則新增
         const existing = hits.findIndex(h => h.id === result.id);
         if (existing >= 0) {
@@ -2646,11 +2459,7 @@ function onScanSettingChange() {
 
   btn.classList.add("ready");
   const mktLabel = selectedMarket === "TSE" ? "上市" : selectedMarket === "OTC" ? "上櫃" : "上市+上櫃";
-  const volLabel = scanConds.vol > 0 ? `量≥${scanConds.vol}x` : "";
-  const fgnLabel = scanConds.foreign > 0 ? `外資≥${scanConds.foreign}日` : "";
-  const chipLabel= scanConds.chip > 0 ? `籌碼≥${scanConds.chip}分` : "";
-  const condStr  = [volLabel, fgnLabel, chipLabel].filter(Boolean).join(" · ") || "無額外條件";
-  if (hint) hint.textContent = `已選：${selectedIndustryPanel === "ALL" ? "全部產業" : selectedIndustryPanel} ｜ ${mktLabel} ｜ 共 ${pool.length} 檔 ｜ ${condStr} → 點擊開始掃描`;
+  if (hint) hint.textContent = `已選：${selectedIndustryPanel === "ALL" ? "全部產業" : selectedIndustryPanel} ｜ ${mktLabel} ｜ 共 ${pool.length} 檔 → 點擊開始掃描`;
 }
 
 async function startPanelScan() {
