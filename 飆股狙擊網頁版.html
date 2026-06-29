@@ -231,20 +231,24 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 
 
 /* ── 盤後分析選股面板 ── */
-.scan-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;margin-bottom:16px}
-.scan-panel-title{font-size:11px;font-family:var(--mono);color:var(--cyan);letter-spacing:2px;margin-bottom:12px}
-.scan-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.scan-select{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:7px 12px;color:var(--text);font-family:var(--mono);font-size:12px;cursor:pointer;min-width:200px}
-.scan-select:focus{outline:none;border-color:var(--cyan)}
-.market-toggle{display:flex;gap:4px}
-.market-btn{padding:6px 14px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s}
-.market-btn.active{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
-.market-btn.listed.active{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
-.market-btn.otc.active{background:rgba(255,171,0,.1);border-color:var(--amber);color:var(--amber)}
-.btn-start-scan{padding:7px 20px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(0,229,255,.05);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .2s;letter-spacing:1px;opacity:.4;pointer-events:none}
-.btn-start-scan.ready{opacity:1;pointer-events:auto;box-shadow:0 0 10px rgba(0,229,255,.2)}
-.btn-start-scan.ready:hover{background:rgba(0,229,255,.15)}
-.scan-hint{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:6px}
+.scan-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px 18px;margin-bottom:16px}
+.scan-panel-title{font-size:11px;font-family:var(--mono);color:var(--cyan);letter-spacing:2px;margin-bottom:8px}
+/* ── 融資融券查詢欄 ── */
+.mq-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mq-input{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:13px;width:160px;outline:none;transition:border-color .2s}
+.mq-input:focus{border-color:var(--cyan)}
+.mq-input::placeholder{color:var(--text2);font-size:11px}
+.mq-btn{padding:6px 18px;border-radius:3px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(0,229,255,.06);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap;transition:background .2s}
+.mq-btn:hover{background:rgba(0,229,255,.15)}
+.mq-result{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-left:6px}
+.mq-field{display:flex;flex-direction:column;gap:2px;min-width:90px}
+.mq-label{font-size:9px;font-family:var(--mono);color:var(--text2);letter-spacing:1px}
+.mq-value{font-size:14px;font-family:var(--mono);font-weight:600;color:#e8f4ff}
+.mq-value.up{color:var(--green)}
+.mq-value.down{color:var(--red)}
+.mq-hint{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:4px}
+.mq-date{font-size:9px;font-family:var(--mono);color:var(--text2);margin-left:auto;white-space:nowrap}
+.mq-sep{width:1px;height:32px;background:var(--border);flex-shrink:0}
 
 
 /* ── 五大券商 ── */
@@ -316,61 +320,40 @@ header::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;back
 
 <!-- 盤後分析選股面板 -->
 <div class="scan-panel">
-  <div class="scan-panel-title">◈ 盤後分析設定 — 請選擇產業別與市場後開始掃描</div>
-  <div class="scan-controls">
-    <!-- 產業別下拉 -->
-    <select class="scan-select" id="industrySelect" onchange="onScanSettingChange()">
-      <option value="">── 選擇產業別 ──</option>
-      <option value="ALL">🌐 全部產業</option>
-      <optgroup label="電子科技">
-        <option value="半導體">半導體</option>
-        <option value="電腦及週邊設備">電腦及週邊設備</option>
-        <option value="光電業">光電業</option>
-        <option value="通信網路業">通信網路業</option>
-        <option value="電子零組件業">電子零組件業</option>
-        <option value="電子通路業">電子通路業</option>
-        <option value="資訊服務業">資訊服務業</option>
-        <option value="其他電子業">其他電子業</option>
-      </optgroup>
-      <optgroup label="傳統產業">
-        <option value="水泥工業">水泥工業</option>
-        <option value="食品工業">食品工業</option>
-        <option value="塑膠工業">塑膠工業</option>
-        <option value="紡織纖維">紡織纖維</option>
-        <option value="電機機械">電機機械</option>
-        <option value="電器電纜">電器電纜</option>
-        <option value="化學工業">化學工業</option>
-        <option value="玻璃陶瓷">玻璃陶瓷</option>
-        <option value="造紙工業">造紙工業</option>
-        <option value="鋼鐵工業">鋼鐵工業</option>
-        <option value="橡膠工業">橡膠工業</option>
-        <option value="汽車工業">汽車工業</option>
-        <option value="建材營造">建材營造</option>
-      </optgroup>
-      <optgroup label="金融">
-        <option value="金融保險">金融保險</option>
-        <option value="貿易百貨">貿易百貨</option>
-      </optgroup>
-      <optgroup label="其他">
-        <option value="生技醫療">生技醫療</option>
-        <option value="航運業">航運業</option>
-        <option value="觀光餐旅">觀光餐旅</option>
-        <option value="油電燃氣">油電燃氣</option>
-        <option value="綜合">綜合</option>
-      </optgroup>
-    </select>
-
-    <!-- 上市/上櫃切換 -->
-    <div class="market-toggle">
-      <button class="market-btn active" data-market="ALL" onclick="setMarket('ALL',this)">全部</button>
-      <button class="market-btn listed" data-market="TSE" onclick="setMarket('TSE',this)">上市 TSE</button>
-      <button class="market-btn otc" data-market="OTC" onclick="setMarket('OTC',this)">上櫃 OTC</button>
+  <div class="scan-panel-title">◈ 融資融券查詢</div>
+  <div class="mq-bar">
+    <input class="mq-input" id="mqInput" type="text" placeholder="輸入股票代號或名稱"
+      onkeydown="if(event.key==='Enter') queryMargin()">
+    <button class="mq-btn" onclick="queryMargin()">🔍 查詢</button>
+    <div class="mq-sep" id="mqSep" style="display:none"></div>
+    <!-- 融資餘額 -->
+    <div class="mq-field" id="mqMarginField" style="display:none">
+      <span class="mq-label">融資餘額（張）</span>
+      <span class="mq-value" id="mqMarginBal">--</span>
     </div>
-
-    <!-- 掃描按鈕 -->
-    <button class="btn-start-scan" id="btnPanelScan" onclick="startPanelScan()">▶ 開始掃描</button>
+    <!-- 融資增減 -->
+    <div class="mq-field" id="mqMarginChgField" style="display:none">
+      <span class="mq-label">融資增減（張）</span>
+      <span class="mq-value" id="mqMarginChg">--</span>
+    </div>
+    <!-- 融券餘額 -->
+    <div class="mq-field" id="mqShortField" style="display:none">
+      <span class="mq-label">融券餘額（張）</span>
+      <span class="mq-value" id="mqShortBal">--</span>
+    </div>
+    <!-- 融券增減 -->
+    <div class="mq-field" id="mqShortChgField" style="display:none">
+      <span class="mq-label">融券增減（張）</span>
+      <span class="mq-value" id="mqShortChg">--</span>
+    </div>
+    <!-- 券資比 -->
+    <div class="mq-field" id="mqRatioField" style="display:none">
+      <span class="mq-label">券資比（%）</span>
+      <span class="mq-value" id="mqRatio">--</span>
+    </div>
+    <span class="mq-date" id="mqDate" style="display:none"></span>
   </div>
-  <div class="scan-hint" id="scanHint">請先選擇產業別，再按開始掃描</div>
+  <div class="mq-hint" id="mqHint">輸入代號後按 Enter 或點查詢</div>
 </div>
 
 <div class="radar-section">
@@ -1383,7 +1366,7 @@ function renderHits() {
         <div class="hit-vol-label">量能</div>
       </div>
       <div class="hit-price">
-        <div class="hit-price-val">$${h.close}</div>
+        <div class="hit-price-val">$${parseFloat(h.close).toFixed(2)}</div>
         <div class="hit-change ${up?"up":"down"}">${sign}${h.changePct}%</div>
       </div>
     </div>`;
@@ -2031,7 +2014,7 @@ function exportReport() {
     return [
       "  " + stars + " " + h.id + " " + (h.name || ""),
       "  策略型態：" + h.label,
-      "  現價：$" + h.close + "　漲幅：" + (h.changePct > 0 ? "+" : "") + h.changePct + "%　量能：" + h.volRatio + "倍",
+      "  現價：$" + parseFloat(h.close).toFixed(2) + "　漲幅：" + (h.changePct > 0 ? "+" : "") + h.changePct + "%　量能：" + h.volRatio + "倍",
       "  " + line3,
       "  訊號說明：" + h.detail,
       "  掃描時間：" + (h.time || "--"),
@@ -2426,6 +2409,99 @@ function setMarket(market, btn) {
   document.querySelectorAll(".market-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   onScanSettingChange();
+}
+
+// ── 融資融券快速查詢 ──────────────────────────────
+async function queryMargin() {
+  const raw   = document.getElementById("mqInput").value.trim();
+  const hint  = document.getElementById("mqHint");
+  if (!raw) { hint.textContent = "請輸入股票代號或名稱"; return; }
+
+  // 支援名稱查詢：從 stockNameMap 反查代號
+  let stockId = raw;
+  if (!/^\d+$/.test(raw)) {
+    const found = Object.entries(stockNameMap).find(([id, name]) =>
+      name.includes(raw) || raw.includes(name)
+    );
+    if (found) stockId = found[0];
+    else { hint.textContent = `找不到「${raw}」，請改用股票代號`; return; }
+  }
+  const stockName = stockNameMap[stockId] || BUILTIN_STOCKS[stockId] || stockId;
+  hint.textContent = `查詢中：${stockId} ${stockName}…`;
+
+  // 隱藏結果區
+  ["mqSep","mqMarginField","mqMarginChgField","mqShortField","mqShortChgField","mqRatioField","mqDate"]
+    .forEach(id => { const el = document.getElementById(id); if(el) el.style.display="none"; });
+
+  try {
+    const end   = new Date();
+    const start = new Date(end); start.setDate(start.getDate() - 10);
+    const fmt   = d => d.toISOString().slice(0,10);
+
+    // 優先用後端 proxy，fallback 到 FinMind 直連
+    let data = null;
+    try {
+      const r = await fetch(`/api/margin?token=${encodeURIComponent(token)}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`);
+      if (r.ok) { const j = await r.json(); data = j.data || j; }
+    } catch(_) {}
+
+    if (!data || !data.length) {
+      const r2 = await fetch(`${FINMIND_API}?dataset=TaiwanStockMarginPurchaseShortSale&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`);
+      const j2 = await r2.json();
+      data = j2.data || [];
+    }
+
+    if (!data || !data.length) {
+      hint.textContent = `${stockId} ${stockName} — 查無近期融資融券資料`;
+      return;
+    }
+
+    // 取最新一筆
+    const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
+    const today  = sorted[sorted.length - 1];
+    const prev   = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+
+    const marginBal  = parseInt(today.MarginPurchaseTodayBalance || today.margin_purchase_today_balance || 0);
+    const marginPrev = prev ? parseInt(prev.MarginPurchaseTodayBalance || prev.margin_purchase_today_balance || 0) : marginBal;
+    const marginChg  = marginBal - marginPrev;
+
+    const shortBal   = parseInt(today.ShortSaleTodayBalance || today.short_sale_today_balance || 0);
+    const shortPrev  = prev ? parseInt(prev.ShortSaleTodayBalance || prev.short_sale_today_balance || 0) : shortBal;
+    const shortChg   = shortBal - shortPrev;
+
+    const ratio      = marginBal > 0 ? (shortBal / marginBal * 100).toFixed(2) : "--";
+    const ratioNum   = marginBal > 0 ? (shortBal / marginBal * 100) : 0;
+
+    // 更新欄位
+    document.getElementById("mqMarginBal").textContent = marginBal.toLocaleString();
+    document.getElementById("mqMarginBal").className   = "mq-value";
+
+    const mc = document.getElementById("mqMarginChg");
+    mc.textContent  = (marginChg >= 0 ? "+" : "") + marginChg.toLocaleString();
+    mc.className    = "mq-value " + (marginChg >= 0 ? "up" : "down");
+
+    document.getElementById("mqShortBal").textContent  = shortBal.toLocaleString();
+    document.getElementById("mqShortBal").className    = "mq-value";
+
+    const sc = document.getElementById("mqShortChg");
+    sc.textContent  = (shortChg >= 0 ? "+" : "") + shortChg.toLocaleString();
+    sc.className    = "mq-value " + (shortChg >= 0 ? "up" : "down");
+
+    const rv = document.getElementById("mqRatio");
+    rv.textContent  = ratio === "--" ? "--" : ratio + "%";
+    rv.className    = "mq-value " + (ratioNum > 15 ? "down" : ratioNum > 8 ? "" : "up");
+
+    document.getElementById("mqDate").textContent = `資料日期：${today.date}`;
+
+    ["mqSep","mqMarginField","mqMarginChgField","mqShortField","mqShortChgField","mqRatioField","mqDate"]
+      .forEach(id => { const el = document.getElementById(id); if(el) el.style.display = id === "mqSep" ? "block" : "flex"; });
+
+    hint.textContent = `${stockId} ${stockName}`;
+
+  } catch(e) {
+    hint.textContent = `查詢失敗：${e.message}`;
+    console.error("queryMargin error:", e);
+  }
 }
 
 function onScanSettingChange() {
