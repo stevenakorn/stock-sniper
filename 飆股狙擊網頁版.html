@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.0</title>
+<title>飆股狙擊系統 v9.1</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -331,6 +331,26 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .bt-strategy-table th{color:var(--text2);font-size:11px;font-weight:500}
 .bt-strategy-table th:first-child,.bt-strategy-table td:first-child{text-align:left}
 
+
+/* K線工具列(v9.1) */
+.kline-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.kperiod-group{display:flex;gap:4px}
+.kperiod-btn{padding:5px 14px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .15s;min-height:30px}
+.kperiod-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.kperiod-btn.active{background:rgba(76,141,255,.12);border-color:var(--cyan);color:var(--cyan);font-weight:500}
+.kline-legend{display:flex;gap:12px;font-size:11px;font-family:var(--mono);color:var(--text2);flex-wrap:wrap}
+.kline-legend .lg{display:inline-flex;align-items:center;gap:4px}
+.kline-legend .lg i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.kline-info{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:7px 10px;margin-bottom:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);font-family:var(--mono);font-size:12px;color:var(--text2);min-height:32px}
+.kline-info b{color:var(--text);font-weight:600;margin-left:2px}
+.kline-info .ki-date{color:var(--cyan);font-weight:500}
+.kline-info .ki-vol{color:var(--text2);margin-left:auto}
+@media(max-width:640px){
+  .kline-info{gap:8px 12px;font-size:11px}
+  .kline-info .ki-vol{margin-left:0}
+  .kperiod-btn{padding:6px 12px;min-height:34px}
+}
+
 /* ── 響應式 ── */
 @media(max-width:1100px){
   .radar-grid{grid-template-columns:1fr}
@@ -375,7 +395,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.0 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.1 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -623,7 +643,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.0 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.1 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1056,60 +1076,198 @@ function setupCanvas(canvas, cssH) {
   return { ctx, W: Math.max(cssW, 260), H: cssH };
 }
 
-// K 線圖(近60根,含 MA5/MA20 與量能)
-function drawKline(d) {
+
+// ════════════════════════════════════════
+// v9.1 K線互動模組:日/週/月切換 + 十字準星 + OHLC 資訊行
+// ════════════════════════════════════════
+var KLINE = {
+  raw: null,        // 完整日資料 {open,high,low,close,volume,date}
+  period: "D",      // D / W / M
+  bars: [],         // 當前週期聚合後的 K 棒陣列
+  geo: null,        // 繪圖幾何(給 hover 命中用)
+  hoverIdx: -1,     // 游標所在 K 棒索引(-1=無)
+  VIEW: { D: 60, W: 52, M: 24 }, // 各週期預設顯示根數
+};
+
+// 把日資料聚合成週/月 OHLC。period: "W" 用 ISO 週、"M" 用年月
+function aggregateOHLC(raw, period) {
+  if (period === "D") {
+    // 直接轉成統一格式的 bar 陣列
+    return raw.date.map((dt, i) => ({
+      date: dt, open: raw.open[i], high: raw.high[i], low: raw.low[i],
+      close: raw.close[i], volume: raw.volume[i],
+    }));
+  }
+  const keyOf = (dt) => {
+    const d = new Date(dt);
+    if (period === "M") {
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    }
+    // ISO 週:用該週的週四決定年份,回傳 YYYY-Www
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
+    return t.getUTCFullYear() + "-W" + String(weekNo).padStart(2, "0");
+  };
+  const groups = new Map();
+  raw.date.forEach((dt, i) => {
+    const k = keyOf(dt);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(i);
+  });
+  const bars = [];
+  // Map 保序(資料本來就時間升冪),依序聚合
+  for (const [k, idxs] of groups) {
+    const first = idxs[0], lastI = idxs[idxs.length - 1];
+    let hi = -Infinity, lo = Infinity, vol = 0;
+    idxs.forEach(i => {
+      if (raw.high[i] > hi) hi = raw.high[i];
+      if (raw.low[i] < lo) lo = raw.low[i];
+      vol += raw.volume[i] || 0;
+    });
+    bars.push({
+      date: raw.date[lastI],   // 用區間最後一天當標籤
+      periodKey: k,
+      open: raw.open[first], high: hi, low: lo, close: raw.close[lastI], volume: vol,
+    });
+  }
+  return bars;
+}
+
+function klineSetPeriod(p, btn) {
+  KLINE.period = p;
+  document.querySelectorAll(".kperiod-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  KLINE.hoverIdx = -1;
+  buildKlineBars();
+  renderKlineChart();
+}
+
+function buildKlineBars() {
+  if (!KLINE.raw) return;
+  KLINE.bars = aggregateOHLC(KLINE.raw, KLINE.period);
+}
+
+// 進入詳情時呼叫:存資料 + 綁事件 + 首次繪製
+function initKline(rawDaily) {
+  KLINE.raw = rawDaily;
+  KLINE.period = "D";
+  KLINE.hoverIdx = -1;
+  buildKlineBars();
   const canvas = document.getElementById("klineCanvas");
-  if (!canvas) return;
-  const { ctx, W, H } = setupCanvas(canvas, 240);
-  const N = Math.min(60, d.close.length);
-  const o = d.open.slice(-N), c = d.close.slice(-N), hi = d.high.slice(-N), lo = d.low.slice(-N), v = d.volume.slice(-N), dt = d.date.slice(-N);
+  if (canvas && !canvas._klineBound) {
+    const onMove = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+      klineHover(cx);
+      if (ev.touches) ev.preventDefault();
+    };
+    canvas.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mouseleave", () => { KLINE.hoverIdx = -1; renderKlineChart(); });
+    canvas.addEventListener("touchstart", onMove, { passive: false });
+    canvas.addEventListener("touchmove", onMove, { passive: false });
+    canvas._klineBound = true;
+  }
+  renderKlineChart();
+}
+
+function klineHover(cssX) {
+  const g = KLINE.geo;
+  if (!g) return;
+  // 由 x 反推 K 棒索引
+  let idx = Math.round((cssX - g.padL - g.step / 2) / g.step);
+  idx = Math.max(0, Math.min(g.N - 1, idx));
+  if (idx !== KLINE.hoverIdx) {
+    KLINE.hoverIdx = idx;
+    renderKlineChart();
+  }
+}
+
+function updateKlineInfo(bar) {
+  const el = document.getElementById("klineInfo");
+  if (!el) return;
+  if (!bar) { el.innerHTML = `<span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span>`; return; }
+  const up = bar.close >= bar.open;
+  const col = up ? "var(--up)" : "var(--down)";
+  const chg = bar.open ? ((bar.close - bar.open) / bar.open * 100) : 0;
+  const f = v => (v >= 1000 ? v.toFixed(0) : v.toFixed(2));
+  const volLot = Math.round((bar.volume || 0) / 1000); // 股→張
+  el.innerHTML =
+    `<span class="ki-date">${bar.date}</span>` +
+    `<span>開<b>${f(bar.open)}</b></span>` +
+    `<span>高<b style="color:var(--up)">${f(bar.high)}</b></span>` +
+    `<span>低<b style="color:var(--down)">${f(bar.low)}</b></span>` +
+    `<span>收<b style="color:${col}">${f(bar.close)}</b></span>` +
+    `<span style="color:${col}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</span>` +
+    `<span class="ki-vol">量 ${volLot.toLocaleString()} 張</span>`;
+}
+
+function renderKlineChart() {
+  const canvas = document.getElementById("klineCanvas");
+  if (!canvas || !KLINE.bars.length) return;
+  const { ctx, W, H } = setupCanvas(canvas, 260);
+  const viewN = KLINE.VIEW[KLINE.period] || 60;
+  const all = KLINE.bars;
+  const N = Math.min(viewN, all.length);
+  const bars = all.slice(-N);
+  const startAbs = all.length - N; // 對應到完整 bars 的起點(算 MA 用)
+
   const UP = cssVar("--up"), DOWN = cssVar("--down"), GRID = cssVar("--border"), TXT = cssVar("--text2");
   const MA5C = cssVar("--amber"), MA20C = cssVar("--cyan");
   const padL = 6, padR = 52, padT = 8;
-  const priceH = H * 0.68, volTop = priceH + 14, volH = H - volTop - 16;
+  const priceH = H * 0.66, volTop = priceH + 14, volH = H - volTop - 18;
   const plotW = W - padL - padR;
-  const step = plotW / N, bw = Math.max(2, Math.min(9, step * 0.6));
+  const step = plotW / N, bw = Math.max(2, Math.min(11, step * 0.62));
 
-  // MA 序列(用完整 close 算,避免前段失真)
+  const c = bars.map(b => b.close), o = bars.map(b => b.open),
+        hi = bars.map(b => b.high), lo = bars.map(b => b.low),
+        v = bars.map(b => b.volume), dt = bars.map(b => b.date);
+
+  // MA(用完整聚合序列算,避免起點失真)
+  const closeAll = all.map(b => b.close);
   const maSeries = (p) => {
     const out = [];
-    for (let i = d.close.length - N; i < d.close.length; i++) {
-      if (i + 1 >= p) out.push(avg(d.close.slice(i + 1 - p, i + 1)));
+    for (let i = startAbs; i < all.length; i++) {
+      if (i + 1 >= p) out.push(avg(closeAll.slice(i + 1 - p, i + 1)));
       else out.push(null);
     }
     return out;
   };
   const ma5 = maSeries(5), ma20 = maSeries(20);
 
-  const allP = [...hi, ...lo, ...ma5.filter(x=>x), ...ma20.filter(x=>x)];
+  const allP = [...hi, ...lo, ...ma5.filter(x => x), ...ma20.filter(x => x)];
   let pMin = Math.min(...allP), pMax = Math.max(...allP);
   const pad = (pMax - pMin) * 0.06 || 1; pMin -= pad; pMax += pad;
   const y = p => padT + (pMax - p) / (pMax - pMin) * (priceH - padT);
   const vMax = Math.max(...v) || 1;
   const x = i => padL + i * step + step / 2;
 
+  // 存幾何供 hover
+  KLINE.geo = { padL, step, N, bw };
+
   ctx.clearRect(0, 0, W, H);
-  // 格線 + 右側價格標籤
+  // 格線 + 價格標籤
   ctx.strokeStyle = GRID; ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace"; ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
     const p = pMin + (pMax - pMin) * g / 4, yy = y(p);
     ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.globalAlpha = .5; ctx.stroke(); ctx.globalAlpha = 1;
     ctx.fillText(p.toFixed(p >= 100 ? 0 : 2), W - padR + 5, yy + 3);
   }
-  // K 棒(台股慣例:漲紅跌綠)
+  // K 棒
   for (let i = 0; i < N; i++) {
     const up = c[i] >= o[i];
     ctx.strokeStyle = ctx.fillStyle = up ? UP : DOWN;
     ctx.beginPath(); ctx.moveTo(x(i), y(hi[i])); ctx.lineTo(x(i), y(lo[i])); ctx.stroke();
     const top = y(Math.max(o[i], c[i])), hgt = Math.max(1, Math.abs(y(o[i]) - y(c[i])));
-    ctx.fillRect(x(i) - bw/2, top, bw, hgt);
-    // 量能
+    ctx.fillRect(x(i) - bw / 2, top, bw, hgt);
     const vh = v[i] / vMax * volH;
-    ctx.globalAlpha = .55;
-    ctx.fillRect(x(i) - bw/2, volTop + volH - vh, bw, vh);
+    ctx.globalAlpha = .5;
+    ctx.fillRect(x(i) - bw / 2, volTop + volH - vh, bw, vh);
     ctx.globalAlpha = 1;
   }
-  // MA 線
+  // MA
   const drawMA = (arr, color) => {
     ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath();
     let started = false;
@@ -1121,13 +1279,38 @@ function drawKline(d) {
     ctx.stroke(); ctx.lineWidth = 1;
   };
   drawMA(ma5, MA5C); drawMA(ma20, MA20C);
+
   // 日期標籤(頭/中/尾)
-  ctx.fillStyle = TXT;
-  [0, Math.floor(N/2), N-1].forEach(i => {
-    const t = (dt[i] || "").slice(5);
-    ctx.fillText(t, Math.min(Math.max(x(i) - 12, padL), W - padR - 30), H - 3);
+  ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace";
+  [0, Math.floor(N / 2), N - 1].forEach(i => {
+    const t = (dt[i] || "").slice(KLINE.period === "M" ? 0 : 5);
+    ctx.fillText(t, Math.min(Math.max(x(i) - 14, padL), W - padR - 34), H - 3);
   });
+
+  // 十字準星 + hover
+  let hi_ = KLINE.hoverIdx;
+  if (hi_ >= 0 && hi_ < N) {
+    const hx = x(hi_);
+    const hbar = bars[hi_];
+    ctx.save();
+    ctx.strokeStyle = cssVar("--text2"); ctx.globalAlpha = .55; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    // 垂直線
+    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, priceH); ctx.stroke();
+    // 水平線(對齊收盤)
+    const hy = y(hbar.close);
+    ctx.beginPath(); ctx.moveTo(padL, hy); ctx.lineTo(W - padR, hy); ctx.stroke();
+    ctx.restore();
+    // 收盤價標籤(右側)
+    ctx.fillStyle = cssVar("--cyan"); ctx.font = "10px Roboto Mono, monospace";
+    ctx.fillText(hbar.close.toFixed(hbar.close >= 100 ? 0 : 2), W - padR + 5, hy + 3);
+    updateKlineInfo(hbar);
+  } else {
+    // 無 hover 時預設顯示最後一根
+    updateKlineInfo(bars[N - 1]);
+  }
 }
+
 
 // 法人買賣超柱狀圖(近20交易日,外資+投信合計,單位:張)
 function drawInstChart(chip) {
@@ -1174,7 +1357,7 @@ function drawInstChart(chip) {
 }
 
 function drawStockCharts(d, chip) {
-  try { drawKline(d); } catch(e) {}
+  try { initKline(d); } catch(e) {}
   try { drawInstChart(chip); } catch(e) {}
 }
 
@@ -1540,6 +1723,35 @@ async function fetchStockData(stockId) {
   } catch(e) {
     return null;
   }
+}
+
+// 個股詳情專用:抓約 1 年日K(供週K/月K 聚合;獨立快取,不影響掃描)
+async function fetchDailyLong(stockId) {
+  const _ck = "pxL_" + stockId;
+  const _c = memGet(_ck);
+  if (_c) return _c;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 400);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!json.data || json.data.length < 20) return null;
+    const rows = json.data;
+    const out = {
+      close:  rows.map(r => parseFloat(r.close)),
+      open:   rows.map(r => parseFloat(r.open)),
+      high:   rows.map(r => parseFloat(r.max)),
+      low:    rows.map(r => parseFloat(r.min)),
+      volume: rows.map(r => parseFloat(r.Trading_Volume)),
+      date:   rows.map(r => r.date),
+    };
+    memSet(_ck, out);
+    return out;
+  } catch(e) { return null; }
 }
 
 // ════════════════════════════════════════
@@ -2198,7 +2410,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.0 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.1 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -2828,13 +3040,15 @@ async function searchStock() {
     start.setDate(start.getDate() - 90);
     const fmt = d => d.toISOString().split("T")[0];
 
-    const [priceRes, chipRes] = await Promise.allSettled([
+    const [priceRes, chipRes, longRes] = await Promise.allSettled([
       fetchStockData(stockId),
       fetchChipData(stockId),
+      fetchDailyLong(stockId),
     ]);
 
-    const d    = priceRes.status === "fulfilled" ? priceRes.value : null;
-    const chip = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
+    const d       = priceRes.status === "fulfilled" ? priceRes.value : null;
+    const chip    = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
+    const dLong   = (longRes.status === "fulfilled" && longRes.value) ? longRes.value : d;
 
     if (!d) {
       detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得 ${stockId} 的資料</div>`;
@@ -2918,7 +3132,15 @@ async function searchStock() {
     </div>
     <div class="kline-section">
       <div class="kline-wrap">
-        <div class="kline-title"><span>日K線 · 近60交易日</span><span class="lg"><i style="background:var(--amber)"></i>MA5</span><span class="lg"><i style="background:var(--cyan)"></i>MA20</span><span style="margin-left:auto">紅漲綠跌</span></div>
+        <div class="kline-toolbar">
+          <div class="kperiod-group">
+            <button class="kperiod-btn active" onclick="klineSetPeriod('D',this)">日K</button>
+            <button class="kperiod-btn" onclick="klineSetPeriod('W',this)">週K</button>
+            <button class="kperiod-btn" onclick="klineSetPeriod('M',this)">月K</button>
+          </div>
+          <div class="kline-legend"><span class="lg"><i style="background:var(--amber)"></i>MA5</span><span class="lg"><i style="background:var(--cyan)"></i>MA20</span><span>紅漲綠跌</span></div>
+        </div>
+        <div class="kline-info" id="klineInfo"><span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span></div>
         <canvas id="klineCanvas"></canvas>
       </div>
       <div class="kline-wrap">
@@ -2926,7 +3148,7 @@ async function searchStock() {
         <canvas id="instCanvas"></canvas>
       </div>
     </div>`;
-    requestAnimationFrame(() => drawStockCharts(d, chip));
+    requestAnimationFrame(() => drawStockCharts(dLong, chip));
 
   } catch(e) {
     detail.innerHTML = `<div class="search-loading" style="color:var(--red)">分析失敗：${e.message}</div>`;
