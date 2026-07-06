@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.1</title>
+<title>飆股狙擊系統 v9.2</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -395,7 +395,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.1 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.2 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -643,7 +643,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.1 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.2 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1312,48 +1312,68 @@ function renderKlineChart() {
 }
 
 
-// 法人買賣超柱狀圖(近20交易日,外資+投信合計,單位:張)
-function drawInstChart(chip) {
-  const canvas = document.getElementById("instCanvas");
+// 法人買賣超柱狀圖(近20交易日,外資/投信分開,單位:張;買超紅賣超綠)
+// 單一機構繪製:vals 為每日淨買賣超(張),maxAbs 為共用刻度
+function drawInstBars(canvasId, dates, vals, maxAbs) {
+  const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-  const wrap = canvas.closest(".kline-wrap");
-  if (!chip || !chip.inst || !chip.inst.length) { if (wrap) wrap.style.display = "none"; return; }
-  const byDate = {};
-  const fNames = ["Foreign_Investor","外資","外資及陸資"], tNames = ["Investment_Trust","投信"];
-  chip.inst.forEach(r => {
-    const b = parseInt(r.buy||0) || parseInt(r.Buy||0) || 0;
-    const s = parseInt(r.sell||0) || parseInt(r.Sell||0) || 0;
-    const net = (b - s) / 1000; // 股 → 張
-    if (fNames.includes(r.name) || tNames.includes(r.name)) {
-      byDate[r.date] = (byDate[r.date] || 0) + net;
-    }
-  });
-  const dates = Object.keys(byDate).sort().slice(-20);
-  if (!dates.length) { if (wrap) wrap.style.display = "none"; return; }
-  const vals = dates.map(dd => byDate[dd]);
-  const { ctx, W, H } = setupCanvas(canvas, 120);
+  const { ctx, W, H } = setupCanvas(canvas, 110);
   const UP = cssVar("--up"), DOWN = cssVar("--down"), GRID = cssVar("--border"), TXT = cssVar("--text2");
-  const padL = 6, padR = 52, padT = 6, padB = 14;
+  const padL = 6, padR = 56, padT = 6, padB = 14;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const maxAbs = Math.max(...vals.map(Math.abs)) || 1;
   const zeroY = padT + plotH / 2;
   const step = plotW / dates.length, bw = Math.max(3, Math.min(14, step * 0.62));
   ctx.clearRect(0, 0, W, H);
   ctx.strokeStyle = GRID; ctx.beginPath(); ctx.moveTo(padL, zeroY); ctx.lineTo(W - padR, zeroY); ctx.stroke();
   ctx.font = "10px Roboto Mono, monospace"; ctx.fillStyle = TXT;
-  ctx.fillText("+" + Math.round(maxAbs).toLocaleString() + "張", W - padR + 4, padT + 8);
-  ctx.fillText("-" + Math.round(maxAbs).toLocaleString() + "張", W - padR + 4, H - padB);
+  ctx.fillText("+" + Math.round(maxAbs).toLocaleString(), W - padR + 4, padT + 8);
+  ctx.fillText("-" + Math.round(maxAbs).toLocaleString(), W - padR + 4, H - padB);
   vals.forEach((val, i) => {
     const hgt = Math.abs(val) / maxAbs * (plotH / 2);
-    ctx.fillStyle = val >= 0 ? UP : DOWN;
+    ctx.fillStyle = val >= 0 ? UP : DOWN; // 買超紅、賣超綠
     const xx = padL + i * step + (step - bw) / 2;
     if (val >= 0) ctx.fillRect(xx, zeroY - hgt, bw, Math.max(hgt, 1));
     else ctx.fillRect(xx, zeroY, bw, Math.max(hgt, 1));
   });
   ctx.fillStyle = TXT;
   [0, dates.length - 1].forEach(i => {
-    ctx.fillText(dates[i].slice(5), padL + i * step, H - 2);
+    ctx.fillText((dates[i] || "").slice(5), padL + i * step, H - 2);
   });
+}
+
+function drawInstChart(chip) {
+  const wrapF = document.getElementById("instWrapF");
+  const wrapT = document.getElementById("instWrapT");
+  if (!chip || !chip.inst || !chip.inst.length) {
+    if (wrapF) wrapF.style.display = "none";
+    if (wrapT) wrapT.style.display = "none";
+    return;
+  }
+  const fNames = ["Foreign_Investor", "外資", "外資及陸資"];
+  const tNames = ["Investment_Trust", "投信"];
+  const fBy = {}, tBy = {};
+  chip.inst.forEach(r => {
+    const b = parseInt(r.buy || 0) || parseInt(r.Buy || 0) || 0;
+    const s = parseInt(r.sell || 0) || parseInt(r.Sell || 0) || 0;
+    const net = (b - s) / 1000; // 股 → 張
+    if (fNames.includes(r.name)) fBy[r.date] = (fBy[r.date] || 0) + net;
+    else if (tNames.includes(r.name)) tBy[r.date] = (tBy[r.date] || 0) + net;
+  });
+  // 兩機構共用日期軸(聯集),取最近 20 日
+  const allDates = [...new Set([...Object.keys(fBy), ...Object.keys(tBy)])].sort().slice(-20);
+  if (!allDates.length) {
+    if (wrapF) wrapF.style.display = "none";
+    if (wrapT) wrapT.style.display = "none";
+    return;
+  }
+  const fVals = allDates.map(d => fBy[d] || 0);
+  const tVals = allDates.map(d => tBy[d] || 0);
+  // 共用刻度:兩者最大絕對值,讓兩張圖高度可直接比較
+  const maxAbs = Math.max(1, ...fVals.map(Math.abs), ...tVals.map(Math.abs));
+  if (wrapF) wrapF.style.display = "";
+  if (wrapT) wrapT.style.display = "";
+  drawInstBars("instCanvasF", allDates, fVals, maxAbs);
+  drawInstBars("instCanvasT", allDates, tVals, maxAbs);
 }
 
 function drawStockCharts(d, chip) {
@@ -2410,7 +2430,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.1 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.2 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -3143,9 +3163,13 @@ async function searchStock() {
         <div class="kline-info" id="klineInfo"><span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span></div>
         <canvas id="klineCanvas"></canvas>
       </div>
-      <div class="kline-wrap">
-        <div class="kline-title"><span>外資＋投信 每日合計買賣超 · 近20交易日（張）</span></div>
-        <canvas id="instCanvas"></canvas>
+      <div class="kline-wrap" id="instWrapF">
+        <div class="kline-title"><span>外資 每日買賣超 · 近20交易日（張）</span><span style="margin-left:auto;color:var(--text2)">買超紅 · 賣超綠</span></div>
+        <canvas id="instCanvasF"></canvas>
+      </div>
+      <div class="kline-wrap" id="instWrapT">
+        <div class="kline-title"><span>投信 每日買賣超 · 近20交易日（張）</span></div>
+        <canvas id="instCanvasT"></canvas>
       </div>
     </div>`;
     requestAnimationFrame(() => drawStockCharts(dLong, chip));
