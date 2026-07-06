@@ -1,0 +1,16 @@
+{
+  "name": "飆股狙擊系統 PRO",
+  "short_name": "飆股狙擊",
+  "description": "台股飆股掃描・盤後分析・訊號回測・大盤濾網",
+  "start_url": "./%E9%A3%86%E8%82%A1%E7%8B%99%E6%93%8A%E7%B6%B2%E9%A0%81%E7%89%88.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1017",
+  "theme_color": "#0d1017",
+  "lang": "zh-Hant-TW",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
