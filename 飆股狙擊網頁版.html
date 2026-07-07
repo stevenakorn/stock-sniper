@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.2</title>
+<title>飆股狙擊系統 v9.3</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -332,6 +332,14 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .bt-strategy-table th:first-child,.bt-strategy-table td:first-child{text-align:left}
 
 
+
+/* 回測勾選操作(v9.3) */
+.bt-actions{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}
+.bt-check-all{display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--text2);cursor:pointer}
+.bt-check-all input,.bt-check{width:15px;height:15px;cursor:pointer;accent-color:var(--cyan)}
+.bt-check-count{font-size:12px;font-family:var(--mono);color:var(--text2)}
+.bt-actions .radar-btn:disabled{opacity:.4;cursor:not-allowed}
+
 /* K線工具列(v9.1) */
 .kline-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .kperiod-group{display:flex;gap:4px}
@@ -395,7 +403,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.2 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.3 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -643,7 +651,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.2 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.3 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1007,21 +1015,29 @@ function renderBacktest() {
 
   // 明細表(最近 80 筆)
   const cell = v => (v === null || v === undefined) ? `<td style="color:var(--text2)">--</td>` : `<td class="${cls(v)}">${fmtPct(v)}</td>`;
-  const trs = rows.slice(0, 80).map(x => `
-    <tr style="cursor:pointer" onclick="openStockDetail('${x.id}')">
+  const trs = rows.slice(0, 200).map(x => {
+    const key = x.date + "|" + x.id;
+    return `
+    <tr>
+      <td style="text-align:center"><input type="checkbox" class="bt-check" data-key="${key}" onchange="updateBtCheckCount()"></td>
       <td>${x.date}</td>
-      <td>${x.id} ${esc(x.name)}</td>
+      <td style="cursor:pointer" onclick="openStockDetail('${x.id}')">${x.id} ${esc(x.name)}</td>
       <td><span class="bt-tag ${x.type}">${stratNames[x.type] || x.type}</span></td>
       <td style="color:var(--amber)">${"★".repeat(x.stars || 1)}</td>
       <td>${(x.bt.entry ?? x.close).toFixed ? (x.bt.entry ?? x.close).toFixed(2) : x.bt.entry}</td>
       ${cell(x.bt.r1)}${cell(x.bt.r3)}${cell(x.bt.r5)}${cell(x.bt.r10)}
-    </tr>`).join("");
+    </tr>`; }).join("");
   tblEl.innerHTML = `
+    <div class="bt-actions">
+      <label class="bt-check-all"><input type="checkbox" id="btCheckAll" onchange="toggleBtCheckAll(this)"> 全選</label>
+      <span class="bt-check-count" id="btCheckCount">已選 0 筆</span>
+      <button class="radar-btn" id="btnBtDelete" onclick="deleteCheckedSignals()" disabled style="border-color:var(--down);color:var(--down)">清除勾選並重算</button>
+    </div>
     <div class="bt-table-wrap"><table class="bt-table">
-      <thead><tr><th>訊號日</th><th>股票</th><th>策略</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+1日</th><th>+3日</th><th>+5日</th><th>+10日</th></tr></thead>
+      <thead><tr><th style="width:34px"></th><th>訊號日</th><th>股票</th><th>策略</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+1日</th><th>+3日</th><th>+5日</th><th>+10日</th></tr></thead>
       <tbody>${trs}</tbody>
     </table></div>
-    <div class="bt-note" style="margin-top:8px">※ 以「訊號隔日開盤價」為進場基準,+N 日為進場後第 N 個交易日收盤。點擊列可開啟個股詳情。僅供策略驗證參考。</div>`;
+    <div class="bt-note" style="margin-top:8px">※ 以「訊號隔日開盤價」為進場基準,+N 日為進場後第 N 個交易日收盤。點股票名可開個股詳情。勾選後可「清除並重算」以調整勝率基期(清除前會自動匯出 CSV 備份)。僅供策略驗證參考。</div>`;
 }
 
 function exportBacktestCSV() {
@@ -1037,6 +1053,40 @@ function exportBacktestCSV() {
   });
   downloadText(`回測結果_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
   addLog("✅ 回測結果 CSV 已匯出");
+}
+
+// ── 回測列表勾選 / 清除 ──
+function updateBtCheckCount() {
+  const boxes = document.querySelectorAll(".bt-check");
+  const checked = document.querySelectorAll(".bt-check:checked");
+  const cnt = document.getElementById("btCheckCount");
+  const del = document.getElementById("btnBtDelete");
+  const all = document.getElementById("btCheckAll");
+  if (cnt) cnt.textContent = `已選 ${checked.length} 筆`;
+  if (del) del.disabled = checked.length === 0;
+  if (all) all.checked = boxes.length > 0 && checked.length === boxes.length;
+}
+function toggleBtCheckAll(el) {
+  document.querySelectorAll(".bt-check").forEach(b => { b.checked = el.checked; });
+  updateBtCheckCount();
+}
+function deleteCheckedSignals() {
+  const checked = [...document.querySelectorAll(".bt-check:checked")];
+  if (!checked.length) return;
+  const keys = checked.map(b => b.dataset.key);
+  if (!confirm(`確定要清除勾選的 ${keys.length} 筆訊號?\n(清除前會自動匯出 CSV 備份,此動作會從歷史永久移除這些訊號)`)) return;
+  // 先自動匯出全部回測結果當備份
+  try { exportBacktestCSV(); } catch(e) {}
+  // 從歷史刪除
+  const h = loadHistory();
+  let removed = 0;
+  keys.forEach(k => {
+    const [date, id] = k.split("|");
+    if (h[date] && h[date][id]) { delete h[date][id]; removed++; if (!Object.keys(h[date]).length) delete h[date]; }
+  });
+  saveHistory(h);
+  addLog(`🗑 已清除 ${removed} 筆訊號並重算勝率基期(已備份 CSV)`, "warn");
+  renderBacktest();
 }
 
 // ── 訊號 CSV 匯出 ──
@@ -1078,21 +1128,17 @@ function setupCanvas(canvas, cssH) {
 
 
 // ════════════════════════════════════════
-// v9.1 K線互動模組:日/週/月切換 + 十字準星 + OHLC 資訊行
+// v9.3 K線模組:主圖(K線+MA)+ 成交量圖 + KD圖,三圖游標連動
 // ════════════════════════════════════════
 var KLINE = {
-  raw: null,        // 完整日資料 {open,high,low,close,volume,date}
-  period: "D",      // D / W / M
-  bars: [],         // 當前週期聚合後的 K 棒陣列
-  geo: null,        // 繪圖幾何(給 hover 命中用)
-  hoverIdx: -1,     // 游標所在 K 棒索引(-1=無)
-  VIEW: { D: 60, W: 52, M: 24 }, // 各週期預設顯示根數
+  raw: null, period: "D", bars: [], hoverIdx: -1,
+  geo: null,          // 共用 x 座標 {padL, step, N, viewBars, startAbs}
+  kd: null,           // 當前 period 的 {K,D}(對齊 bars)
+  VIEW: { D: 60, W: 52, M: 24 },
 };
 
-// 把日資料聚合成週/月 OHLC。period: "W" 用 ISO 週、"M" 用年月
 function aggregateOHLC(raw, period) {
   if (period === "D") {
-    // 直接轉成統一格式的 bar 陣列
     return raw.date.map((dt, i) => ({
       date: dt, open: raw.open[i], high: raw.high[i], low: raw.low[i],
       close: raw.close[i], volume: raw.volume[i],
@@ -1100,10 +1146,7 @@ function aggregateOHLC(raw, period) {
   }
   const keyOf = (dt) => {
     const d = new Date(dt);
-    if (period === "M") {
-      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-    }
-    // ISO 週:用該週的週四決定年份,回傳 YYYY-Www
+    if (period === "M") return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
     const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     const day = t.getUTCDay() || 7;
     t.setUTCDate(t.getUTCDate() + 4 - day);
@@ -1118,7 +1161,6 @@ function aggregateOHLC(raw, period) {
     groups.get(k).push(i);
   });
   const bars = [];
-  // Map 保序(資料本來就時間升冪),依序聚合
   for (const [k, idxs] of groups) {
     const first = idxs[0], lastI = idxs[idxs.length - 1];
     let hi = -Infinity, lo = Infinity, vol = 0;
@@ -1127,13 +1169,26 @@ function aggregateOHLC(raw, period) {
       if (raw.low[i] < lo) lo = raw.low[i];
       vol += raw.volume[i] || 0;
     });
-    bars.push({
-      date: raw.date[lastI],   // 用區間最後一天當標籤
-      periodKey: k,
-      open: raw.open[first], high: hi, low: lo, close: raw.close[lastI], volume: vol,
-    });
+    bars.push({ date: raw.date[lastI], periodKey: k, open: raw.open[first], high: hi, low: lo, close: raw.close[lastI], volume: vol });
   }
   return bars;
+}
+
+// 9日 KD(RSV 平滑 1/3),回傳對齊 bars 的 {K,D}
+function calcKD(bars, period) {
+  period = period || 9;
+  const K = [], D = [];
+  let k = 50, d = 50;
+  for (let i = 0; i < bars.length; i++) {
+    const s = Math.max(0, i - period + 1);
+    let hh = -Infinity, ll = Infinity;
+    for (let j = s; j <= i; j++) { if (bars[j].high > hh) hh = bars[j].high; if (bars[j].low < ll) ll = bars[j].low; }
+    const rsv = (hh === ll) ? 50 : ((bars[i].close - ll) / (hh - ll) * 100);
+    k = k * 2 / 3 + rsv / 3;
+    d = d * 2 / 3 + k / 3;
+    K.push(k); D.push(d);
+  }
+  return { K, D };
 }
 
 function klineSetPeriod(p, btn) {
@@ -1142,50 +1197,58 @@ function klineSetPeriod(p, btn) {
   if (btn) btn.classList.add("active");
   KLINE.hoverIdx = -1;
   buildKlineBars();
-  renderKlineChart();
+  renderAllCharts();
 }
 
 function buildKlineBars() {
   if (!KLINE.raw) return;
   KLINE.bars = aggregateOHLC(KLINE.raw, KLINE.period);
+  KLINE.kd = calcKD(KLINE.bars, 9);
 }
 
-// 進入詳情時呼叫:存資料 + 綁事件 + 首次繪製
 function initKline(rawDaily) {
   KLINE.raw = rawDaily;
   KLINE.period = "D";
   KLINE.hoverIdx = -1;
   buildKlineBars();
-  const canvas = document.getElementById("klineCanvas");
-  if (canvas && !canvas._klineBound) {
-    const onMove = (ev) => {
-      const rect = canvas.getBoundingClientRect();
-      const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
-      klineHover(cx);
-      if (ev.touches) ev.preventDefault();
-    };
-    canvas.addEventListener("mousemove", onMove);
-    canvas.addEventListener("mouseleave", () => { KLINE.hoverIdx = -1; renderKlineChart(); });
-    canvas.addEventListener("touchstart", onMove, { passive: false });
-    canvas.addEventListener("touchmove", onMove, { passive: false });
-    canvas._klineBound = true;
-  }
-  renderKlineChart();
+  ["klineCanvas", "volCanvas", "kdCanvas"].forEach(id => {
+    const cv = document.getElementById(id);
+    if (cv && !cv._klineBound) {
+      const onMove = (ev) => {
+        const rect = cv.getBoundingClientRect();
+        const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+        klineHover(cx);
+        if (ev.touches) ev.preventDefault();
+      };
+      cv.addEventListener("mousemove", onMove);
+      cv.addEventListener("mouseleave", () => { KLINE.hoverIdx = -1; renderAllCharts(); });
+      cv.addEventListener("touchstart", onMove, { passive: false });
+      cv.addEventListener("touchmove", onMove, { passive: false });
+      cv._klineBound = true;
+    }
+  });
+  renderAllCharts();
 }
 
 function klineHover(cssX) {
   const g = KLINE.geo;
   if (!g) return;
-  // 由 x 反推 K 棒索引
   let idx = Math.round((cssX - g.padL - g.step / 2) / g.step);
   idx = Math.max(0, Math.min(g.N - 1, idx));
   if (idx !== KLINE.hoverIdx) {
     KLINE.hoverIdx = idx;
-    renderKlineChart();
+    renderAllCharts();
   }
 }
 
-function updateKlineInfo(bar) {
+// 一次重畫三張圖(共用 geo)
+function renderAllCharts() {
+  renderKlineChart();   // 會設定 KLINE.geo
+  renderVolChart();
+  renderKDChart();
+}
+
+function updateKlineInfo(bar, kdVal) {
   const el = document.getElementById("klineInfo");
   if (!el) return;
   if (!bar) { el.innerHTML = `<span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span>`; return; }
@@ -1193,7 +1256,9 @@ function updateKlineInfo(bar) {
   const col = up ? "var(--up)" : "var(--down)";
   const chg = bar.open ? ((bar.close - bar.open) / bar.open * 100) : 0;
   const f = v => (v >= 1000 ? v.toFixed(0) : v.toFixed(2));
-  const volLot = Math.round((bar.volume || 0) / 1000); // 股→張
+  const volLot = Math.round((bar.volume || 0) / 1000);
+  let kdTxt = "";
+  if (kdVal) kdTxt = `<span>K<b style="color:var(--amber)">${kdVal.K.toFixed(1)}</b></span><span>D<b style="color:var(--cyan)">${kdVal.D.toFixed(1)}</b></span>`;
   el.innerHTML =
     `<span class="ki-date">${bar.date}</span>` +
     `<span>開<b>${f(bar.open)}</b></span>` +
@@ -1201,31 +1266,31 @@ function updateKlineInfo(bar) {
     `<span>低<b style="color:var(--down)">${f(bar.low)}</b></span>` +
     `<span>收<b style="color:${col}">${f(bar.close)}</b></span>` +
     `<span style="color:${col}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</span>` +
+    kdTxt +
     `<span class="ki-vol">量 ${volLot.toLocaleString()} 張</span>`;
 }
 
+// ── 主圖:K棒 + MA(不含量能柱,量能獨立一張)──
 function renderKlineChart() {
   const canvas = document.getElementById("klineCanvas");
   if (!canvas || !KLINE.bars.length) return;
-  const { ctx, W, H } = setupCanvas(canvas, 260);
+  const { ctx, W, H } = setupCanvas(canvas, 230);
   const viewN = KLINE.VIEW[KLINE.period] || 60;
   const all = KLINE.bars;
   const N = Math.min(viewN, all.length);
   const bars = all.slice(-N);
-  const startAbs = all.length - N; // 對應到完整 bars 的起點(算 MA 用)
+  const startAbs = all.length - N;
 
   const UP = cssVar("--up"), DOWN = cssVar("--down"), GRID = cssVar("--border"), TXT = cssVar("--text2");
   const MA5C = cssVar("--amber"), MA20C = cssVar("--cyan");
-  const padL = 6, padR = 52, padT = 8;
-  const priceH = H * 0.66, volTop = priceH + 14, volH = H - volTop - 18;
+  const padL = 6, padR = 52, padT = 8, padB = 4;
+  const priceH = H - padB;
   const plotW = W - padL - padR;
   const step = plotW / N, bw = Math.max(2, Math.min(11, step * 0.62));
 
   const c = bars.map(b => b.close), o = bars.map(b => b.open),
-        hi = bars.map(b => b.high), lo = bars.map(b => b.low),
-        v = bars.map(b => b.volume), dt = bars.map(b => b.date);
+        hi = bars.map(b => b.high), lo = bars.map(b => b.low), dt = bars.map(b => b.date);
 
-  // MA(用完整聚合序列算,避免起點失真)
   const closeAll = all.map(b => b.close);
   const maSeries = (p) => {
     const out = [];
@@ -1236,80 +1301,150 @@ function renderKlineChart() {
     return out;
   };
   const ma5 = maSeries(5), ma20 = maSeries(20);
-
   const allP = [...hi, ...lo, ...ma5.filter(x => x), ...ma20.filter(x => x)];
   let pMin = Math.min(...allP), pMax = Math.max(...allP);
   const pad = (pMax - pMin) * 0.06 || 1; pMin -= pad; pMax += pad;
   const y = p => padT + (pMax - p) / (pMax - pMin) * (priceH - padT);
-  const vMax = Math.max(...v) || 1;
   const x = i => padL + i * step + step / 2;
 
-  // 存幾何供 hover
-  KLINE.geo = { padL, step, N, bw };
+  // 共用 geo(三圖對齊用)
+  KLINE.geo = { padL, padR, step, N, bw, startAbs, W };
 
   ctx.clearRect(0, 0, W, H);
-  // 格線 + 價格標籤
   ctx.strokeStyle = GRID; ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace"; ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
     const p = pMin + (pMax - pMin) * g / 4, yy = y(p);
     ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.globalAlpha = .5; ctx.stroke(); ctx.globalAlpha = 1;
     ctx.fillText(p.toFixed(p >= 100 ? 0 : 2), W - padR + 5, yy + 3);
   }
-  // K 棒
   for (let i = 0; i < N; i++) {
     const up = c[i] >= o[i];
     ctx.strokeStyle = ctx.fillStyle = up ? UP : DOWN;
     ctx.beginPath(); ctx.moveTo(x(i), y(hi[i])); ctx.lineTo(x(i), y(lo[i])); ctx.stroke();
     const top = y(Math.max(o[i], c[i])), hgt = Math.max(1, Math.abs(y(o[i]) - y(c[i])));
     ctx.fillRect(x(i) - bw / 2, top, bw, hgt);
-    const vh = v[i] / vMax * volH;
-    ctx.globalAlpha = .5;
-    ctx.fillRect(x(i) - bw / 2, volTop + volH - vh, bw, vh);
-    ctx.globalAlpha = 1;
   }
-  // MA
   const drawMA = (arr, color) => {
     ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath();
     let started = false;
-    arr.forEach((p, i) => {
-      if (p === null) return;
-      if (!started) { ctx.moveTo(x(i), y(p)); started = true; }
-      else ctx.lineTo(x(i), y(p));
-    });
+    arr.forEach((p, i) => { if (p === null) return; if (!started) { ctx.moveTo(x(i), y(p)); started = true; } else ctx.lineTo(x(i), y(p)); });
     ctx.stroke(); ctx.lineWidth = 1;
   };
   drawMA(ma5, MA5C); drawMA(ma20, MA20C);
 
-  // 日期標籤(頭/中/尾)
+  // 準星(垂直線 + 收盤水平線)
+  const hidx = KLINE.hoverIdx;
+  if (hidx >= 0 && hidx < N) {
+    const hx = x(hidx), hbar = bars[hidx];
+    ctx.save();
+    ctx.strokeStyle = cssVar("--text2"); ctx.globalAlpha = .6; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, priceH); ctx.stroke();
+    const hy = y(hbar.close);
+    ctx.beginPath(); ctx.moveTo(padL, hy); ctx.lineTo(W - padR, hy); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = cssVar("--cyan"); ctx.font = "10px Roboto Mono, monospace";
+    ctx.fillText(hbar.close.toFixed(hbar.close >= 100 ? 0 : 2), W - padR + 5, hy + 3);
+    const kdVal = { K: KLINE.kd.K[startAbs + hidx], D: KLINE.kd.D[startAbs + hidx] };
+    updateKlineInfo(hbar, kdVal);
+  } else {
+    const li = N - 1;
+    const kdVal = { K: KLINE.kd.K[startAbs + li], D: KLINE.kd.D[startAbs + li] };
+    updateKlineInfo(bars[li], kdVal);
+  }
+
+  // 日期標籤
   ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace";
   [0, Math.floor(N / 2), N - 1].forEach(i => {
     const t = (dt[i] || "").slice(KLINE.period === "M" ? 0 : 5);
     ctx.fillText(t, Math.min(Math.max(x(i) - 14, padL), W - padR - 34), H - 3);
   });
-
-  // 十字準星 + hover
-  let hi_ = KLINE.hoverIdx;
-  if (hi_ >= 0 && hi_ < N) {
-    const hx = x(hi_);
-    const hbar = bars[hi_];
-    ctx.save();
-    ctx.strokeStyle = cssVar("--text2"); ctx.globalAlpha = .55; ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    // 垂直線
-    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, priceH); ctx.stroke();
-    // 水平線(對齊收盤)
-    const hy = y(hbar.close);
-    ctx.beginPath(); ctx.moveTo(padL, hy); ctx.lineTo(W - padR, hy); ctx.stroke();
-    ctx.restore();
-    // 收盤價標籤(右側)
-    ctx.fillStyle = cssVar("--cyan"); ctx.font = "10px Roboto Mono, monospace";
-    ctx.fillText(hbar.close.toFixed(hbar.close >= 100 ? 0 : 2), W - padR + 5, hy + 3);
-    updateKlineInfo(hbar);
-  } else {
-    // 無 hover 時預設顯示最後一根
-    updateKlineInfo(bars[N - 1]);
-  }
 }
+
+// ── 成交量圖(獨立,共用 geo)──
+function renderVolChart() {
+  const canvas = document.getElementById("volCanvas");
+  const g = KLINE.geo;
+  if (!canvas || !g) return;
+  const { ctx, W, H } = setupCanvas(canvas, 90);
+  const UP = cssVar("--up"), DOWN = cssVar("--down"), TXT = cssVar("--text2");
+  const { padL, padR, step, N, startAbs } = g;
+  const bars = KLINE.bars.slice(-N);
+  const padT = 6, padB = 14;
+  const plotH = H - padT - padB;
+  const vols = bars.map(b => (b.volume || 0) / 1000); // 張
+  const vMax = Math.max(...vols) || 1;
+  const bw = Math.max(2, Math.min(11, step * 0.62));
+  const x = i => padL + i * step + step / 2;
+  ctx.clearRect(0, 0, W, H);
+  // 右上標最大量
+  ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace";
+  ctx.fillText(Math.round(vMax).toLocaleString() + "張", W - padR + 4, padT + 8);
+  for (let i = 0; i < N; i++) {
+    const up = bars[i].close >= bars[i].open;
+    ctx.fillStyle = up ? UP : DOWN; ctx.globalAlpha = .65;
+    const vh = vols[i] / vMax * plotH;
+    ctx.fillRect(x(i) - bw / 2, padT + plotH - vh, bw, Math.max(vh, 1));
+    ctx.globalAlpha = 1;
+  }
+  // 準星垂直線 + 該日量標籤
+  const hidx = KLINE.hoverIdx;
+  if (hidx >= 0 && hidx < N) {
+    const hx = x(hidx);
+    ctx.save(); ctx.strokeStyle = cssVar("--text2"); ctx.globalAlpha = .6; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + plotH); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = cssVar("--cyan"); ctx.font = "10px Roboto Mono, monospace";
+    ctx.fillText(Math.round(vols[hidx]).toLocaleString(), W - padR + 4, padT + plotH);
+  }
+  // 標題(左上)
+  ctx.fillStyle = TXT; ctx.font = "10px Roboto Mono, monospace";
+  ctx.fillText("成交量(張)", padL, H - 2);
+}
+
+// ── KD 圖(獨立,共用 geo)──
+function renderKDChart() {
+  const canvas = document.getElementById("kdCanvas");
+  const g = KLINE.geo;
+  if (!canvas || !g) return;
+  const { ctx, W, H } = setupCanvas(canvas, 90);
+  const GRID = cssVar("--border"), TXT = cssVar("--text2");
+  const KC = cssVar("--amber"), DC = cssVar("--cyan");
+  const { padL, padR, step, N, startAbs } = g;
+  const padT = 6, padB = 14;
+  const plotH = H - padT - padB;
+  const Kf = KLINE.kd.K.slice(startAbs, startAbs + N);
+  const Df = KLINE.kd.D.slice(startAbs, startAbs + N);
+  const y = v => padT + (100 - v) / 100 * plotH; // 0~100
+  const x = i => padL + i * step + step / 2;
+  ctx.clearRect(0, 0, W, H);
+  // 20 / 50 / 80 參考線
+  ctx.strokeStyle = GRID; ctx.fillStyle = TXT; ctx.font = "9px Roboto Mono, monospace"; ctx.lineWidth = 1;
+  [20, 50, 80].forEach(lv => {
+    const yy = y(lv);
+    ctx.globalAlpha = lv === 50 ? .3 : .5; ctx.beginPath();
+    ctx.setLineDash(lv === 50 ? [2, 3] : []);
+    ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = 1; ctx.fillText(String(lv), W - padR + 5, yy + 3);
+  });
+  const line = (arr, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath();
+    arr.forEach((v, i) => { const px = x(i), py = y(v); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.stroke(); ctx.lineWidth = 1;
+  };
+  line(Kf, KC); line(Df, DC);
+  // 準星 + 該日 K/D 值
+  const hidx = KLINE.hoverIdx;
+  if (hidx >= 0 && hidx < N) {
+    const hx = x(hidx);
+    ctx.save(); ctx.strokeStyle = cssVar("--text2"); ctx.globalAlpha = .6; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + plotH); ctx.stroke(); ctx.restore();
+  }
+  // 圖例
+  ctx.font = "10px Roboto Mono, monospace";
+  ctx.fillStyle = KC; ctx.fillText("K", padL, H - 2);
+  ctx.fillStyle = DC; ctx.fillText("D", padL + 16, H - 2);
+  ctx.fillStyle = TXT; ctx.fillText("KD(9)", padL + 34, H - 2);
+}
+
 
 
 // 法人買賣超柱狀圖(近20交易日,外資/投信分開,單位:張;買超紅賣超綠)
@@ -1378,7 +1513,6 @@ function drawInstChart(chip) {
 
 function drawStockCharts(d, chip) {
   try { initKline(d); } catch(e) {}
-  try { drawInstChart(chip); } catch(e) {}
 }
 
 // ── PWA ──
@@ -2430,7 +2564,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.2 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.3 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -3163,13 +3297,11 @@ async function searchStock() {
         <div class="kline-info" id="klineInfo"><span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span></div>
         <canvas id="klineCanvas"></canvas>
       </div>
-      <div class="kline-wrap" id="instWrapF">
-        <div class="kline-title"><span>外資 每日買賣超 · 近20交易日（張）</span><span style="margin-left:auto;color:var(--text2)">買超紅 · 賣超綠</span></div>
-        <canvas id="instCanvasF"></canvas>
+      <div class="kline-wrap" id="volWrap">
+        <canvas id="volCanvas"></canvas>
       </div>
-      <div class="kline-wrap" id="instWrapT">
-        <div class="kline-title"><span>投信 每日買賣超 · 近20交易日（張）</span></div>
-        <canvas id="instCanvasT"></canvas>
+      <div class="kline-wrap" id="kdWrap">
+        <canvas id="kdCanvas"></canvas>
       </div>
     </div>`;
     requestAnimationFrame(() => drawStockCharts(dLong, chip));
