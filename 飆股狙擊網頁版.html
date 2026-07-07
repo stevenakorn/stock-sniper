@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.4</title>
+<title>飆股狙擊系統 v9.5</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -12,6 +12,15 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+:root[data-theme="light"]{
+  --bg:#f4f6fa; --bg2:#ffffff; --bg3:#eef1f6;
+  --border:#d8dee8; --border2:#c3ccd9;
+  --cyan:#2f6fe0; --cyan2:#2559c0;
+  --text:#1a2230; --text2:#5a6678;
+  --up:#e0313c; --down:#1a9463;
+  --amber:#c8860a; --gold:#c99a1e; --purple:#6b4fd0;
+  --shadow:0 1px 3px rgba(30,40,60,.08);
+}
 :root {
   /* 基底 */
   --bg:#0d1017; --bg2:#141922; --bg3:#1b2230;
@@ -334,6 +343,17 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 
 
+
+/* 多空分組(v9.5) */
+.bt-group-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.bt-group-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:11px 14px}
+.bt-group-card.bull{border-left:3px solid var(--up)}
+.bt-group-card.bear{border-left:3px solid var(--down)}
+.bt-group-title{font-size:12px;font-family:var(--mono);color:var(--text2);margin-bottom:8px}
+.bt-group-stat{display:flex;gap:16px;font-size:13px;font-family:var(--mono);color:var(--text2);flex-wrap:wrap}
+.bt-group-stat b{color:var(--text);font-weight:600}
+@media(max-width:640px){.bt-group-bar{grid-template-columns:1fr}}
+
 /* 回測分頁/篩選(v9.4) */
 .bt-scope-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .bt-scope-label{font-size:12px;font-family:var(--mono);color:var(--text2)}
@@ -358,6 +378,16 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   .bt-search{max-width:none;min-width:120px}
   .bt-filter-count{width:100%;margin-left:0;text-align:right}
 }
+
+
+/* 主題鈕 + 自選星號(v9.5) */
+.theme-toggle{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s;padding:0}
+.theme-toggle:hover{border-color:var(--cyan)}
+.hit-card{position:relative}
+.watch-star{position:absolute;top:8px;right:10px;background:transparent;border:none;color:var(--text2);font-size:17px;cursor:pointer;padding:2px 4px;line-height:1;z-index:2;transition:color .15s,transform .1s}
+.watch-star:hover{transform:scale(1.2)}
+.watch-star.on{color:var(--gold)}
+.hit-card.watched{border-color:rgba(242,193,78,.4);background:linear-gradient(90deg,rgba(242,193,78,.06),transparent)}
 
 /* 回測勾選操作(v9.3) */
 .bt-actions{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}
@@ -429,13 +459,14 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.4 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.5 · PRO</p>
     </div>
   </div>
   <div class="header-right">
     <div class="mkt-chip" id="mktChip"><span class="mc-dot"></span><span>大盤載入中…</span></div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="market-badge closed" id="marketBadge">盤後</div>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切換深色/淺色">🌙</button>
   </div>
 </header>
 
@@ -677,7 +708,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.4 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.5 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -687,6 +718,47 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 // ════════════════════════════════════════
 // v9.0 新增模組:快取層 / 大盤濾網 / 回測 / CSV / 圖表 / PWA
 // ════════════════════════════════════════
+
+// ── 主題切換(v9.5)──
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  const btn = document.getElementById("themeToggle");
+  if (btn) btn.textContent = t === "light" ? "☀️" : "🌙";
+  try { localStorage.setItem("theme", t); } catch(e) {}
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = cur === "dark" ? "light" : "dark";
+  applyTheme(next);
+  // 主題換色後重繪圖表(canvas 用 cssVar 取色)
+  try { if (typeof renderAllCharts === "function" && KLINE && KLINE.bars && KLINE.bars.length) renderAllCharts(); } catch(e) {}
+}
+(function initTheme() {
+  let t = "dark";
+  try { t = localStorage.getItem("theme") || "dark"; } catch(e) {}
+  document.documentElement.setAttribute("data-theme", t);
+})();
+
+// ── 自選股(v9.5)──
+var WATCH_KEY = "watchlist_v1";
+function loadWatch() {
+  try { return new Set(JSON.parse(localStorage.getItem(WATCH_KEY) || "[]")); }
+  catch(e) { return new Set(); }
+}
+function saveWatch(set) {
+  try { localStorage.setItem(WATCH_KEY, JSON.stringify([...set])); } catch(e) {}
+}
+var WATCH = loadWatch();
+function isWatched(id) { return WATCH.has(String(id)); }
+function toggleWatch(id, ev) {
+  if (ev) { ev.stopPropagation(); }
+  id = String(id);
+  if (WATCH.has(id)) { WATCH.delete(id); }
+  else { WATCH.add(id); }
+  saveWatch(WATCH);
+  if (typeof renderHits === "function") renderHits();
+  addLog(WATCH.has(id) ? `⭐ 已加入自選:${id}` : `已移除自選:${id}`);
+}
 
 // ── 工具 ──
 function todayISO() {
@@ -780,6 +852,36 @@ async function fetchIndexData() {
     const out = { close: rows.map(r => parseFloat(r.close)), date: rows.map(r => r.date) };
     lsCacheSet("taiex", out);
     return out;
+  } catch(e) { return null; }
+}
+
+// 回測用:抓約 250 日大盤,建 {date->{close,ma20}} 對照(獨立快取)
+var _mktRef = null;
+async function loadMktRef() {
+  if (_mktRef) return _mktRef;
+  const cached = lsCacheGet("taiexRef");
+  if (cached) { _mktRef = cached; return _mktRef; }
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 250);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=TAIEX&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=TAIEX&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!json.data || json.data.length < 25) return null;
+    const rows = json.data;
+    const dates = rows.map(r => r.date);
+    const closes = rows.map(r => parseFloat(r.close));
+    const map = {}; // date -> {close, ma20, idx}
+    dates.forEach((dt, i) => {
+      const ma20 = (i >= 19) ? avg(closes.slice(i - 19, i + 1)) : null;
+      map[dt] = { close: closes[i], ma20, idx: i };
+    });
+    _mktRef = { dates, closes, map };
+    lsCacheSet("taiexRef", _mktRef);
+    return _mktRef;
   } catch(e) { return null; }
 }
 async function loadMarketFilter() {
@@ -912,6 +1014,7 @@ async function runBacktest() {
     return;
   }
   const toFetch = jobs.filter(j => j.need).slice(-200); // 最多處理最近 200 筆
+  const mktRef = await loadMktRef(); // 大盤對照(可能 null,容錯)
   btRunning = true;
   if (btn) { btn.disabled = true; btn.textContent = "回測中..."; }
   addLog(`▶ 回測開始:歷史訊號 ${jobs.length} 筆,需更新 ${toFetch.length} 筆`);
@@ -943,6 +1046,22 @@ async function runBacktest() {
         };
         const bt = { entry: +entry.toFixed(2), entryBasis: "nextOpen", r1: r(1), r3: r(3), r5: r(5), r10: r(10) };
         bt.pending = (bt.r10 === null); // 未滿10日,之後還要再更新
+        // 大盤同期報酬 + 訊號日多空(以加權指數同樣「隔日進場、+N日收盤」對照)
+        if (mktRef && mktRef.map[job.date]) {
+          const mi = mktRef.map[job.date].idx;
+          const mEntryIdx = mi + 1;
+          const mEntry = (mEntryIdx < mktRef.closes.length) ? mktRef.closes[mEntryIdx] : null;
+          if (mEntry) {
+            const mr = k => {
+              const j = mEntryIdx + (k - 1);
+              return (j < mktRef.closes.length) ? +(((mktRef.closes[j] - mEntry) / mEntry) * 100).toFixed(2) : null;
+            };
+            bt.mktR5 = mr(5); bt.mktR1 = mr(1); bt.mktR10 = mr(10);
+          }
+          // 訊號日大盤多空:收盤 vs 20MA
+          const ref = mktRef.map[job.date];
+          bt.bull = (ref.ma20 != null) ? (ref.close >= ref.ma20) : null;
+        }
         job.sig.bt = bt;
       } catch(e) {}
     }));
@@ -1036,6 +1155,21 @@ function renderBacktest() {
   const r10s = statRows.map(x => x.bt.r10).filter(v => v !== null && v !== undefined);
   const avgR10 = avgOf(r10s);
   const scopeLabel = BT.scope === "s45" ? "4-5★" : "3-5★";
+  // 大盤同期(有 mktR5 的樣本)
+  const withMkt = statRows.filter(x => x.bt.mktR5 !== null && x.bt.mktR5 !== undefined);
+  const avgMktR5 = avgOf(withMkt.map(x => x.bt.mktR5));
+  const avgStockR5same = avgOf(withMkt.map(x => bestR(x.bt)).filter(v => v !== null));
+  const excessR5 = avgStockR5same - avgMktR5;
+  const hasMkt = withMkt.length > 0;
+  // 多空分組
+  const bullRows = statRows.filter(x => x.bt.bull === true);
+  const bearRows = statRows.filter(x => x.bt.bull === false);
+  const grpStat = arr => {
+    if (!arr.length) return { n: 0, wr: "--", a5: 0 };
+    const w = arr.filter(x => bestR(x.bt) > 0).length;
+    return { n: arr.length, wr: (w / arr.length * 100).toFixed(0) + "%", a5: avgOf(arr.map(x => bestR(x.bt)).filter(v => v !== null)) };
+  };
+  const bullS = grpStat(bullRows), bearS = grpStat(bearRows);
 
   // 依策略統計(同樣只算 statRows)
   const byStrat = {};
@@ -1067,7 +1201,17 @@ function renderBacktest() {
       <div class="bt-card"><div class="bt-card-label">已回測訊號</div><div class="bt-card-value">${statRows.length}</div><div class="bt-card-sub">${scopeLabel}·近 ${HIST_MAX_DAYS} 天</div></div>
       <div class="bt-card"><div class="bt-card-label">勝率(5日)</div><div class="bt-card-value ${winRate >= 50 ? "up" : "down"}">${winRate}%</div><div class="bt-card-sub">${wins.length} 勝 / ${statRows.length - wins.length} 敗</div></div>
       <div class="bt-card"><div class="bt-card-label">平均報酬(5日)</div><div class="bt-card-value ${cls(avgR5)}">${fmtPct(avgR5)}</div><div class="bt-card-sub">隔日均:${fmtPct(avgR1)}</div></div>
-      <div class="bt-card"><div class="bt-card-label">平均報酬(10日)</div><div class="bt-card-value ${cls(avgR10)}">${r10s.length ? fmtPct(avgR10) : "--"}</div><div class="bt-card-sub">樣本 ${r10s.length} 筆</div></div>
+      <div class="bt-card"><div class="bt-card-label">超額報酬(5日)</div><div class="bt-card-value ${hasMkt ? cls(excessR5) : ""}">${hasMkt ? fmtPct(excessR5) : "--"}</div><div class="bt-card-sub">${hasMkt ? "大盤同期:" + fmtPct(avgMktR5) : "需更新回測"}</div></div>
+    </div>
+    <div class="bt-group-bar">
+      <div class="bt-group-card bull">
+        <div class="bt-group-title">📈 訊號日多頭盤（站上20MA）</div>
+        <div class="bt-group-stat"><span>${bullS.n} 筆</span><span>勝率 <b>${bullS.wr}</b></span><span>均酬 <b class="${cls(bullS.a5)}">${bullS.n ? fmtPct(bullS.a5) : "--"}</b></span></div>
+      </div>
+      <div class="bt-group-card bear">
+        <div class="bt-group-title">📉 訊號日空頭盤（跌破20MA）</div>
+        <div class="bt-group-stat"><span>${bearS.n} 筆</span><span>勝率 <b>${bearS.wr}</b></span><span>均酬 <b class="${cls(bearS.a5)}">${bearS.n ? fmtPct(bearS.a5) : "--"}</b></span></div>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="bt-stat-tables">
       <div class="bt-card" style="padding:10px 12px">
@@ -1116,6 +1260,7 @@ function renderBtTable(allRows) {
       <td style="color:var(--amber)">${"★".repeat(x.stars || 1)}</td>
       <td>${entry && entry.toFixed ? entry.toFixed(2) : entry}</td>
       ${cell(x.bt.r1)}${cell(x.bt.r3)}${cell(x.bt.r5)}${cell(x.bt.r10)}
+      ${cell(x.bt.mktR5)}
     </tr>`; }).join("");
 
   const dateOpts = `<option value="all">全部日期</option>` +
@@ -1152,8 +1297,8 @@ function renderBtTable(allRows) {
       <button class="radar-btn" id="btnBtDelete" onclick="deleteCheckedSignals()" disabled style="border-color:var(--down);color:var(--down)">清除勾選並重算</button>
     </div>
     <div class="bt-table-wrap"><table class="bt-table">
-      <thead><tr><th style="width:34px"></th><th>訊號日</th><th>股票</th><th>策略</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+1日</th><th>+3日</th><th>+5日</th><th>+10日</th></tr></thead>
-      <tbody>${trs || '<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:20px">無符合條件的訊號</td></tr>'}</tbody>
+      <thead><tr><th style="width:34px"></th><th>訊號日</th><th>股票</th><th>策略</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+1日</th><th>+3日</th><th>+5日</th><th>+10日</th><th>大盤+5日</th></tr></thead>
+      <tbody>${trs || '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:20px">無符合條件的訊號</td></tr>'}</tbody>
     </table></div>
     ${pager}
     <div class="bt-note" style="margin-top:8px">※ 進場基準為「訊號隔日開盤價」。明細僅顯示 3★↑（預設 4-5★）,1-2★ 不顯示也不計整體勝率。點股票名開個股詳情。清除前會自動匯出 CSV 備份。僅供策略驗證參考。</div>`;
@@ -2513,7 +2658,11 @@ function renderHits() {
   if (starFilter > 0)       filtered = filtered.filter(h => h.stars >= starFilter);
 
   // 依星級排序（高到低）
-  filtered.sort((a,b) => b.stars - a.stars || b.chipScore - a.chipScore);
+  filtered.sort((a,b) => {
+    const wa = isWatched(a.id) ? 1 : 0, wb = isWatched(b.id) ? 1 : 0;
+    if (wa !== wb) return wb - wa; // 自選股置頂
+    return b.stars - a.stars || b.chipScore - a.chipScore;
+  });
 
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
   document.getElementById("statHits").textContent = hits.length;
@@ -2535,7 +2684,8 @@ function renderHits() {
     const starStr = "★".repeat(stars) + "☆".repeat(5-stars);
     const chipCls = (h.chipScore||0) >= 4 ? "good" : (h.chipScore||0) >= 2 ? "mid" : "low";
     return `
-    <div class="hit-card ${h.type} s${stars}" onclick="openStockDetail('${h.id}')" title="點擊查看個股詳情">
+    <div class="hit-card ${h.type} s${stars}${isWatched(h.id) ? ' watched' : ''}" onclick="openStockDetail('${h.id}')" title="點擊查看個股詳情">
+      <button class="watch-star${isWatched(h.id) ? ' on' : ''}" onclick="toggleWatch('${h.id}', event)" title="加入/移除自選股">${isWatched(h.id) ? '★' : '☆'}</button>
       <div style="min-width:60px">
         <div class="hit-type ${h.type}">${h.label}</div>
         <div class="star-badge s${stars}" style="margin-top:4px;font-size:11px">${starStr}</div>
@@ -2693,7 +2843,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.4 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.5 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
