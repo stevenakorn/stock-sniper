@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.3</title>
+<title>飆股狙擊系統 v9.4</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -333,6 +333,32 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 
 
+
+/* 回測分頁/篩選(v9.4) */
+.bt-scope-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.bt-scope-label{font-size:12px;font-family:var(--mono);color:var(--text2)}
+.bt-scope-btn{padding:5px 14px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .15s;min-height:30px}
+.bt-scope-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.bt-scope-btn.active{background:rgba(76,141,255,.12);border-color:var(--cyan);color:var(--cyan);font-weight:500}
+.bt-scope-note{font-size:11px;font-family:var(--mono);color:var(--text2);margin-left:4px}
+.bt-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.bt-select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:7px 10px;color:var(--text);font-family:var(--mono);font-size:12px;cursor:pointer;min-height:34px;outline:none}
+.bt-select:focus{border-color:var(--cyan)}
+.bt-search{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:7px 12px;color:var(--text);font-family:var(--mono);font-size:12px;min-width:150px;flex:1;max-width:220px;outline:none}
+.bt-search:focus{border-color:var(--cyan)}
+.bt-filter-count{font-size:11px;font-family:var(--mono);color:var(--text2);margin-left:auto;white-space:nowrap}
+.bt-pager{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap}
+.bt-page-btn{padding:6px 12px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .15s;min-height:32px}
+.bt-page-btn:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan)}
+.bt-page-btn:disabled{opacity:.35;cursor:not-allowed}
+.bt-page-info{font-size:12px;font-family:var(--mono);color:var(--text);padding:0 8px;white-space:nowrap}
+@media(max-width:640px){
+  .bt-filter-bar{gap:6px}
+  .bt-select,.bt-search{font-size:11px;min-height:36px}
+  .bt-search{max-width:none;min-width:120px}
+  .bt-filter-count{width:100%;margin-left:0;text-align:right}
+}
+
 /* 回測勾選操作(v9.3) */
 .bt-actions{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}
 .bt-check-all{display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--text2);cursor:pointer}
@@ -403,7 +429,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.3 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.4 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -651,7 +677,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.3 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.4 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -944,6 +970,37 @@ function collectBtRows() {
   return rows;
 }
 
+// 回測顯示狀態(v9.4):分頁、篩選、星級門檻
+var BT = {
+  page: 1,
+  perPage: 50,
+  scope: "s35",          // s35 = 3-5星計入統計 / s45 = 只4-5星
+  fStrat: "all",         // all / breakout / consolidation / accumulation
+  fStar: "45",           // 45 = 只顯示4-5星 / 345 = 含3星
+  fDate: "all",
+  fQuery: "",
+};
+
+// 統計範圍:整體勝率只算 3★ 以上(或 4★ 以上),1-2★ 永不計入
+function btStatRows(rows) {
+  const min = BT.scope === "s45" ? 4 : 3;
+  return rows.filter(x => (x.stars || 1) >= min);
+}
+// 明細顯示範圍:永不顯示 1-2★;預設 4-5★,fStar=345 才含 3★
+function btVisibleRows(rows) {
+  const minShow = BT.fStar === "345" ? 3 : 4;
+  return rows.filter(x => {
+    if ((x.stars || 1) < minShow) return false;
+    if (BT.fStrat !== "all" && x.type !== BT.fStrat) return false;
+    if (BT.fDate !== "all" && x.date !== BT.fDate) return false;
+    if (BT.fQuery) {
+      const q = BT.fQuery.trim().toLowerCase();
+      if (!(String(x.id).includes(q) || (x.name || "").toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+}
+
 function renderBacktest() {
   const sumEl = document.getElementById("btSummary");
   const tblEl = document.getElementById("btTableWrap");
@@ -951,10 +1008,10 @@ function renderBacktest() {
   if (!sumEl || !tblEl) return;
   const h = loadHistory();
   const totalArchived = Object.values(h).reduce((s, day) => s + Object.keys(day).length, 0);
-  const rows = collectBtRows();
+  const allRows = collectBtRows();
   if (dateEl) dateEl.textContent = `已歸檔 ${totalArchived} 筆`;
 
-  if (!rows.length) {
+  if (!allRows.length) {
     sumEl.innerHTML = "";
     tblEl.innerHTML = `<div class="bt-empty">尚無回測結果<br>訊號會自動歸檔,隔日後點「↻ 更新回測」計算後續報酬與勝率</div>`;
     const csvBtn = document.getElementById("btnBtCsv");
@@ -964,59 +1021,92 @@ function renderBacktest() {
   const csvBtn = document.getElementById("btnBtCsv");
   if (csvBtn) csvBtn.disabled = false;
 
-  // 總覽(以 +5 日報酬為主要判準,不足5日用最遠可得)
   const bestR = b => (b.r5 !== null && b.r5 !== undefined) ? b.r5 : (b.r3 ?? b.r1);
-  const wins  = rows.filter(x => bestR(x.bt) > 0);
-  const winRate = (wins.length / rows.length * 100).toFixed(1);
-  const avgOf = arr => arr.length ? (arr.reduce((a,b) => a+b, 0) / arr.length) : 0;
-  const avgR5 = avgOf(rows.map(x => bestR(x.bt)).filter(v => v !== null));
-  const avgR1 = avgOf(rows.map(x => x.bt.r1).filter(v => v !== null && v !== undefined));
-  const r10s  = rows.map(x => x.bt.r10).filter(v => v !== null && v !== undefined);
-  const avgR10 = avgOf(r10s);
+  const avgOf = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
   const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
   const cls = v => v >= 0 ? "up" : "down";
-
-  // 依策略統計
   const stratNames = { breakout: "爆量突破", consolidation: "強勢整理", accumulation: "主力蓄勢" };
-  const byStrat = {};
-  rows.forEach(x => { (byStrat[x.type] = byStrat[x.type] || []).push(x); });
-  // 依星級統計
-  const byStar = {};
-  rows.forEach(x => { const s = x.stars || 1; (byStar[s] = byStar[s] || []).push(x); });
 
-  const statRow = (label, arr) => {
+  // ── 整體統計:只用 3★↑(或 4★↑)──
+  const statRows = btStatRows(allRows);
+  const wins = statRows.filter(x => bestR(x.bt) > 0);
+  const winRate = statRows.length ? (wins.length / statRows.length * 100).toFixed(1) : "0.0";
+  const avgR5 = avgOf(statRows.map(x => bestR(x.bt)).filter(v => v !== null));
+  const avgR1 = avgOf(statRows.map(x => x.bt.r1).filter(v => v !== null && v !== undefined));
+  const r10s = statRows.map(x => x.bt.r10).filter(v => v !== null && v !== undefined);
+  const avgR10 = avgOf(r10s);
+  const scopeLabel = BT.scope === "s45" ? "4-5★" : "3-5★";
+
+  // 依策略統計(同樣只算 statRows)
+  const byStrat = {};
+  statRows.forEach(x => { (byStrat[x.type] = byStrat[x.type] || []).push(x); });
+  // 各星級統計:1-5★ 全顯示(對照用,用 allRows)
+  const byStar = {};
+  allRows.forEach(x => { const s = x.stars || 1; (byStar[s] = byStar[s] || []).push(x); });
+
+  const statRow = (label, arr, dim) => {
     const w = arr.filter(x => bestR(x.bt) > 0).length;
-    const wr = (w / arr.length * 100).toFixed(0);
+    const wr = arr.length ? (w / arr.length * 100).toFixed(0) : "0";
     const a5 = avgOf(arr.map(x => bestR(x.bt)).filter(v => v !== null));
-    return `<tr><td>${label}</td><td>${arr.length}</td><td>${wr}%</td><td class="${cls(a5)}">${fmtPct(a5)}</td></tr>`;
+    return `<tr${dim ? ' style="opacity:.5"' : ''}><td>${label}</td><td>${arr.length}</td><td>${wr}%</td><td class="${cls(a5)}">${fmtPct(a5)}</td></tr>`;
   };
   let stratHtml = Object.keys(byStrat).map(k =>
     statRow(`<span class="bt-tag ${k}">${stratNames[k] || k}</span>`, byStrat[k])).join("");
-  let starHtml = [5,4,3,2,1].filter(s => byStar[s]).map(s =>
-    statRow("★".repeat(s), byStar[s])).join("");
+  // 星級表:1-2★ 標灰(不計入整體),3-5★ 正常
+  let starHtml = [5, 4, 3, 2, 1].filter(s => byStar[s]).map(s =>
+    statRow("★".repeat(s), byStar[s], s < 3)).join("");
 
   sumEl.innerHTML = `
+    <div class="bt-scope-bar">
+      <span class="bt-scope-label">統計範圍</span>
+      <button class="bt-scope-btn ${BT.scope === "s35" ? "active" : ""}" onclick="btSetScope('s35')">3-5★</button>
+      <button class="bt-scope-btn ${BT.scope === "s45" ? "active" : ""}" onclick="btSetScope('s45')">只 4-5★</button>
+      <span class="bt-scope-note">1-2★ 不列入整體勝率</span>
+    </div>
     <div class="bt-summary-grid">
-      <div class="bt-card"><div class="bt-card-label">已回測訊號</div><div class="bt-card-value">${rows.length}</div><div class="bt-card-sub">近 ${HIST_MAX_DAYS} 天內</div></div>
-      <div class="bt-card"><div class="bt-card-label">勝率(5日)</div><div class="bt-card-value ${winRate >= 50 ? "up" : "down"}">${winRate}%</div><div class="bt-card-sub">${wins.length} 勝 / ${rows.length - wins.length} 敗</div></div>
+      <div class="bt-card"><div class="bt-card-label">已回測訊號</div><div class="bt-card-value">${statRows.length}</div><div class="bt-card-sub">${scopeLabel}·近 ${HIST_MAX_DAYS} 天</div></div>
+      <div class="bt-card"><div class="bt-card-label">勝率(5日)</div><div class="bt-card-value ${winRate >= 50 ? "up" : "down"}">${winRate}%</div><div class="bt-card-sub">${wins.length} 勝 / ${statRows.length - wins.length} 敗</div></div>
       <div class="bt-card"><div class="bt-card-label">平均報酬(5日)</div><div class="bt-card-value ${cls(avgR5)}">${fmtPct(avgR5)}</div><div class="bt-card-sub">隔日均:${fmtPct(avgR1)}</div></div>
       <div class="bt-card"><div class="bt-card-label">平均報酬(10日)</div><div class="bt-card-value ${cls(avgR10)}">${r10s.length ? fmtPct(avgR10) : "--"}</div><div class="bt-card-sub">樣本 ${r10s.length} 筆</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="bt-stat-tables">
       <div class="bt-card" style="padding:10px 12px">
-        <div class="bt-card-label" style="margin-bottom:8px">各策略表現</div>
+        <div class="bt-card-label" style="margin-bottom:8px">各策略表現（${scopeLabel}）</div>
         <table class="bt-strategy-table"><thead><tr><th>策略</th><th>筆數</th><th>勝率</th><th>均酬5日</th></tr></thead><tbody>${stratHtml}</tbody></table>
       </div>
       <div class="bt-card" style="padding:10px 12px">
-        <div class="bt-card-label" style="margin-bottom:8px">各星級表現</div>
+        <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體）</div>
         <table class="bt-strategy-table"><thead><tr><th>星級</th><th>筆數</th><th>勝率</th><th>均酬5日</th></tr></thead><tbody>${starHtml}</tbody></table>
       </div>
     </div>`;
 
-  // 明細表(最近 80 筆)
+  renderBtTable(allRows);
+}
+
+// 明細表(可獨立重繪:換頁/篩選/搜尋不重算統計)
+function renderBtTable(allRows) {
+  const tblEl = document.getElementById("btTableWrap");
+  if (!tblEl) return;
+  if (!allRows) allRows = collectBtRows();
+
+  const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  const cls = v => v >= 0 ? "up" : "down";
   const cell = v => (v === null || v === undefined) ? `<td style="color:var(--text2)">--</td>` : `<td class="${cls(v)}">${fmtPct(v)}</td>`;
-  const trs = rows.slice(0, 200).map(x => {
+  const stratNames = { breakout: "爆量突破", consolidation: "強勢整理", accumulation: "主力蓄勢" };
+
+  // 日期選項(全部可選日期,升冪反轉)
+  const allDates = [...new Set(allRows.map(x => x.date))].sort().reverse();
+
+  const visible = btVisibleRows(allRows);
+  const totalPages = Math.max(1, Math.ceil(visible.length / BT.perPage));
+  if (BT.page > totalPages) BT.page = totalPages;
+  if (BT.page < 1) BT.page = 1;
+  const startI = (BT.page - 1) * BT.perPage;
+  const pageRows = visible.slice(startI, startI + BT.perPage);
+
+  const trs = pageRows.map(x => {
     const key = x.date + "|" + x.id;
+    const entry = (x.bt.entry ?? x.close);
     return `
     <tr>
       <td style="text-align:center"><input type="checkbox" class="bt-check" data-key="${key}" onchange="updateBtCheckCount()"></td>
@@ -1024,20 +1114,59 @@ function renderBacktest() {
       <td style="cursor:pointer" onclick="openStockDetail('${x.id}')">${x.id} ${esc(x.name)}</td>
       <td><span class="bt-tag ${x.type}">${stratNames[x.type] || x.type}</span></td>
       <td style="color:var(--amber)">${"★".repeat(x.stars || 1)}</td>
-      <td>${(x.bt.entry ?? x.close).toFixed ? (x.bt.entry ?? x.close).toFixed(2) : x.bt.entry}</td>
+      <td>${entry && entry.toFixed ? entry.toFixed(2) : entry}</td>
       ${cell(x.bt.r1)}${cell(x.bt.r3)}${cell(x.bt.r5)}${cell(x.bt.r10)}
     </tr>`; }).join("");
+
+  const dateOpts = `<option value="all">全部日期</option>` +
+    allDates.map(d => `<option value="${d}" ${BT.fDate === d ? "selected" : ""}>${d}</option>`).join("");
+
+  const pager = totalPages > 1 ? `
+    <div class="bt-pager">
+      <button class="bt-page-btn" onclick="btGoPage(1)" ${BT.page === 1 ? "disabled" : ""}>«</button>
+      <button class="bt-page-btn" onclick="btGoPage(${BT.page - 1})" ${BT.page === 1 ? "disabled" : ""}>‹ 上一頁</button>
+      <span class="bt-page-info">第 ${BT.page} / ${totalPages} 頁</span>
+      <button class="bt-page-btn" onclick="btGoPage(${BT.page + 1})" ${BT.page === totalPages ? "disabled" : ""}>下一頁 ›</button>
+      <button class="bt-page-btn" onclick="btGoPage(${totalPages})" ${BT.page === totalPages ? "disabled" : ""}>»</button>
+    </div>` : "";
+
   tblEl.innerHTML = `
+    <div class="bt-filter-bar">
+      <select class="bt-select" onchange="btSetFilter('fDate',this.value)">${dateOpts}</select>
+      <select class="bt-select" onchange="btSetFilter('fStrat',this.value)">
+        <option value="all">全部策略</option>
+        <option value="breakout" ${BT.fStrat === "breakout" ? "selected" : ""}>爆量突破</option>
+        <option value="consolidation" ${BT.fStrat === "consolidation" ? "selected" : ""}>強勢整理</option>
+        <option value="accumulation" ${BT.fStrat === "accumulation" ? "selected" : ""}>主力蓄勢</option>
+      </select>
+      <select class="bt-select" onchange="btSetFilter('fStar',this.value)">
+        <option value="45" ${BT.fStar === "45" ? "selected" : ""}>只 4-5★</option>
+        <option value="345" ${BT.fStar === "345" ? "selected" : ""}>含 3★</option>
+      </select>
+      <input class="bt-search" type="text" placeholder="搜尋股號/名稱" value="${BT.fQuery}" oninput="btSearchInput(this.value)">
+      <span class="bt-filter-count">${visible.length} 筆符合</span>
+    </div>
     <div class="bt-actions">
-      <label class="bt-check-all"><input type="checkbox" id="btCheckAll" onchange="toggleBtCheckAll(this)"> 全選</label>
+      <label class="bt-check-all"><input type="checkbox" id="btCheckAll" onchange="toggleBtCheckAll(this)"> 全選本頁</label>
       <span class="bt-check-count" id="btCheckCount">已選 0 筆</span>
       <button class="radar-btn" id="btnBtDelete" onclick="deleteCheckedSignals()" disabled style="border-color:var(--down);color:var(--down)">清除勾選並重算</button>
     </div>
     <div class="bt-table-wrap"><table class="bt-table">
       <thead><tr><th style="width:34px"></th><th>訊號日</th><th>股票</th><th>策略</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+1日</th><th>+3日</th><th>+5日</th><th>+10日</th></tr></thead>
-      <tbody>${trs}</tbody>
+      <tbody>${trs || '<tr><td colspan="10" style="text-align:center;color:var(--text2);padding:20px">無符合條件的訊號</td></tr>'}</tbody>
     </table></div>
-    <div class="bt-note" style="margin-top:8px">※ 以「訊號隔日開盤價」為進場基準,+N 日為進場後第 N 個交易日收盤。點股票名可開個股詳情。勾選後可「清除並重算」以調整勝率基期(清除前會自動匯出 CSV 備份)。僅供策略驗證參考。</div>`;
+    ${pager}
+    <div class="bt-note" style="margin-top:8px">※ 進場基準為「訊號隔日開盤價」。明細僅顯示 3★↑（預設 4-5★）,1-2★ 不顯示也不計整體勝率。點股票名開個股詳情。清除前會自動匯出 CSV 備份。僅供策略驗證參考。</div>`;
+}
+
+function btSetScope(s) { BT.scope = s; renderBacktest(); }
+function btSetFilter(k, v) { BT[k] = v; BT.page = 1; renderBtTable(); }
+function btGoPage(p) { BT.page = p; renderBtTable(); }
+var _btSearchTimer = null;
+function btSearchInput(v) {
+  BT.fQuery = v; BT.page = 1;
+  clearTimeout(_btSearchTimer);
+  _btSearchTimer = setTimeout(() => renderBtTable(), 250);
 }
 
 function exportBacktestCSV() {
@@ -2564,7 +2693,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.3 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.4 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
