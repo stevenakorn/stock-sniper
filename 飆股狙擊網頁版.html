@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.5</title>
+<title>飆股狙擊系統 v9.6</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -344,6 +344,52 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 
 
+
+/* 中長期潛力掃描(v9.6) */
+.lt-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.lt-ctrl-group{display:flex;align-items:center;gap:5px}
+.lt-ctrl-label{font-size:11px;font-family:var(--mono);color:var(--text2);margin-right:2px}
+.lt-mode-btn,.lt-scope-btn{padding:6px 14px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;transition:all .15s;min-height:32px}
+.lt-mode-btn:hover,.lt-scope-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.lt-mode-btn.active,.lt-scope-btn.active{background:rgba(76,141,255,.12);border-color:var(--cyan);color:var(--cyan);font-weight:500}
+.lt-scan-btn{padding:8px 20px;border-radius:var(--radius-s);border:1px solid var(--cyan);background:var(--cyan);color:#fff;font-size:13px;font-family:var(--mono);cursor:pointer;transition:background .15s;min-height:36px;font-weight:500}
+.lt-scan-btn:hover{background:var(--cyan2)}
+.lt-scan-btn:disabled{opacity:.5;cursor:not-allowed}
+.lt-stop-btn{padding:8px 14px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;min-height:36px}
+.lt-stop-btn:hover{border-color:var(--down);color:var(--down)}
+.lt-prog-wrap{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.lt-prog{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s;width:0%}
+.lt-note{font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.6;margin-bottom:12px}
+.lt-empty{padding:28px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;line-height:2}
+.lt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.lt-card{position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px;cursor:pointer;transition:border-color .15s,transform .1s}
+.lt-card:hover{border-color:var(--cyan);transform:translateY(-2px)}
+.lt-card.s5{border-color:rgba(242,193,78,.5);border-left:3px solid var(--gold)}
+.lt-card.s4{border-left:3px solid var(--amber)}
+.lt-card.s3{border-left:3px solid var(--cyan)}
+.lt-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px}
+.lt-name{font-size:16px;font-weight:700;color:var(--text)}
+.lt-code{font-size:11px;font-family:var(--mono);color:var(--text2);margin-left:6px}
+.lt-price{text-align:right}
+.lt-price-val{font-size:18px;font-family:var(--mono);font-weight:700;color:var(--text)}
+.lt-star{font-size:12px;color:var(--gold);letter-spacing:1px;margin-top:2px}
+.lt-metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;font-size:12px;font-family:var(--mono);color:var(--text2);margin-bottom:8px}
+.lt-metrics b{color:var(--text);font-weight:600}
+.lt-metrics b.up{color:var(--up)}
+.lt-metrics b.down{color:var(--down)}
+.lt-ma{font-size:11px;font-family:var(--mono);color:var(--text2);padding-top:8px;border-top:1px solid var(--border)}
+.lt-ma b{color:var(--cyan);font-weight:600}
+.lt-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.lt-tag{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:4px}
+.lt-tag.good{color:var(--up);background:rgba(240,66,78,.1);border:1px solid rgba(240,66,78,.3)}
+.lt-tag.mid{color:var(--down);background:rgba(34,160,107,.1);border:1px solid rgba(34,160,107,.3)}
+.lt-tag.hot{color:var(--amber);background:rgba(242,169,30,.1);border:1px solid rgba(242,169,30,.3)}
+@media(max-width:640px){
+  .lt-grid{grid-template-columns:1fr}
+  .lt-controls{gap:8px}
+  .lt-scan-btn{flex:1}
+}
+
 /* 多空分組(v9.5) */
 .bt-group-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .bt-group-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:11px 14px}
@@ -459,7 +505,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.5 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.6 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -686,6 +732,34 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   </div>
 </div>
 
+<!-- 中長期潛力掃描 -->
+<div class="panel" style="margin-top:14px">
+  <div class="panel-header">
+    <span class="panel-title">LONG-TERM RADAR · 中長期潛力掃描</span>
+    <span class="panel-badge" id="ltCount">0 檔</span>
+  </div>
+  <div style="padding:14px 16px">
+    <div class="lt-controls">
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">條件</span>
+        <button class="lt-mode-btn active" onclick="setLtMode('strict',this)">嚴格</button>
+        <button class="lt-mode-btn" onclick="setLtMode('flex',this)">彈性</button>
+      </div>
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">範圍</span>
+        <button class="lt-scope-btn active" onclick="setLtScope('all',this)">全市場</button>
+        <button class="lt-scope-btn" onclick="setLtScope('tse',this)">僅上市</button>
+      </div>
+      <button class="lt-scan-btn" id="btnLtScan" onclick="startLtScan()">🎯 開始掃描</button>
+      <button class="lt-stop-btn" onclick="stopLtScan()">■ 中止</button>
+      <button class="radar-btn" onclick="exportLtCSV()">↓ CSV</button>
+    </div>
+    <div class="lt-prog-wrap"><div class="lt-prog" id="ltProgress"></div></div>
+    <div class="lt-note">趨勢模板(收盤>50>150>200MA、200MA上揚、距高點25%內、離低點25%上)為必要門檻;嚴格版另需 VCP 收縮 + 年報酬≥30%。掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考。</div>
+    <div id="ltResults"><div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股</div></div>
+  </div>
+</div>
+
 <!-- 回測績效 -->
 <div class="panel bt-section">
   <div class="panel-header">
@@ -708,7 +782,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.5 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.6 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1789,6 +1863,242 @@ function drawStockCharts(d, chip) {
   try { initKline(d); } catch(e) {}
 }
 
+
+// ════════════════════════════════════════
+// v9.6 中長期潛力掃描(趨勢模板 + VCP + 籌碼,務實版)
+// 依歐尼爾 CANSLIM + 米奈爾維尼趨勢模板,台股資料適配
+// ════════════════════════════════════════
+var LTSCAN = { running: false, results: [], mode: "strict", scope: "all" };
+
+function ltSMA(arr, n, endIdx) {
+  if (endIdx == null) endIdx = arr.length - 1;
+  if (endIdx + 1 < n) return null;
+  return avg(arr.slice(endIdx - n + 1, endIdx + 1));
+}
+function ltATR(high, low, close, n, endIdx) {
+  if (endIdx == null) endIdx = close.length - 1;
+  if (endIdx < n) return null;
+  let sum = 0;
+  for (let i = endIdx - n + 1; i <= endIdx; i++) {
+    const tr = Math.max(high[i] - low[i], Math.abs(high[i] - close[i - 1]), Math.abs(low[i] - close[i - 1]));
+    sum += tr;
+  }
+  return sum / n;
+}
+
+// 分析單檔,回傳評估結果(不符最低門檻回 null)
+function ltAnalyze(id, d, chip) {
+  const n = d.close.length;
+  if (n < 200) return null; // 資料不足以算 200MA
+  const i = n - 1;
+  const price = d.close[i];
+  const s50 = ltSMA(d.close, 50, i), s150 = ltSMA(d.close, 150, i), s200 = ltSMA(d.close, 200, i);
+  if (s50 == null || s150 == null || s200 == null) return null;
+  const s200_21 = ltSMA(d.close, 200, i - 21);
+  const win = Math.min(252, n);
+  const hi52 = Math.max(...d.high.slice(-win));
+  const lo52 = Math.min(...d.low.slice(-win));
+
+  // ── 趨勢模板(硬條件)──
+  const t1 = price > s150 && price > s200;
+  const t2 = s150 > s200;
+  const t3 = s200_21 != null && s200 > s200_21;
+  const t4 = s50 > s150 && s50 > s200;
+  const t5 = price > s50;
+  const t6 = price >= 1.25 * lo52;
+  const t7 = price >= 0.75 * hi52;
+  const trendPass = t1 && t2 && t3 && t4 && t5 && t6 && t7;
+  if (!trendPass) return null; // 趨勢模板是必要門檻(嚴格/彈性都要)
+
+  // ── 年報酬強度(代 RPS)──
+  const yrAgo = (n >= 252) ? d.close[n - 252] : d.close[0];
+  const yrRet = (price / yrAgo - 1) * 100;
+  const strongRet = yrRet >= 30;
+
+  // ── VCP ──
+  const a14 = ltATR(d.high, d.low, d.close, 14, i);
+  const a50 = ltATR(d.high, d.low, d.close, 50, i);
+  const volRatio = (a14 != null) ? a14 / price : 1;
+  const volContract = (a14 != null && a50 != null) ? a14 < a50 : false;
+  const last21 = d.close.slice(-21);
+  const rangePct = (Math.max(...last21) - Math.min(...last21)) / price;
+  const vol20 = avg(d.volume.slice(-20));
+  const vol50 = avg(d.volume.slice(-50));
+  const volDrying = vol20 < vol50;
+  const vcpTight = volRatio < 0.05 && volContract && rangePct < 0.10 && volDrying;
+
+  // ── 籌碼(用現有 chip:inst 外資投信買超天數、融資減少)──
+  let foreignBuyDays = 0, trustBuyDays = 0, marginDown = false;
+  if (chip && chip.inst && chip.inst.length) {
+    const fNames = ["Foreign_Investor", "外資", "外資及陸資"], tNames = ["Investment_Trust", "投信"];
+    const byDateF = {}, byDateT = {};
+    chip.inst.forEach(r => {
+      const net = ((parseInt(r.buy || 0) || 0) - (parseInt(r.sell || 0) || 0)) / 1000;
+      if (fNames.includes(r.name)) byDateF[r.date] = (byDateF[r.date] || 0) + net;
+      else if (tNames.includes(r.name)) byDateT[r.date] = (byDateT[r.date] || 0) + net;
+    });
+    const recentF = Object.keys(byDateF).sort().slice(-10);
+    const recentT = Object.keys(byDateT).sort().slice(-10);
+    foreignBuyDays = recentF.filter(dt => byDateF[dt] > 0).length;
+    trustBuyDays = recentT.filter(dt => byDateT[dt] > 0).length;
+  }
+  if (chip && chip.margin && chip.margin.length >= 2) {
+    const m = chip.margin;
+    const latest = m[m.length - 1], prev = m[m.length - 2];
+    const lb = parseFloat(latest.MarginPurchaseTodayBalance ?? latest.margin ?? 0);
+    const pb = parseFloat(prev.MarginPurchaseTodayBalance ?? prev.margin ?? 0);
+    marginDown = lb < pb; // 融資減少 = 散戶下車
+  }
+  const chipGood = (foreignBuyDays >= 7 || trustBuyDays >= 7);
+
+  // ── 評分(潛力星等 1-5)──
+  let score = 2; // 趨勢模板已過,基礎 2
+  if (strongRet) score += 1;
+  if (vcpTight) score += 1;
+  if (chipGood) score += 1;
+  if (marginDown) score += 0.5;
+  const stars = Math.min(5, Math.max(1, Math.round(score)));
+
+  // 嚴格版:VCP + 強勢報酬 必須成立
+  if (LTSCAN.mode === "strict") {
+    if (!vcpTight || !strongRet) return null;
+  }
+
+  return {
+    id, price: +price.toFixed(2), stars,
+    yrRet: +yrRet.toFixed(1), strongRet,
+    s50: +s50.toFixed(1), s150: +s150.toFixed(1), s200: +s200.toFixed(1),
+    distHigh: +((price / hi52 - 1) * 100).toFixed(1),  // 距52週高 %
+    distLow: +((price / lo52 - 1) * 100).toFixed(1),   // 離52週低 %
+    vcpTight, volRatio: +(volRatio * 100).toFixed(2), rangePct: +(rangePct * 100).toFixed(1),
+    volDrying, foreignBuyDays, trustBuyDays, marginDown, chipGood,
+  };
+}
+
+async function startLtScan() {
+  if (LTSCAN.running) return;
+  if (!token) { addLog("請先設定 Token", "warn"); return; }
+  if (!STOCK_LIST || !STOCK_LIST.length) { addLog("股票清單未載入", "warn"); return; }
+  LTSCAN.running = true;
+  LTSCAN.results = [];
+  const btn = document.getElementById("btnLtScan");
+  const prog = document.getElementById("ltProgress");
+  const wrap = document.getElementById("ltResults");
+  if (btn) { btn.disabled = true; btn.textContent = "掃描中..."; }
+
+  // 範圍
+  let list = STOCK_LIST.slice();
+  if (LTSCAN.scope === "tse") list = list.filter(id => isListed(id));
+  addLog(`▶ 中長期潛力掃描開始（${LTSCAN.mode === "strict" ? "嚴格" : "彈性"}/${LTSCAN.scope === "tse" ? "上市" : "全市場"}）：共 ${list.length} 檔`);
+
+  const BATCH = 20;
+  let done = 0, found = 0;
+  for (let bi = 0; bi < list.length; bi += BATCH) {
+    if (!LTSCAN.running) break; // 可中止
+    const batch = list.slice(bi, bi + BATCH);
+    await Promise.allSettled(batch.map(async id => {
+      try {
+        const d = await fetchDailyLong(id); // 400天,有快取
+        if (!d || d.close.length < 200) return;
+        // 先過趨勢模板再決定要不要抓籌碼(省 API)
+        const quick = ltAnalyze(id, d, null);
+        if (!quick) return;
+        // 過了才抓籌碼補分
+        let chip = null;
+        try { chip = await fetchChipData(id); } catch (e) {}
+        const full = ltAnalyze(id, d, chip);
+        if (full) {
+          full.name = (stockNameMap && stockNameMap[id]) || id;
+          LTSCAN.results.push(full);
+          found++;
+        }
+      } catch (e) {}
+    }));
+    done = Math.min(bi + BATCH, list.length);
+    const pct = Math.round(done / list.length * 100);
+    if (prog) prog.style.width = pct + "%";
+    if (btn) btn.textContent = `掃描中 ${done}/${list.length}（找到 ${found}）`;
+    await new Promise(r => setTimeout(r, 80));
+  }
+
+  LTSCAN.running = false;
+  if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
+  LTSCAN.results.sort((a, b) => b.stars - a.stars || b.yrRet - a.yrRet);
+  addLog(`✅ 中長期掃描完成：${LTSCAN.results.length} 檔符合`);
+  renderLtResults();
+}
+
+function stopLtScan() {
+  LTSCAN.running = false;
+  const btn = document.getElementById("btnLtScan");
+  if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
+  addLog("已中止中長期掃描");
+}
+
+function setLtMode(m, el) {
+  LTSCAN.mode = m;
+  document.querySelectorAll(".lt-mode-btn").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+function setLtScope(s, el) {
+  LTSCAN.scope = s;
+  document.querySelectorAll(".lt-scope-btn").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+
+function renderLtResults() {
+  const wrap = document.getElementById("ltResults");
+  const cnt = document.getElementById("ltCount");
+  if (!wrap) return;
+  const rows = LTSCAN.results;
+  if (cnt) cnt.textContent = `${rows.length} 檔`;
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股<br>（收盤 > 50 > 150 > 200MA、200MA 上揚、距高點 25% 內、VCP 收縮、法人買超）</div>`;
+    return;
+  }
+  const cards = rows.map(r => {
+    const chipTags = [];
+    if (r.foreignBuyDays >= 7) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日</span>`);
+    if (r.trustBuyDays >= 7) chipTags.push(`<span class="lt-tag good">投信買${r.trustBuyDays}/10日</span>`);
+    if (r.marginDown) chipTags.push(`<span class="lt-tag mid">融資減</span>`);
+    if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
+    return `
+    <div class="lt-card s${r.stars}" onclick="openStockDetail('${r.id}')" title="點擊查看個股詳情">
+      <button class="watch-star${isWatched(r.id) ? ' on' : ''}" onclick="toggleWatch('${r.id}', event)">${isWatched(r.id) ? '★' : '☆'}</button>
+      <div class="lt-card-head">
+        <div>
+          <span class="lt-name">${esc(r.name)}</span>
+          <span class="lt-code">${r.id}</span>
+        </div>
+        <div class="lt-price">
+          <div class="lt-price-val">$${r.price}</div>
+          <div class="lt-star">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</div>
+        </div>
+      </div>
+      <div class="lt-metrics">
+        <span>年報酬 <b class="${r.yrRet >= 0 ? "up" : "down"}">${r.yrRet >= 0 ? "+" : ""}${r.yrRet}%</b></span>
+        <span>距高點 <b>${r.distHigh}%</b></span>
+        <span>離低點 <b class="up">+${r.distLow}%</b></span>
+        <span>月幅 <b>${r.rangePct}%</b></span>
+      </div>
+      <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200}</div>
+      ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
+    </div>`;
+  }).join("");
+  wrap.innerHTML = `<div class="lt-grid">${cards}</div>`;
+}
+
+function exportLtCSV() {
+  const rows = LTSCAN.results;
+  if (!rows.length) { alert("尚無掃描結果"); return; }
+  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "外資買超天", "投信買超天", "融資減少"];
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [head.map(q).join(",")];
+  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.foreignBuyDays, r.trustBuyDays, r.marginDown ? "是" : ""].map(q).join(",")));
+  downloadText(`中長期潛力股_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
+  addLog("✅ 中長期潛力股 CSV 已匯出");
+}
+
 // ── PWA ──
 function registerPWA() {
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
@@ -2843,7 +3153,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.5 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.6 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
