@@ -294,6 +294,40 @@ def margin_today():
     except Exception as e:
         return jsonify({"data": [], "error": str(e)})
 
+@app.route("/api/month_revenue")
+def month_revenue():
+    """月營收表 TaiwanStockMonthRevenue（供中長期營收成長濾網）"""
+    token    = request.args.get("token", "")
+    stock_id = request.args.get("stock_id", "")
+    start    = request.args.get("start_date", "")
+    end      = request.args.get("end_date", "")
+    if not all([token, stock_id]):
+        return jsonify({"error": "缺少參數", "data": []}), 400
+    params = {"data_id": stock_id}
+    if start:
+        params["start_date"] = start
+    if end:
+        params["end_date"] = end
+    data = call_finmind("TaiwanStockMonthRevenue", params, token)
+    return jsonify(data)
+
+@app.route("/api/per")
+def per():
+    """個股 PER/PBR 資料表 TaiwanStockPER（本益比、股價淨值比、殖利率）"""
+    token    = request.args.get("token", "")
+    stock_id = request.args.get("stock_id", "")
+    start    = request.args.get("start_date", "")
+    end      = request.args.get("end_date", "")
+    if not all([token, stock_id]):
+        return jsonify({"error": "缺少參數", "data": []}), 400
+    params = {"data_id": stock_id}
+    if start:
+        params["start_date"] = start
+    if end:
+        params["end_date"] = end
+    data = call_finmind("TaiwanStockPER", params, token)
+    return jsonify(data)
+
 @app.route("/api/clear_cache")
 def clear_cache():
     return jsonify({"status": "ok", "cleared": 0})
