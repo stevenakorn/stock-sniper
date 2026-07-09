@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.7</title>
+<title>飆股狙擊系統 v9.9</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -346,6 +346,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 
 
+
+/* 營收濾網開關(v9.9) */
+.lt-rev-toggle{display:flex;align-items:center;gap:5px;font-size:12px;font-family:var(--mono);color:var(--text2);cursor:pointer;white-space:nowrap}
+.lt-rev-toggle input{width:15px;height:15px;cursor:pointer;accent-color:var(--cyan)}
+
 /* 中長期勝率/勾選(v9.7) */
 .lt-stat-empty{padding:20px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;line-height:2}
 .lt-stat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
@@ -516,7 +521,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.7 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.9 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -761,6 +766,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
         <button class="lt-scope-btn active" onclick="setLtScope('all',this)">全市場</button>
         <button class="lt-scope-btn" onclick="setLtScope('tse',this)">僅上市</button>
       </div>
+      <label class="lt-rev-toggle"><input type="checkbox" id="ltRevFilter" checked onchange="LTSCAN.revFilter=this.checked"> 月營收年增>0</label>
       <button class="lt-scan-btn" id="btnLtScan" onclick="startLtScan()">🎯 開始掃描</button>
       <button class="lt-stop-btn" onclick="stopLtScan()">■ 中止</button>
       <button class="radar-btn" onclick="exportLtCSV()">↓ CSV</button>
@@ -794,7 +800,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.7 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.9 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1880,7 +1886,7 @@ function drawStockCharts(d, chip) {
 // v9.6 中長期潛力掃描(趨勢模板 + VCP + 籌碼,務實版)
 // 依歐尼爾 CANSLIM + 米奈爾維尼趨勢模板,台股資料適配
 // ════════════════════════════════════════
-var LTSCAN = { running: false, results: [], mode: "strict", scope: "all" };
+var LTSCAN = { running: false, results: [], mode: "strict", scope: "all", revFilter: true };
 
 function ltSMA(arr, n, endIdx) {
   if (endIdx == null) endIdx = arr.length - 1;
@@ -2015,12 +2021,22 @@ async function startLtScan() {
         // 先過趨勢模板再決定要不要抓籌碼(省 API)
         const quick = ltAnalyze(id, d, null);
         if (!quick) return;
-        // 過了才抓籌碼補分
-        let chip = null;
+        // 過了才抓籌碼、月營收、PER(省 API)
+        let chip = null, rev = null, per = null;
         try { chip = await fetchChipData(id); } catch (e) {}
+        try { rev = await fetchMonthRevenue(id); } catch (e) {}
+        // 月營收年增硬濾網:有資料且 YoY <= 0 則剔除(衰退股)
+        if (LTSCAN.revFilter && rev && rev.yoy != null && rev.yoy <= 0) return;
+        try { per = await fetchPER(id); } catch (e) {}
         const full = ltAnalyze(id, d, chip);
         if (full) {
           full.name = (stockNameMap && stockNameMap[id]) || id;
+          full.revYoy = rev ? rev.yoy : null;
+          full.revYoy3 = rev ? rev.yoy3 : null;
+          full.revMonth = rev ? rev.month : null;
+          full.per = per ? per.per : null;
+          full.pbr = per ? per.pbr : null;
+          full.divYield = per ? per.yield : null;
           LTSCAN.results.push(full);
           found++;
         }
@@ -2093,8 +2109,8 @@ function renderLtResults() {
       <div class="lt-metrics">
         <span>年報酬 <b class="${r.yrRet >= 0 ? "up" : "down"}">${r.yrRet >= 0 ? "+" : ""}${r.yrRet}%</b></span>
         <span>距高點 <b>${r.distHigh}%</b></span>
-        <span>離低點 <b class="up">+${r.distLow}%</b></span>
-        <span>月幅 <b>${r.rangePct}%</b></span>
+        ${r.revYoy != null ? `<span>營收YoY <b class="${r.revYoy >= 0 ? "up" : "down"}">${r.revYoy >= 0 ? "+" : ""}${r.revYoy}%</b></span>` : `<span>離低點 <b class="up">+${r.distLow}%</b></span>`}
+        ${r.per != null ? `<span>本益比 <b>${r.per}</b></span>` : `<span>月幅 <b>${r.rangePct}%</b></span>`}
       </div>
       <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200}</div>
       ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
@@ -2112,10 +2128,10 @@ function renderLtResults() {
 function exportLtCSV() {
   const rows = LTSCAN.results;
   if (!rows.length) { alert("尚無掃描結果"); return; }
-  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "外資買超天", "投信買超天", "融資減少"];
+  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "外資買超天", "投信買超天", "融資減少", "營收YoY%", "近3月YoY%", "本益比", "股價淨值比", "殖利率%"];
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [head.map(q).join(",")];
-  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.foreignBuyDays, r.trustBuyDays, r.marginDown ? "是" : ""].map(q).join(",")));
+  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.foreignBuyDays, r.trustBuyDays, r.marginDown ? "是" : "", r.revYoy ?? "", r.revYoy3 ?? "", r.per ?? "", r.pbr ?? "", r.divYield ?? ""].map(q).join(",")));
   downloadText(`中長期潛力股_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
   addLog("✅ 中長期潛力股 CSV 已匯出");
 }
@@ -2224,7 +2240,7 @@ function ltCollectBtRows() {
   return rows;
 }
 
-function ltSetScope(s) { LTBT.scope = s; ltRenderStats(); }
+function ltSetScope(s) { LTBT.scope = s; LTBT.page = 1; ltRenderStats(); }
 
 function ltRenderStats() {
   const el = document.getElementById("ltStats");
@@ -2259,6 +2275,32 @@ function ltRenderStats() {
   };
   const starHtml = [5, 4, 3, 2, 1].filter(s => byStar[s]).map(starRow).join("");
 
+  // ── 明細條列(分頁 50/頁,只列 3-5★ 或依 scope)──
+  const cell = v => (v === null || v === undefined) ? `<td style="color:var(--text2)">--</td>` : `<td class="${cls(v)}">${fmtPct(v)}</td>`;
+  const perPage = 50;
+  const totalPages = Math.max(1, Math.ceil(stat.length / perPage));
+  if (LTBT.page == null) LTBT.page = 1;
+  if (LTBT.page > totalPages) LTBT.page = totalPages;
+  if (LTBT.page < 1) LTBT.page = 1;
+  const startI = (LTBT.page - 1) * perPage;
+  const pageRows = stat.slice(startI, startI + perPage);
+  const detailTrs = pageRows.map(x => `
+    <tr>
+      <td>${x.date}</td>
+      <td style="cursor:pointer" onclick="openStockDetail('${x.id}')">${x.id} ${esc(x.name)}</td>
+      <td style="color:var(--amber)">${"★".repeat(x.stars || 1)}</td>
+      <td>${(x.bt.entry != null && x.bt.entry.toFixed) ? x.bt.entry.toFixed(2) : (x.scanClose ?? "--")}</td>
+      ${cell(x.bt.r5)}${cell(x.bt.r10)}${cell(x.bt.r20)}
+    </tr>`).join("");
+  const pager = totalPages > 1 ? `
+    <div class="bt-pager">
+      <button class="bt-page-btn" onclick="ltGoPage(1)" ${LTBT.page === 1 ? "disabled" : ""}>«</button>
+      <button class="bt-page-btn" onclick="ltGoPage(${LTBT.page - 1})" ${LTBT.page === 1 ? "disabled" : ""}>‹ 上一頁</button>
+      <span class="bt-page-info">第 ${LTBT.page} / ${totalPages} 頁</span>
+      <button class="bt-page-btn" onclick="ltGoPage(${LTBT.page + 1})" ${LTBT.page === totalPages ? "disabled" : ""}>下一頁 ›</button>
+      <button class="bt-page-btn" onclick="ltGoPage(${totalPages})" ${LTBT.page === totalPages ? "disabled" : ""}>»</button>
+    </div>` : "";
+
   el.innerHTML = `
     <div class="lt-stat-head">
       <span class="lt-stat-title">中長期勝率統計</span>
@@ -2274,11 +2316,19 @@ function ltRenderStats() {
       <div class="bt-card"><div class="bt-card-label">均酬(10日)</div><div class="bt-card-value ${cls(avg10)}">${fmtPct(avg10)}</div><div class="bt-card-sub">5日:${fmtPct(avg5)}</div></div>
       <div class="bt-card"><div class="bt-card-label">均酬(20日)</div><div class="bt-card-value ${cls(avg20)}">${r20s.length ? fmtPct(avg20) : "--"}</div><div class="bt-card-sub">樣本 ${r20s.length}</div></div>
     </div>
-    <div class="bt-card" style="padding:10px 12px">
+    <div class="bt-card" style="padding:10px 12px;margin-bottom:10px">
       <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體）</div>
       <table class="bt-strategy-table"><thead><tr><th>星級</th><th>筆數</th><th>勝率</th><th>均酬10日</th></tr></thead><tbody>${starHtml}</tbody></table>
-    </div>`;
+    </div>
+    <div class="bt-table-wrap"><table class="bt-table">
+      <thead><tr><th>掃描日</th><th>股票</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+5日</th><th>+10日</th><th>+20日</th></tr></thead>
+      <tbody>${detailTrs}</tbody>
+    </table></div>
+    ${pager}
+    <div class="bt-note" style="margin-top:8px">※ 以「掃描隔日開盤價」為進場基準,+N 日為進場後第 N 個交易日收盤。點股票名開個股詳情。僅列 ${scopeLabel}。僅供研究參考。</div>`;
 }
+
+function ltGoPage(p) { LTBT.page = p; ltRenderStats(); }
 
 // ── 勾選刪除(從目前掃描結果移除,不碰歸檔)──
 function ltUpdateCheckCount() {
@@ -2304,6 +2354,78 @@ function ltDeleteChecked() {
   renderLtResults();
 }
 
+
+
+// ════════════════════════════════════════
+// v9.9 月營收 / PER 資料(基本面補強)
+// ════════════════════════════════════════
+// 月營收:抓近 14 個月,算最新月 YoY(vs 去年同月)與近3月平均 YoY
+async function fetchMonthRevenue(stockId) {
+  const _ck = "rev_" + stockId;
+  const _c = memGet(_ck);
+  if (_c) return _c;
+  const end = new Date();
+  const start = new Date(); start.setMonth(start.getMonth() - 15);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/month_revenue?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockMonthRevenue&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!json.data || !json.data.length) return null;
+    const rows = json.data.slice().sort((a, b) =>
+      (a.revenue_year - b.revenue_year) || (a.revenue_month - b.revenue_month));
+    const latest = rows[rows.length - 1];
+    // 找去年同月
+    const yearAgo = rows.find(r => r.revenue_year === latest.revenue_year - 1 && r.revenue_month === latest.revenue_month);
+    let yoy = null;
+    if (yearAgo && yearAgo.revenue > 0) yoy = (latest.revenue / yearAgo.revenue - 1) * 100;
+    // 近3月平均 YoY
+    const last3 = rows.slice(-3);
+    let yoy3sum = 0, yoy3cnt = 0;
+    last3.forEach(r => {
+      const ya = rows.find(x => x.revenue_year === r.revenue_year - 1 && x.revenue_month === r.revenue_month);
+      if (ya && ya.revenue > 0) { yoy3sum += (r.revenue / ya.revenue - 1) * 100; yoy3cnt++; }
+    });
+    const yoy3 = yoy3cnt ? yoy3sum / yoy3cnt : null;
+    const out = {
+      revenue: latest.revenue,
+      month: latest.revenue_month, year: latest.revenue_year,
+      yoy: yoy != null ? +yoy.toFixed(1) : null,
+      yoy3: yoy3 != null ? +yoy3.toFixed(1) : null,
+    };
+    memSet(_ck, out);
+    return out;
+  } catch (e) { return null; }
+}
+
+// PER/PBR:抓最新一筆
+async function fetchPER(stockId) {
+  const _ck = "per_" + stockId;
+  const _c = memGet(_ck);
+  if (_c) return _c;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 20);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/per?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockPER&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!json.data || !json.data.length) return null;
+    const latest = json.data[json.data.length - 1];
+    const out = {
+      per: latest.PER != null ? +parseFloat(latest.PER).toFixed(2) : null,
+      pbr: latest.PBR != null ? +parseFloat(latest.PBR).toFixed(2) : null,
+      yield: latest.dividend_yield != null ? +parseFloat(latest.dividend_yield).toFixed(2) : null,
+      date: latest.date,
+    };
+    memSet(_ck, out);
+    return out;
+  } catch (e) { return null; }
+}
 
 // ── PWA ──
 function registerPWA() {
@@ -3359,7 +3481,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.7 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.9 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -3990,15 +4112,19 @@ async function searchStock() {
     start.setDate(start.getDate() - 90);
     const fmt = d => d.toISOString().split("T")[0];
 
-    const [priceRes, chipRes, longRes] = await Promise.allSettled([
+    const [priceRes, chipRes, longRes, revRes, perRes] = await Promise.allSettled([
       fetchStockData(stockId),
       fetchChipData(stockId),
       fetchDailyLong(stockId),
+      fetchMonthRevenue(stockId),
+      fetchPER(stockId),
     ]);
 
     const d       = priceRes.status === "fulfilled" ? priceRes.value : null;
     const chip    = chipRes.status  === "fulfilled" ? chipRes.value  : { inst: null, margin: null };
     const dLong   = (longRes.status === "fulfilled" && longRes.value) ? longRes.value : d;
+    const revInfo = revRes.status === "fulfilled" ? revRes.value : null;
+    const perInfo = perRes.status === "fulfilled" ? perRes.value : null;
 
     if (!d) {
       detail.innerHTML = `<div class="search-loading" style="color:var(--red)">無法取得 ${stockId} 的資料</div>`;
@@ -4068,7 +4194,7 @@ async function searchStock() {
         <div class="detail-row"><span class="detail-key">60MA</span><span class="detail-val">$${ma60}</span></div>
       </div>
       <div class="detail-block">
-        <div class="detail-block-title">🏦 籌碼面</div>
+<div class="detail-block-title">🏦 籌碼面</div>
         <div class="detail-row"><span class="detail-key">籌碼評分</span><span class="chip-stars">${stars}</span></div>
         <div class="detail-row"><span class="detail-key">外資近5日</span><span class="detail-val ${chipInfo.foreignNet5>0?"up":"down"}">${chipInfo.foreignNet5>0?"+":""}${chipInfo.foreignNet5.toFixed(0)}張</span></div>
         <div class="detail-row"><span class="detail-key">投信近5日</span><span class="detail-val ${chipInfo.trustNet5>0?"up":"down"}">${chipInfo.trustNet5>0?"+":""}${chipInfo.trustNet5.toFixed(0)}張</span></div>
@@ -4078,6 +4204,14 @@ async function searchStock() {
       <div class="broker-block">
         <div class="detail-block-title">🏢 五大熱點券商</div>
         ${renderBrokerBlock(chip.broker)}
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">📊 基本面</div>
+        ${revInfo && revInfo.yoy != null ? `<div class="detail-row"><span class="detail-key">月營收YoY</span><span class="detail-val ${revInfo.yoy>=0?"up":"down"}">${revInfo.yoy>=0?"+":""}${revInfo.yoy}%</span></div>` : `<div class="detail-row"><span class="detail-key">月營收YoY</span><span class="detail-val" style="color:var(--text2)">--</span></div>`}
+        ${revInfo && revInfo.yoy3 != null ? `<div class="detail-row"><span class="detail-key">近3月均YoY</span><span class="detail-val ${revInfo.yoy3>=0?"up":"down"}">${revInfo.yoy3>=0?"+":""}${revInfo.yoy3}%</span></div>` : ""}
+        ${perInfo && perInfo.per != null ? `<div class="detail-row"><span class="detail-key">本益比PER</span><span class="detail-val">${perInfo.per}</span></div>` : `<div class="detail-row"><span class="detail-key">本益比PER</span><span class="detail-val" style="color:var(--text2)">--</span></div>`}
+        ${perInfo && perInfo.pbr != null ? `<div class="detail-row"><span class="detail-key">股價淨值比PBR</span><span class="detail-val">${perInfo.pbr}</span></div>` : ""}
+        ${perInfo && perInfo.yield != null ? `<div class="detail-row"><span class="detail-key">殖利率</span><span class="detail-val ${perInfo.yield>=0?"up":""}">${perInfo.yield}%</span></div>` : ""}
       </div>
     </div>
     <div class="kline-section">
