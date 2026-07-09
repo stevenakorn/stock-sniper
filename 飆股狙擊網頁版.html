@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.6</title>
+<title>飆股狙擊系統 v9.7</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -345,6 +345,17 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 
 
+
+/* 中長期勝率/勾選(v9.7) */
+.lt-stat-empty{padding:20px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;line-height:2}
+.lt-stat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.lt-stat-title{font-size:12px;font-family:var(--mono);color:var(--text);letter-spacing:1px;font-weight:500}
+#ltStats{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.lt-actions{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}
+.lt-check{width:15px;height:15px;cursor:pointer;accent-color:var(--cyan)}
+.lt-card .lt-check{position:absolute;top:12px;left:12px;z-index:3}
+.lt-card{padding-left:36px}
+
 /* 中長期潛力掃描(v9.6) */
 .lt-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .lt-ctrl-group{display:flex;align-items:center;gap:5px}
@@ -505,7 +516,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.6 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.7 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -756,6 +767,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     </div>
     <div class="lt-prog-wrap"><div class="lt-prog" id="ltProgress"></div></div>
     <div class="lt-note">趨勢模板(收盤>50>150>200MA、200MA上揚、距高點25%內、離低點25%上)為必要門檻;嚴格版另需 VCP 收縮 + 年報酬≥30%。掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考。</div>
+    <div id="ltStats"><div class="lt-stat-empty">掃描後結果會自動歸檔,隔日後可計算中長期勝率</div></div>
     <div id="ltResults"><div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股</div></div>
   </div>
 </div>
@@ -782,7 +794,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.6 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.7 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2025,7 +2037,9 @@ async function startLtScan() {
   if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
   LTSCAN.results.sort((a, b) => b.stars - a.stars || b.yrRet - a.yrRet);
   addLog(`✅ 中長期掃描完成：${LTSCAN.results.length} 檔符合`);
+  ltArchive();
   renderLtResults();
+  ltRenderStats();
 }
 
 function stopLtScan() {
@@ -2063,9 +2077,10 @@ function renderLtResults() {
     if (r.marginDown) chipTags.push(`<span class="lt-tag mid">融資減</span>`);
     if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
     return `
-    <div class="lt-card s${r.stars}" onclick="openStockDetail('${r.id}')" title="點擊查看個股詳情">
+    <div class="lt-card s${r.stars}" title="點擊查看個股詳情">
+      <input type="checkbox" class="lt-check" data-id="${r.id}" onchange="ltUpdateCheckCount()" onclick="event.stopPropagation()">
       <button class="watch-star${isWatched(r.id) ? ' on' : ''}" onclick="toggleWatch('${r.id}', event)">${isWatched(r.id) ? '★' : '☆'}</button>
-      <div class="lt-card-head">
+      <div class="lt-card-head" style="cursor:pointer" onclick="openStockDetail('${r.id}')">
         <div>
           <span class="lt-name">${esc(r.name)}</span>
           <span class="lt-code">${r.id}</span>
@@ -2085,7 +2100,13 @@ function renderLtResults() {
       ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
     </div>`;
   }).join("");
-  wrap.innerHTML = `<div class="lt-grid">${cards}</div>`;
+  wrap.innerHTML = `
+    <div class="lt-actions">
+      <label class="bt-check-all"><input type="checkbox" id="ltCheckAll" onchange="ltToggleCheckAll(this)"> 全選</label>
+      <span class="bt-check-count" id="ltCheckCount">已選 0</span>
+      <button class="radar-btn" id="btnLtDelete" onclick="ltDeleteChecked()" disabled style="border-color:var(--down);color:var(--down)">移除勾選</button>
+    </div>
+    <div class="lt-grid">${cards}</div>`;
 }
 
 function exportLtCSV() {
@@ -2098,6 +2119,191 @@ function exportLtCSV() {
   downloadText(`中長期潛力股_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
   addLog("✅ 中長期潛力股 CSV 已匯出");
 }
+
+// ════════════════════════════════════════
+// v9.7 中長期歸檔 / 回測勝率 / 勾選刪除
+// ════════════════════════════════════════
+var LT_HIST_KEY = "lt_history_v1";
+var LT_HIST_MAX_DAYS = 90;
+var LTBT = { scope: "s35", running: false };
+
+function ltLoadHistory() {
+  try { return JSON.parse(localStorage.getItem(LT_HIST_KEY) || "{}"); }
+  catch(e) { return {}; }
+}
+function ltSaveHistory(h) {
+  try { localStorage.setItem(LT_HIST_KEY, JSON.stringify(h)); }
+  catch(e) {
+    try {
+      const dates = Object.keys(h).sort();
+      dates.slice(0, Math.ceil(dates.length/2)).forEach(d => delete h[d]);
+      localStorage.setItem(LT_HIST_KEY, JSON.stringify(h));
+    } catch(_) {}
+  }
+}
+// 掃描完歸檔:記錄掃描日、星等、掃描時價格(當進場參考)
+function ltArchive() {
+  if (!LTSCAN.results.length) return;
+  const h = ltLoadHistory();
+  const d = todayISO();
+  if (!h[d]) h[d] = {};
+  LTSCAN.results.forEach(r => {
+    const prev = h[d][r.id] || {};
+    h[d][r.id] = {
+      id: r.id, name: r.name || r.id, stars: r.stars,
+      scanClose: r.price, yrRet: r.yrRet,
+      vcpTight: r.vcpTight, foreignBuyDays: r.foreignBuyDays, trustBuyDays: r.trustBuyDays,
+      bt: prev.bt || null,
+    };
+  });
+  const dates = Object.keys(h).sort();
+  while (dates.length > LT_HIST_MAX_DAYS) delete h[dates.shift()];
+  ltSaveHistory(h);
+}
+
+// 中長期回測:算掃描日隔日開盤進場後的報酬(+5/+10/+20日,中長期看較長)
+async function runLtBacktest() {
+  if (LTBT.running) return;
+  if (!token) { addLog("請先設定 Token", "warn"); return; }
+  const btn = document.getElementById("btnLtBt");
+  const h = ltLoadHistory();
+  const today = todayISO();
+  const jobs = [];
+  Object.keys(h).sort().forEach(date => {
+    if (date >= today) return;
+    Object.values(h[date]).forEach(sig => {
+      if (!sig.bt || sig.bt.pending) jobs.push({ date, sig });
+    });
+  });
+  if (!jobs.length) { ltRenderStats(); addLog("尚無可回測的中長期歷史(需掃描後隔日)", "warn"); return; }
+  const toFetch = jobs.slice(-200);
+  LTBT.running = true;
+  if (btn) { btn.disabled = true; btn.textContent = "計算中..."; }
+  addLog(`▶ 中長期回測:${jobs.length} 筆,更新 ${toFetch.length} 筆`);
+  let done = 0;
+  const BATCH = 8;
+  for (let i = 0; i < toFetch.length; i += BATCH) {
+    const batch = toFetch.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async job => {
+      try {
+        const d = await fetchDailyLong(job.sig.id);
+        if (!d) return;
+        const idx = d.date.indexOf(job.date);
+        if (idx < 0) {
+          if (new Date(today) - new Date(job.date) > 85 * 86400000) job.sig.bt = { expired: true };
+          return;
+        }
+        const eIdx = idx + 1;
+        const entry = (eIdx < d.open.length) ? d.open[eIdx] : null;
+        if (!entry) { job.sig.bt = { pending: true }; return; }
+        const r = k => { const j = eIdx + (k - 1); return (j < d.close.length) ? +(((d.close[j] - entry) / entry) * 100).toFixed(2) : null; };
+        const bt = { entry: +entry.toFixed(2), r5: r(5), r10: r(10), r20: r(20) };
+        bt.pending = (bt.r20 === null);
+        job.sig.bt = bt;
+      } catch(e) {}
+    }));
+    done = Math.min(i + BATCH, toFetch.length);
+    if (btn) btn.textContent = `計算中 ${done}/${toFetch.length}`;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  ltSaveHistory(h);
+  LTBT.running = false;
+  if (btn) { btn.disabled = false; btn.textContent = "↻ 更新勝率"; }
+  addLog(`✅ 中長期回測完成,更新 ${done} 筆`);
+  ltRenderStats();
+}
+
+function ltCollectBtRows() {
+  const h = ltLoadHistory();
+  const rows = [];
+  Object.keys(h).sort().reverse().forEach(date => {
+    Object.values(h[date]).forEach(sig => {
+      if (sig.bt && !sig.bt.expired && sig.bt.r5 !== null && sig.bt.r5 !== undefined) rows.push({ date, ...sig });
+    });
+  });
+  return rows;
+}
+
+function ltSetScope(s) { LTBT.scope = s; ltRenderStats(); }
+
+function ltRenderStats() {
+  const el = document.getElementById("ltStats");
+  if (!el) return;
+  const rows = ltCollectBtRows();
+  const min = LTBT.scope === "s45" ? 4 : 3;
+  const stat = rows.filter(x => (x.stars || 1) >= min);
+  const totalArch = Object.values(ltLoadHistory()).reduce((s, day) => s + Object.keys(day).length, 0);
+  if (!stat.length) {
+    el.innerHTML = `<div class="lt-stat-empty">尚無中長期勝率資料（已歸檔 ${totalArch} 筆）<br>掃描結果會自動歸檔,隔日後點「↻ 更新勝率」計算後續報酬</div>`;
+    return;
+  }
+  const bestR = b => (b.r10 !== null && b.r10 !== undefined) ? b.r10 : (b.r5);
+  const avgOf = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  const cls = v => v >= 0 ? "up" : "down";
+  const wins = stat.filter(x => bestR(x.bt) > 0);
+  const wr = (wins.length / stat.length * 100).toFixed(1);
+  const avg10 = avgOf(stat.map(x => bestR(x.bt)));
+  const avg5 = avgOf(stat.map(x => x.bt.r5).filter(v => v != null));
+  const r20s = stat.map(x => x.bt.r20).filter(v => v != null);
+  const avg20 = avgOf(r20s);
+  const scopeLabel = LTBT.scope === "s45" ? "4-5★" : "3-5★";
+
+  // 各星級(1-5全顯示對照)
+  const byStar = {};
+  rows.forEach(x => { const s = x.stars || 1; (byStar[s] = byStar[s] || []).push(x); });
+  const starRow = s => {
+    const arr = byStar[s]; const w = arr.filter(x => bestR(x.bt) > 0).length;
+    const a = avgOf(arr.map(x => bestR(x.bt)));
+    return `<tr${s < 3 ? ' style="opacity:.5"' : ''}><td>${"★".repeat(s)}</td><td>${arr.length}</td><td>${(w / arr.length * 100).toFixed(0)}%</td><td class="${cls(a)}">${fmtPct(a)}</td></tr>`;
+  };
+  const starHtml = [5, 4, 3, 2, 1].filter(s => byStar[s]).map(starRow).join("");
+
+  el.innerHTML = `
+    <div class="lt-stat-head">
+      <span class="lt-stat-title">中長期勝率統計</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="bt-scope-btn ${LTBT.scope === "s35" ? "active" : ""}" onclick="ltSetScope('s35')">3-5★</button>
+        <button class="bt-scope-btn ${LTBT.scope === "s45" ? "active" : ""}" onclick="ltSetScope('s45')">只 4-5★</button>
+        <button class="radar-btn" id="btnLtBt" onclick="runLtBacktest()">↻ 更新勝率</button>
+      </div>
+    </div>
+    <div class="bt-summary-grid" style="margin-bottom:10px">
+      <div class="bt-card"><div class="bt-card-label">樣本數</div><div class="bt-card-value">${stat.length}</div><div class="bt-card-sub">${scopeLabel}</div></div>
+      <div class="bt-card"><div class="bt-card-label">勝率(10日)</div><div class="bt-card-value ${wr >= 50 ? "up" : "down"}">${wr}%</div><div class="bt-card-sub">${wins.length}勝/${stat.length - wins.length}敗</div></div>
+      <div class="bt-card"><div class="bt-card-label">均酬(10日)</div><div class="bt-card-value ${cls(avg10)}">${fmtPct(avg10)}</div><div class="bt-card-sub">5日:${fmtPct(avg5)}</div></div>
+      <div class="bt-card"><div class="bt-card-label">均酬(20日)</div><div class="bt-card-value ${cls(avg20)}">${r20s.length ? fmtPct(avg20) : "--"}</div><div class="bt-card-sub">樣本 ${r20s.length}</div></div>
+    </div>
+    <div class="bt-card" style="padding:10px 12px">
+      <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體）</div>
+      <table class="bt-strategy-table"><thead><tr><th>星級</th><th>筆數</th><th>勝率</th><th>均酬10日</th></tr></thead><tbody>${starHtml}</tbody></table>
+    </div>`;
+}
+
+// ── 勾選刪除(從目前掃描結果移除,不碰歸檔)──
+function ltUpdateCheckCount() {
+  const checked = document.querySelectorAll(".lt-check:checked");
+  const del = document.getElementById("btnLtDelete");
+  const cnt = document.getElementById("ltCheckCount");
+  const all = document.getElementById("ltCheckAll");
+  const boxes = document.querySelectorAll(".lt-check");
+  if (cnt) cnt.textContent = `已選 ${checked.length}`;
+  if (del) del.disabled = checked.length === 0;
+  if (all) all.checked = boxes.length > 0 && checked.length === boxes.length;
+}
+function ltToggleCheckAll(el) {
+  document.querySelectorAll(".lt-check").forEach(b => { b.checked = el.checked; });
+  ltUpdateCheckCount();
+}
+function ltDeleteChecked() {
+  const checked = [...document.querySelectorAll(".lt-check:checked")];
+  if (!checked.length) return;
+  const ids = new Set(checked.map(b => b.dataset.id));
+  LTSCAN.results = LTSCAN.results.filter(r => !ids.has(String(r.id)));
+  addLog(`已從掃描結果移除 ${ids.size} 檔（重掃會再出現）`);
+  renderLtResults();
+}
+
 
 // ── PWA ──
 function registerPWA() {
@@ -3153,7 +3359,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.6 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.7 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -3161,6 +3367,7 @@ async function fetchTopStocks() {
   loadMarketFilter();
   archiveSignals();
   renderBacktest();
+  ltRenderStats();
   registerPWA();
 })();
 
