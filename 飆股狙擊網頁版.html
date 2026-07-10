@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.9</title>
+<title>飆股狙擊系統 v9.10</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -361,6 +361,18 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .lt-card .lt-check{position:absolute;top:12px;left:12px;z-index:3}
 .lt-card{padding-left:36px}
 
+
+/* 中長期條列表(v9.10) */
+.lt-table tbody tr.lt-row{cursor:pointer}
+.lt-table tbody tr.lt-row:hover td{background:rgba(76,141,255,.05)}
+.lt-t-name{font-weight:500;color:var(--text)}
+.lt-t-code{font-size:10px;font-family:var(--mono);color:var(--text2);margin-left:6px}
+.lt-t-price{font-family:var(--mono);font-weight:600}
+.lt-expand td{padding:0;border-bottom:1px solid var(--border)}
+.lt-expand-body{padding:10px 14px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.lt-expand-body .lt-ma{font-size:12px;font-family:var(--mono);color:var(--text2)}
+.lt-expand-body .lt-ma b{color:var(--cyan);font-weight:600}
+
 /* 中長期潛力掃描(v9.6) */
 .lt-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .lt-ctrl-group{display:flex;align-items:center;gap:5px}
@@ -521,7 +533,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.9 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.10 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -800,7 +812,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.9 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.10 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2052,6 +2064,7 @@ async function startLtScan() {
   LTSCAN.running = false;
   if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
   LTSCAN.results.sort((a, b) => b.stars - a.stars || b.yrRet - a.yrRet);
+  LTSCAN.page = 1;
   addLog(`✅ 中長期掃描完成：${LTSCAN.results.length} 檔符合`);
   ltArchive();
   renderLtResults();
@@ -2076,6 +2089,7 @@ function setLtScope(s, el) {
   if (el) el.classList.add("active");
 }
 
+var LT_PER_PAGE = 50;
 function renderLtResults() {
   const wrap = document.getElementById("ltResults");
   const cnt = document.getElementById("ltCount");
@@ -2086,44 +2100,70 @@ function renderLtResults() {
     wrap.innerHTML = `<div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股<br>（收盤 > 50 > 150 > 200MA、200MA 上揚、距高點 25% 內、VCP 收縮、法人買超）</div>`;
     return;
   }
-  const cards = rows.map(r => {
+  if (LTSCAN.page == null) LTSCAN.page = 1;
+  const totalPages = Math.max(1, Math.ceil(rows.length / LT_PER_PAGE));
+  if (LTSCAN.page > totalPages) LTSCAN.page = totalPages;
+  if (LTSCAN.page < 1) LTSCAN.page = 1;
+  const startI = (LTSCAN.page - 1) * LT_PER_PAGE;
+  const pageRows = rows.slice(startI, startI + LT_PER_PAGE);
+
+  const trs = pageRows.map(r => {
     const chipTags = [];
     if (r.foreignBuyDays >= 7) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日</span>`);
     if (r.trustBuyDays >= 7) chipTags.push(`<span class="lt-tag good">投信買${r.trustBuyDays}/10日</span>`);
     if (r.marginDown) chipTags.push(`<span class="lt-tag mid">融資減</span>`);
     if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
+    const rid = "ltx_" + r.id;
     return `
-    <div class="lt-card s${r.stars}" title="點擊查看個股詳情">
-      <input type="checkbox" class="lt-check" data-id="${r.id}" onchange="ltUpdateCheckCount()" onclick="event.stopPropagation()">
-      <button class="watch-star${isWatched(r.id) ? ' on' : ''}" onclick="toggleWatch('${r.id}', event)">${isWatched(r.id) ? '★' : '☆'}</button>
-      <div class="lt-card-head" style="cursor:pointer" onclick="openStockDetail('${r.id}')">
-        <div>
-          <span class="lt-name">${esc(r.name)}</span>
-          <span class="lt-code">${r.id}</span>
+    <tr class="lt-row" onclick="ltToggleExpand('${rid}')">
+      <td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="lt-check" data-id="${r.id}" onchange="ltUpdateCheckCount()"></td>
+      <td onclick="event.stopPropagation()"><button class="watch-star${isWatched(r.id) ? ' on' : ''}" onclick="toggleWatch('${r.id}', event)">${isWatched(r.id) ? '★' : '☆'}</button></td>
+      <td class="lt-t-name">${esc(r.name)}<span class="lt-t-code">${r.id}</span></td>
+      <td class="lt-t-price">$${r.price}</td>
+      <td style="color:var(--amber)">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</td>
+      <td class="${r.yrRet >= 0 ? "up" : "down"}">${r.yrRet >= 0 ? "+" : ""}${r.yrRet}%</td>
+      <td class="${r.revYoy != null ? (r.revYoy >= 0 ? "up" : "down") : ""}">${r.revYoy != null ? (r.revYoy >= 0 ? "+" : "") + r.revYoy + "%" : "--"}</td>
+      <td>${r.per != null ? r.per : "--"}</td>
+      <td>${r.distHigh}%</td>
+    </tr>
+    <tr class="lt-expand" id="${rid}" style="display:none">
+      <td colspan="9">
+        <div class="lt-expand-body">
+          <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200} ｜ 離低點 <b class="up">+${r.distLow}%</b> ｜ 月幅 <b>${r.rangePct}%</b>${r.pbr != null ? ` ｜ PBR <b>${r.pbr}</b>` : ""}${r.revYoy3 != null ? ` ｜ 近3月營收均YoY <b class="${r.revYoy3 >= 0 ? "up" : "down"}">${r.revYoy3 >= 0 ? "+" : ""}${r.revYoy3}%</b>` : ""}</div>
+          ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
+          <button class="radar-btn" onclick="event.stopPropagation();openStockDetail('${r.id}')">查看個股詳情 →</button>
         </div>
-        <div class="lt-price">
-          <div class="lt-price-val">$${r.price}</div>
-          <div class="lt-star">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</div>
-        </div>
-      </div>
-      <div class="lt-metrics">
-        <span>年報酬 <b class="${r.yrRet >= 0 ? "up" : "down"}">${r.yrRet >= 0 ? "+" : ""}${r.yrRet}%</b></span>
-        <span>距高點 <b>${r.distHigh}%</b></span>
-        ${r.revYoy != null ? `<span>營收YoY <b class="${r.revYoy >= 0 ? "up" : "down"}">${r.revYoy >= 0 ? "+" : ""}${r.revYoy}%</b></span>` : `<span>離低點 <b class="up">+${r.distLow}%</b></span>`}
-        ${r.per != null ? `<span>本益比 <b>${r.per}</b></span>` : `<span>月幅 <b>${r.rangePct}%</b></span>`}
-      </div>
-      <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200}</div>
-      ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
-    </div>`;
+      </td>
+    </tr>`;
   }).join("");
+
+  const pager = totalPages > 1 ? `
+    <div class="bt-pager">
+      <button class="bt-page-btn" onclick="ltGoResultPage(1)" ${LTSCAN.page === 1 ? "disabled" : ""}>«</button>
+      <button class="bt-page-btn" onclick="ltGoResultPage(${LTSCAN.page - 1})" ${LTSCAN.page === 1 ? "disabled" : ""}>‹ 上一頁</button>
+      <span class="bt-page-info">第 ${LTSCAN.page} / ${totalPages} 頁</span>
+      <button class="bt-page-btn" onclick="ltGoResultPage(${LTSCAN.page + 1})" ${LTSCAN.page === totalPages ? "disabled" : ""}>下一頁 ›</button>
+      <button class="bt-page-btn" onclick="ltGoResultPage(${totalPages})" ${LTSCAN.page === totalPages ? "disabled" : ""}>»</button>
+    </div>` : "";
+
   wrap.innerHTML = `
     <div class="lt-actions">
-      <label class="bt-check-all"><input type="checkbox" id="ltCheckAll" onchange="ltToggleCheckAll(this)"> 全選</label>
+      <label class="bt-check-all"><input type="checkbox" id="ltCheckAll" onchange="ltToggleCheckAll(this)"> 全選本頁</label>
       <span class="bt-check-count" id="ltCheckCount">已選 0</span>
       <button class="radar-btn" id="btnLtDelete" onclick="ltDeleteChecked()" disabled style="border-color:var(--down);color:var(--down)">移除勾選</button>
     </div>
-    <div class="lt-grid">${cards}</div>`;
+    <div class="bt-table-wrap"><table class="bt-table lt-table">
+      <thead><tr><th></th><th></th><th>股票</th><th>現價</th><th>星級</th><th>年報酬</th><th>營收YoY</th><th>本益比</th><th>距高點</th></tr></thead>
+      <tbody>${trs}</tbody>
+    </table></div>
+    ${pager}
+    <div class="bt-note" style="margin-top:8px">點列可展開 MA / 籌碼細節,點股票名或展開內按鈕可查看個股詳情。</div>`;
 }
+function ltToggleExpand(rid) {
+  const el = document.getElementById(rid);
+  if (el) el.style.display = (el.style.display === "none") ? "" : "none";
+}
+function ltGoResultPage(p) { LTSCAN.page = p; renderLtResults(); }
 
 function exportLtCSV() {
   const rows = LTSCAN.results;
@@ -3481,7 +3521,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.9 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.10 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
