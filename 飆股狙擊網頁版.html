@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.10</title>
+<title>飆股狙擊系統 v9.11</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -533,7 +533,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.10 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.11 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -778,7 +778,15 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
         <button class="lt-scope-btn active" onclick="setLtScope('all',this)">全市場</button>
         <button class="lt-scope-btn" onclick="setLtScope('tse',this)">僅上市</button>
       </div>
-      <label class="lt-rev-toggle"><input type="checkbox" id="ltRevFilter" checked onchange="LTSCAN.revFilter=this.checked"> 月營收年增>0</label>
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">月營收年增</span>
+        <select class="lt-select bt-select" id="ltRevFilter" onchange="LTSCAN.revThreshold = this.value === 'off' ? null : parseFloat(this.value)">
+          <option value="0" selected>&gt; 0%</option>
+          <option value="5">&gt; 5%</option>
+          <option value="10">&gt; 10%</option>
+          <option value="off">不篩選</option>
+        </select>
+      </div>
       <button class="lt-scan-btn" id="btnLtScan" onclick="startLtScan()">🎯 開始掃描</button>
       <button class="lt-stop-btn" onclick="stopLtScan()">■ 中止</button>
       <button class="radar-btn" onclick="exportLtCSV()">↓ CSV</button>
@@ -812,7 +820,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.10 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.11 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1898,7 +1906,7 @@ function drawStockCharts(d, chip) {
 // v9.6 中長期潛力掃描(趨勢模板 + VCP + 籌碼,務實版)
 // 依歐尼爾 CANSLIM + 米奈爾維尼趨勢模板,台股資料適配
 // ════════════════════════════════════════
-var LTSCAN = { running: false, results: [], mode: "strict", scope: "all", revFilter: true };
+var LTSCAN = { running: false, results: [], mode: "strict", scope: "all", revThreshold: 0 };
 
 function ltSMA(arr, n, endIdx) {
   if (endIdx == null) endIdx = arr.length - 1;
@@ -1922,6 +1930,13 @@ function ltAnalyze(id, d, chip) {
   if (n < 200) return null; // 資料不足以算 200MA
   const i = n - 1;
   const price = d.close[i];
+
+  // ── ①流動性濾網:近5日平均成交金額 > 1億元 ──
+  if (d.amount && d.amount.length >= 5) {
+    const avgAmount5 = avg(d.amount.slice(-5));
+    if (avgAmount5 < 1e8) return null; // 成交金額不足1億,直接淘汰(殭屍股)
+  }
+
   const s50 = ltSMA(d.close, 50, i), s150 = ltSMA(d.close, 150, i), s200 = ltSMA(d.close, 200, i);
   if (s50 == null || s150 == null || s200 == null) return null;
   const s200_21 = ltSMA(d.close, 200, i - 21);
@@ -1932,7 +1947,8 @@ function ltAnalyze(id, d, chip) {
   // ── 趨勢模板(硬條件)──
   const t1 = price > s150 && price > s200;
   const t2 = s150 > s200;
-  const t3 = s200_21 != null && s200 > s200_21;
+  // ②200MA方向:容許0.5%緩衝(走平也算過,不要求嚴格向上)
+  const t3 = s200_21 != null && s200 > s200_21 * 0.995;
   const t4 = s50 > s150 && s50 > s200;
   const t5 = price > s50;
   const t6 = price >= 1.25 * lo52;
@@ -1945,7 +1961,7 @@ function ltAnalyze(id, d, chip) {
   const yrRet = (price / yrAgo - 1) * 100;
   const strongRet = yrRet >= 30;
 
-  // ── VCP ──
+  // ── VCP(③參數放寬:ATR比例5%→6%、區間寬度10%→12%)──
   const a14 = ltATR(d.high, d.low, d.close, 14, i);
   const a50 = ltATR(d.high, d.low, d.close, 50, i);
   const volRatio = (a14 != null) ? a14 / price : 1;
@@ -1955,10 +1971,14 @@ function ltAnalyze(id, d, chip) {
   const vol20 = avg(d.volume.slice(-20));
   const vol50 = avg(d.volume.slice(-50));
   const volDrying = vol20 < vol50;
-  const vcpTight = volRatio < 0.05 && volContract && rangePct < 0.10 && volDrying;
+  const vcpTight = volRatio < 0.06 && volContract && rangePct < 0.12 && volDrying;
+
+  // ── 距52週新高3%以內(加分用)──
+  const nearHigh = price >= 0.97 * hi52;
 
   // ── 籌碼(用現有 chip:inst 外資投信買超天數、融資減少)──
   let foreignBuyDays = 0, trustBuyDays = 0, marginDown = false;
+  let foreignNetSum = 0, trustNetSum = 0; // ⑥近10日累積淨買超(張)
   if (chip && chip.inst && chip.inst.length) {
     const fNames = ["Foreign_Investor", "外資", "外資及陸資"], tNames = ["Investment_Trust", "投信"];
     const byDateF = {}, byDateT = {};
@@ -1971,6 +1991,8 @@ function ltAnalyze(id, d, chip) {
     const recentT = Object.keys(byDateT).sort().slice(-10);
     foreignBuyDays = recentF.filter(dt => byDateF[dt] > 0).length;
     trustBuyDays = recentT.filter(dt => byDateT[dt] > 0).length;
+    foreignNetSum = recentF.reduce((s, dt) => s + byDateF[dt], 0);
+    trustNetSum = recentT.reduce((s, dt) => s + byDateT[dt], 0);
   }
   if (chip && chip.margin && chip.margin.length >= 2) {
     const m = chip.margin;
@@ -1979,7 +2001,8 @@ function ltAnalyze(id, d, chip) {
     const pb = parseFloat(prev.MarginPurchaseTodayBalance ?? prev.margin ?? 0);
     marginDown = lb < pb; // 融資減少 = 散戶下車
   }
-  const chipGood = (foreignBuyDays >= 7 || trustBuyDays >= 7);
+  // ⑥法人鎖碼:買超天數≥7天 且 累積淨額為正(排除零星買超但金額為負的假訊號)
+  const chipGood = (foreignBuyDays >= 7 && foreignNetSum > 0) || (trustBuyDays >= 7 && trustNetSum > 0);
 
   // ── 評分(潛力星等 1-5)──
   let score = 2; // 趨勢模板已過,基礎 2
@@ -1987,6 +2010,7 @@ function ltAnalyze(id, d, chip) {
   if (vcpTight) score += 1;
   if (chipGood) score += 1;
   if (marginDown) score += 0.5;
+  if (nearHigh) score += 0.5; // ⑤距52週新高3%以內加分
   const stars = Math.min(5, Math.max(1, Math.round(score)));
 
   // 嚴格版:VCP + 強勢報酬 必須成立
@@ -2001,7 +2025,8 @@ function ltAnalyze(id, d, chip) {
     distHigh: +((price / hi52 - 1) * 100).toFixed(1),  // 距52週高 %
     distLow: +((price / lo52 - 1) * 100).toFixed(1),   // 離52週低 %
     vcpTight, volRatio: +(volRatio * 100).toFixed(2), rangePct: +(rangePct * 100).toFixed(1),
-    volDrying, foreignBuyDays, trustBuyDays, marginDown, chipGood,
+    volDrying, foreignBuyDays, trustBuyDays, marginDown, chipGood, nearHigh,
+    foreignNetSum: +foreignNetSum.toFixed(0), trustNetSum: +trustNetSum.toFixed(0),
   };
 }
 
@@ -2038,7 +2063,7 @@ async function startLtScan() {
         try { chip = await fetchChipData(id); } catch (e) {}
         try { rev = await fetchMonthRevenue(id); } catch (e) {}
         // 月營收年增硬濾網:有資料且 YoY <= 0 則剔除(衰退股)
-        if (LTSCAN.revFilter && rev && rev.yoy != null && rev.yoy <= 0) return;
+        if (LTSCAN.revThreshold != null && rev && rev.yoy != null && rev.yoy <= LTSCAN.revThreshold) return;
         try { per = await fetchPER(id); } catch (e) {}
         const full = ltAnalyze(id, d, chip);
         if (full) {
@@ -2109,10 +2134,11 @@ function renderLtResults() {
 
   const trs = pageRows.map(r => {
     const chipTags = [];
-    if (r.foreignBuyDays >= 7) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日</span>`);
-    if (r.trustBuyDays >= 7) chipTags.push(`<span class="lt-tag good">投信買${r.trustBuyDays}/10日</span>`);
+    if (r.foreignBuyDays >= 7 && r.foreignNetSum > 0) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日(+${Math.round(r.foreignNetSum)}張)</span>`);
+    if (r.trustBuyDays >= 7 && r.trustNetSum > 0) chipTags.push(`<span class="lt-tag good">投信買${r.trustBuyDays}/10日(+${Math.round(r.trustNetSum)}張)</span>`);
     if (r.marginDown) chipTags.push(`<span class="lt-tag mid">融資減</span>`);
     if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
+    if (r.nearHigh) chipTags.push(`<span class="lt-tag hot">距新高3%內</span>`);
     const rid = "ltx_" + r.id;
     return `
     <tr class="lt-row" onclick="ltToggleExpand('${rid}')">
@@ -2168,10 +2194,10 @@ function ltGoResultPage(p) { LTSCAN.page = p; renderLtResults(); }
 function exportLtCSV() {
   const rows = LTSCAN.results;
   if (!rows.length) { alert("尚無掃描結果"); return; }
-  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "外資買超天", "投信買超天", "融資減少", "營收YoY%", "近3月YoY%", "本益比", "股價淨值比", "殖利率%"];
+  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "距新高3%內", "外資買超天", "外資累積淨額(張)", "投信買超天", "投信累積淨額(張)", "融資減少", "營收YoY%", "近3月YoY%", "本益比", "股價淨值比", "殖利率%"];
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [head.map(q).join(",")];
-  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.foreignBuyDays, r.trustBuyDays, r.marginDown ? "是" : "", r.revYoy ?? "", r.revYoy3 ?? "", r.per ?? "", r.pbr ?? "", r.divYield ?? ""].map(q).join(",")));
+  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.nearHigh ? "是" : "", r.foreignBuyDays, r.foreignNetSum, r.trustBuyDays, r.trustNetSum, r.marginDown ? "是" : "", r.revYoy ?? "", r.revYoy3 ?? "", r.per ?? "", r.pbr ?? "", r.divYield ?? ""].map(q).join(",")));
   downloadText(`中長期潛力股_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
   addLog("✅ 中長期潛力股 CSV 已匯出");
 }
@@ -2853,6 +2879,7 @@ async function fetchDailyLong(stockId) {
       high:   rows.map(r => parseFloat(r.max)),
       low:    rows.map(r => parseFloat(r.min)),
       volume: rows.map(r => parseFloat(r.Trading_Volume)),
+      amount: rows.map(r => parseFloat(r.Trading_money) || 0), // 成交金額(元)
       date:   rows.map(r => r.date),
     };
     memSet(_ck, out);
@@ -3521,7 +3548,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.10 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.11 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
