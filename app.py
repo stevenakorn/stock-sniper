@@ -375,6 +375,45 @@ def news():
 
     return jsonify({"data": dedup[:30]})
 
+@app.route("/api/vix")
+def vix():
+    """臺指選擇權波動率指數 TaiwanOptionVix(官方恐慌指數,需 backer/sponsor 權限)"""
+    token = request.args.get("token", "")
+    start = request.args.get("start_date", "")
+    end   = request.args.get("end_date", "")
+    if not token:
+        return jsonify({"error": "缺少 token", "data": []}), 400
+    params = {}
+    if start:
+        params["start_date"] = start
+    if end:
+        params["end_date"] = end
+    data = call_finmind("TaiwanOptionVix", params, token)
+    fm_status = data.get("status")
+    if fm_status is not None and fm_status != 200 and not data.get("data"):
+        return jsonify({"error": data.get("msg", f"FinMind 回應狀態 {fm_status}"), "data": []})
+    return jsonify(data)
+
+@app.route("/api/futures_institutional")
+def futures_institutional():
+    """期貨三大法人買賣 TaiwanFuturesInstitutionalInvestors(聰明錢指標:外資台指期未平倉淨部位)"""
+    token    = request.args.get("token", "")
+    futures_id = request.args.get("futures_id", "TX")
+    start    = request.args.get("start_date", "")
+    end      = request.args.get("end_date", "")
+    if not token:
+        return jsonify({"error": "缺少 token", "data": []}), 400
+    params = {"data_id": futures_id}
+    if start:
+        params["start_date"] = start
+    if end:
+        params["end_date"] = end
+    data = call_finmind("TaiwanFuturesInstitutionalInvestors", params, token)
+    fm_status = data.get("status")
+    if fm_status is not None and fm_status != 200 and not data.get("data"):
+        return jsonify({"error": data.get("msg", f"FinMind 回應狀態 {fm_status}"), "data": []})
+    return jsonify(data)
+
 @app.route("/api/clear_cache")
 def clear_cache():
     return jsonify({"status": "ok", "cleared": 0})
