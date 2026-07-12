@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.14</title>
+<title>飆股狙擊系統 v9.15</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -548,7 +548,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.14 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.15 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -835,7 +835,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.14 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.15 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2513,36 +2513,66 @@ async function fetchPER(stockId) {
 }
 
 // ── 個股新聞(點擊才載入,省API)──
+// 注意:FinMind TaiwanStockNews 資料集不支援區間查詢(帶 end_date 會被拒絕),
+// 只能逐日查詢。走後端時交給後端處理(傳 days 參數);
+// 直連 FinMind 模式則前端自己逐日平行查詢。
 // 回傳 {ok, list, msg}:ok=false 代表 API 呼叫失敗或被拒,不等於真的沒新聞
 async function fetchNews(stockId) {
   const _ck = "news_" + stockId;
   const _c = memGet(_ck);
   if (_c) return _c;
-  const end = new Date();
-  const start = new Date(); start.setDate(start.getDate() - 14);
-  const fmt = d => d.toISOString().split("T")[0];
-  const url = USE_BACKEND
-    ? `${BACKEND_URL}/api/news?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
-    : `${FINMIND_API}?dataset=TaiwanStockNews&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  const NEWS_DAYS = 10;
+
+  if (USE_BACKEND) {
+    const url = `${BACKEND_URL}/api/news?token=${token}&stock_id=${stockId}&days=${NEWS_DAYS}`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        return { ok: false, list: [], msg: json.error || json.msg || `HTTP ${res.status}` };
+      }
+      if (!json.data) return { ok: false, list: [], msg: json.msg || "後端回應無 data 欄位" };
+      const out = json.data
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 15)
+        .map(n => ({ date: n.date, title: n.title, link: n.link, source: n.source }));
+      const result = { ok: true, list: out, msg: "" };
+      memSet(_ck, result);
+      return result;
+    } catch (e) {
+      return { ok: false, list: [], msg: e.message || "連線逾時或失敗" };
+    }
+  }
+
+  // 直連 FinMind 模式:逐日平行查詢(不能帶 end_date)
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    const json = await res.json();
-    // FinMind/後端錯誤:HTTP 非 2xx,或回傳帶 error/msg 且無 data
-    if (!res.ok || json.error) {
-      const msg = json.error || json.msg || `HTTP ${res.status}`;
-      return { ok: false, list: [], msg };
+    const dateList = [];
+    for (let i = 0; i < NEWS_DAYS; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      dateList.push(d.toISOString().split("T")[0]);
     }
-    if (!json.data) {
-      return { ok: false, list: [], msg: json.msg || "後端回應無 data 欄位" };
-    }
-    // 依日期新到舊排序,取最近15則
-    const out = json.data
-      .slice()
+    const results = await Promise.allSettled(dateList.map(dt =>
+      fetch(`${FINMIND_API}?dataset=TaiwanStockNews&data_id=${stockId}&start_date=${dt}&token=${token}`,
+        { signal: AbortSignal.timeout(15000) }).then(r => r.json())
+    ));
+    let rows = [];
+    let firstError = null;
+    results.forEach(r => {
+      if (r.status === "fulfilled" && r.value && r.value.data) rows = rows.concat(r.value.data);
+      else if (r.status === "fulfilled" && r.value && r.value.status && r.value.status !== 200 && !firstError) {
+        firstError = r.value.msg || `FinMind 回應狀態 ${r.value.status}`;
+      }
+    });
+    if (!rows.length && firstError) return { ok: false, list: [], msg: firstError };
+    const seen = new Set();
+    const out = rows
       .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .filter(n => { const k = n.date + n.title; if (seen.has(k)) return false; seen.add(k); return true; })
       .slice(0, 15)
       .map(n => ({ date: n.date, title: n.title, link: n.link, source: n.source }));
     const result = { ok: true, list: out, msg: "" };
-    memSet(_ck, result); // 只快取成功結果(含真的空清單),失敗不快取,允許重試
+    memSet(_ck, result);
     return result;
   } catch (e) {
     return { ok: false, list: [], msg: e.message || "連線逾時或失敗" };
@@ -3653,7 +3683,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.14 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.15 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
