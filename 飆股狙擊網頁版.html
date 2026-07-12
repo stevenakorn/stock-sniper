@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.13</title>
+<title>飆股狙擊系統 v9.14</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -369,7 +369,8 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .news-date{font-size:10px;font-family:var(--mono);color:var(--text2);white-space:nowrap;flex-shrink:0}
 .news-title{font-size:12px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .news-source{font-size:10px;font-family:var(--mono);color:var(--text2);white-space:nowrap;flex-shrink:0}
-.news-empty,.news-loading{padding:16px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.news-empty,.news-loading{padding:16px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.news-error{color:var(--amber);background:rgba(242,169,30,.06);border:1px solid rgba(242,169,30,.25);border-radius:var(--radius-s)}
 .lt-news-row{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:640px){
   .news-item{flex-wrap:wrap}
@@ -547,7 +548,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.13 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.14 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -834,7 +835,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.13 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.14 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2512,6 +2513,7 @@ async function fetchPER(stockId) {
 }
 
 // ── 個股新聞(點擊才載入,省API)──
+// 回傳 {ok, list, msg}:ok=false 代表 API 呼叫失敗或被拒,不等於真的沒新聞
 async function fetchNews(stockId) {
   const _ck = "news_" + stockId;
   const _c = memGet(_ck);
@@ -2525,21 +2527,35 @@ async function fetchNews(stockId) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     const json = await res.json();
-    if (!json.data) return [];
+    // FinMind/後端錯誤:HTTP 非 2xx,或回傳帶 error/msg 且無 data
+    if (!res.ok || json.error) {
+      const msg = json.error || json.msg || `HTTP ${res.status}`;
+      return { ok: false, list: [], msg };
+    }
+    if (!json.data) {
+      return { ok: false, list: [], msg: json.msg || "後端回應無 data 欄位" };
+    }
     // 依日期新到舊排序,取最近15則
     const out = json.data
       .slice()
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 15)
       .map(n => ({ date: n.date, title: n.title, link: n.link, source: n.source }));
-    memSet(_ck, out);
-    return out;
-  } catch (e) { return []; }
+    const result = { ok: true, list: out, msg: "" };
+    memSet(_ck, result); // 只快取成功結果(含真的空清單),失敗不快取,允許重試
+    return result;
+  } catch (e) {
+    return { ok: false, list: [], msg: e.message || "連線逾時或失敗" };
+  }
 }
 
-function renderNewsList(news) {
-  if (!news || !news.length) return `<div class="news-empty">近14天查無相關新聞</div>`;
-  return news.map(n => {
+function renderNewsList(result) {
+  if (!result || !result.ok) {
+    const msg = result ? result.msg : "未知錯誤";
+    return `<div class="news-empty news-error">⚠ 新聞載入失敗:${esc(msg)}<br><span style="font-size:10px">請確認 Token 是否有 TaiwanStockNews 資料集權限,或稍後重試</span></div>`;
+  }
+  if (!result.list.length) return `<div class="news-empty">近14天查無相關新聞</div>`;
+  return result.list.map(n => {
     const d = (n.date || "").slice(0, 10);
     return `<a class="news-item" href="${n.link}" target="_blank" rel="noopener">
       <span class="news-date">${d}</span>
@@ -2555,9 +2571,14 @@ async function loadDetailNews(stockId, btn) {
   if (!wrap) return;
   if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
   wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
-  const news = await fetchNews(stockId);
-  wrap.innerHTML = renderNewsList(news);
-  if (btn) btn.style.display = "none";
+  const result = await fetchNews(stockId);
+  wrap.innerHTML = renderNewsList(result);
+  if (result.ok) {
+    if (btn) btn.style.display = "none";
+  } else {
+    addLog(`⚠ ${stockId} 新聞載入失敗:${result.msg}`, "warn");
+    if (btn) { btn.disabled = false; btn.textContent = "重新載入新聞"; }
+  }
 }
 
 // 中長期展開列:點按鈕才載入新聞
@@ -2566,9 +2587,14 @@ async function loadLtNews(stockId, rid, btn) {
   if (!wrap) return;
   if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
   wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
-  const news = await fetchNews(stockId);
-  wrap.innerHTML = renderNewsList(news);
-  if (btn) btn.style.display = "none";
+  const result = await fetchNews(stockId);
+  wrap.innerHTML = renderNewsList(result);
+  if (result.ok) {
+    if (btn) btn.style.display = "none";
+  } else {
+    addLog(`⚠ ${stockId} 新聞載入失敗:${result.msg}`, "warn");
+    if (btn) { btn.disabled = false; btn.textContent = "重新載入新聞"; }
+  }
 }
 
 // ── PWA ──
@@ -3627,7 +3653,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.13 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.14 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
