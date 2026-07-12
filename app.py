@@ -7,7 +7,7 @@ from flask_cors import CORS
 import requests
 import re
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
@@ -330,25 +330,50 @@ def per():
 
 @app.route("/api/news")
 def news():
-    """個股相關新聞 TaiwanStockNews(近N天,預設10天)"""
+    """個股相關新聞 TaiwanStockNews
+    注意:FinMind 這個資料集不支援區間查詢(帶 end_date 會被拒絕),
+    只能逐日查詢(僅帶 start_date/date,代表查那一天),
+    所以這裡改成平行查詢最近 N 天再合併結果。
+    """
+    from concurrent.futures import ThreadPoolExecutor
     token    = request.args.get("token", "")
     stock_id = request.args.get("stock_id", "")
-    start    = request.args.get("start_date", "")
-    end      = request.args.get("end_date", "")
+    days     = int(request.args.get("days", "10") or 10)
+    days     = max(1, min(days, 20))  # 防呆:1~20天
     if not all([token, stock_id]):
         return jsonify({"error": "缺少參數", "data": []}), 400
-    params = {"data_id": stock_id}
-    if start:
-        params["start_date"] = start
-    if end:
-        params["end_date"] = end
-    data = call_finmind("TaiwanStockNews", params, token)
-    # FinMind 有時以 HTTP 200 包裝錯誤(如權限不足、資料集受限),
-    # 用內部 status/msg 表示,這裡明確攔截轉成 error,避免前端誤判成「查無資料」
-    fm_status = data.get("status")
-    if fm_status is not None and fm_status != 200 and not data.get("data"):
-        return jsonify({"error": data.get("msg", f"FinMind 回應狀態 {fm_status}"), "data": []})
-    return jsonify(data)
+
+    def fetch_one_day(date_str):
+        return call_finmind("TaiwanStockNews", {
+            "data_id": stock_id, "start_date": date_str,
+        }, token)
+
+    date_list = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+    all_rows = []
+    first_error = None
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = list(executor.map(fetch_one_day, date_list))
+    for r in results:
+        if r.get("data"):
+            all_rows.extend(r["data"])
+        elif r.get("status") is not None and r.get("status") != 200 and first_error is None:
+            first_error = r.get("msg", f"FinMind 回應狀態 {r.get('status')}")
+
+    if not all_rows and first_error:
+        # 每一天都查詢失敗(通常是權限或 token 問題),回傳明確錯誤
+        return jsonify({"error": first_error, "data": []})
+
+    # 依日期去重(同 stock_id + title 可能重複出現)+ 排序
+    seen = set()
+    dedup = []
+    for row in sorted(all_rows, key=lambda r: r.get("date", ""), reverse=True):
+        key = (row.get("date"), row.get("title"))
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append(row)
+
+    return jsonify({"data": dedup[:30]})
 
 @app.route("/api/clear_cache")
 def clear_cache():
