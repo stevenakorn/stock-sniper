@@ -328,6 +328,23 @@ def per():
     data = call_finmind("TaiwanStockPER", params, token)
     return jsonify(data)
 
+@app.route("/api/news")
+def news():
+    """個股相關新聞 TaiwanStockNews(近N天,預設10天)"""
+    token    = request.args.get("token", "")
+    stock_id = request.args.get("stock_id", "")
+    start    = request.args.get("start_date", "")
+    end      = request.args.get("end_date", "")
+    if not all([token, stock_id]):
+        return jsonify({"error": "缺少參數", "data": []}), 400
+    params = {"data_id": stock_id}
+    if start:
+        params["start_date"] = start
+    if end:
+        params["end_date"] = end
+    data = call_finmind("TaiwanStockNews", params, token)
+    return jsonify(data)
+
 @app.route("/api/clear_cache")
 def clear_cache():
     return jsonify({"status": "ok", "cleared": 0})
