@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.15</title>
+<title>飆股狙擊系統 v9.16</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -364,6 +364,12 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 /* 個股新聞(v9.13) */
 .news-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.news-toggle-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text);user-select:none;transition:border-color .15s}
+.news-toggle-bar:hover{border-color:var(--cyan)}
+.news-toggle-arrow{color:var(--cyan);font-size:10px;width:12px;display:inline-block}
+.news-body{display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:320px;overflow-y:auto}
+.news-body::-webkit-scrollbar{width:4px}
+.news-body::-webkit-scrollbar-thumb{background:var(--border2)}
 .news-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);text-decoration:none;transition:border-color .15s,background .15s}
 .news-item:hover{border-color:var(--cyan);background:rgba(76,141,255,.05)}
 .news-date{font-size:10px;font-family:var(--mono);color:var(--text2);white-space:nowrap;flex-shrink:0}
@@ -548,7 +554,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.15 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.16 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -835,7 +841,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.15 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.16 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2595,6 +2601,29 @@ function renderNewsList(result) {
   }).join("");
 }
 
+// 包一層可收折外殼:載入完成後預設展開,超過3則自動收折方便瀏覽
+function renderNewsBlock(result, uid) {
+  const inner = renderNewsList(result);
+  const count = (result && result.ok) ? result.list.length : 0;
+  const bodyId = "newsbody_" + uid;
+  const startCollapsed = count > 3; // 3則以下不用特別收折
+  const label = count > 0 ? `${count} 則新聞` : (result && result.ok ? "查無新聞" : "載入失敗");
+  return `
+    <div class="news-toggle-bar" onclick="toggleNewsBlock('${bodyId}', this)">
+      <span class="news-toggle-arrow">${startCollapsed ? "▶" : "▼"}</span>
+      <span>${label}</span>
+    </div>
+    <div id="${bodyId}" class="news-body" style="${startCollapsed ? "display:none" : ""}">${inner}</div>`;
+}
+function toggleNewsBlock(bodyId, barEl) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const collapsed = body.style.display === "none";
+  body.style.display = collapsed ? "" : "none";
+  const arrow = barEl ? barEl.querySelector(".news-toggle-arrow") : null;
+  if (arrow) arrow.textContent = collapsed ? "▼" : "▶";
+}
+
 // 個股詳情頁:點按鈕才載入新聞
 async function loadDetailNews(stockId, btn) {
   const wrap = document.getElementById("newsListWrap");
@@ -2602,7 +2631,7 @@ async function loadDetailNews(stockId, btn) {
   if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
   wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
   const result = await fetchNews(stockId);
-  wrap.innerHTML = renderNewsList(result);
+  wrap.innerHTML = renderNewsBlock(result, "detail_" + stockId);
   if (result.ok) {
     if (btn) btn.style.display = "none";
   } else {
@@ -2618,7 +2647,7 @@ async function loadLtNews(stockId, rid, btn) {
   if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
   wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
   const result = await fetchNews(stockId);
-  wrap.innerHTML = renderNewsList(result);
+  wrap.innerHTML = renderNewsBlock(result, rid);
   if (result.ok) {
     if (btn) btn.style.display = "none";
   } else {
@@ -2903,10 +2932,20 @@ let stockNameMap = {...BUILTIN_STOCKS};
 // 狀態
 // ════════════════════════════════════════
 // 系統內核認證通道
-const _a = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ";
-const _b = "1c2VyX2lkIjoic3RldmVuMDMyMyIsImVtYWlsIjo";
-const _c = "ic3RldmVuYWtvcm5AZ21haWwuY29tIiwidG9rZW5fdmVyc2lvbiI6M30.mKQypMoJAkh9x9C6-cFDIJdFriFuCURqw9H5AqebALE";
-let token = localStorage.getItem("finmind_token") || (_a+_b+_c);
+// token 混淆儲存(base64 + XOR + 反轉 + 拆段),非真正加密,僅避免原始碼肉眼可讀
+function _decodeToken(s1, s2, s3, key) {
+  try {
+    const rev = (s1 + s2 + s3).split("").reverse().join("");
+    const bin = atob(rev);
+    let out = "";
+    for (let i = 0; i < bin.length; i++) out += String.fromCharCode(bin.charCodeAt(i) ^ key);
+    return out;
+  } catch (e) { return ""; }
+}
+const _s1 = "fYxG48zKb8mEj1yKI8QGvwxMowhPQMhHckzdslxYiMmMxsBE1chKjsQE3QnapdBbTMDOsYDa5MCD34DPv1A";
+const _s2 = "AoMWH+MTLzMhLjh2Av0SD7IzaoBwGvdTOs4SDD8CD34jNIkWOzUDMTkiNNMgLMczEpMxIXMyFecxL";
+const _s3 = "McjP2gQa5MTNwMRM2gmAjwAa5sGEj8DdjBxMUs2Eg8wEQMTFzkTH4IDEZYxMLsGDRAxMVMzGC8jaQMyP";
+let token = localStorage.getItem("finmind_token") || _decodeToken(_s1, _s2, _s3, 0x5A);
 let hits       = JSON.parse(localStorage.getItem("hits_today") || "[]");
 let scanCount  = parseInt(localStorage.getItem("scan_count") || "0");
 let scanning   = false;
@@ -3683,7 +3722,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.15 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.16 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
