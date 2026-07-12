@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.11</title>
+<title>飆股狙擊系統 v9.13</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -362,6 +362,20 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .lt-card{padding-left:36px}
 
 
+/* 個股新聞(v9.13) */
+.news-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.news-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);text-decoration:none;transition:border-color .15s,background .15s}
+.news-item:hover{border-color:var(--cyan);background:rgba(76,141,255,.05)}
+.news-date{font-size:10px;font-family:var(--mono);color:var(--text2);white-space:nowrap;flex-shrink:0}
+.news-title{font-size:12px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.news-source{font-size:10px;font-family:var(--mono);color:var(--text2);white-space:nowrap;flex-shrink:0}
+.news-empty,.news-loading{padding:16px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.lt-news-row{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){
+  .news-item{flex-wrap:wrap}
+  .news-title{white-space:normal;width:100%;order:3}
+}
+
 /* 中長期條列表(v9.10) */
 .lt-table tbody tr.lt-row{cursor:pointer}
 .lt-table tbody tr.lt-row:hover td{background:rgba(76,141,255,.05)}
@@ -533,7 +547,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.11 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.13 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -820,7 +834,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.11 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.13 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2157,7 +2171,11 @@ function renderLtResults() {
         <div class="lt-expand-body">
           <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200} ｜ 離低點 <b class="up">+${r.distLow}%</b> ｜ 月幅 <b>${r.rangePct}%</b>${r.pbr != null ? ` ｜ PBR <b>${r.pbr}</b>` : ""}${r.revYoy3 != null ? ` ｜ 近3月營收均YoY <b class="${r.revYoy3 >= 0 ? "up" : "down"}">${r.revYoy3 >= 0 ? "+" : ""}${r.revYoy3}%</b>` : ""}</div>
           ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
-          <button class="radar-btn" onclick="event.stopPropagation();openStockDetail('${r.id}')">查看個股詳情 →</button>
+          <div class="lt-news-row">
+            <button class="radar-btn" onclick="event.stopPropagation();openStockDetail('${r.id}')">查看個股詳情 →</button>
+            <button class="radar-btn" onclick="event.stopPropagation();loadLtNews('${r.id}','${rid}',this)">載入新聞</button>
+          </div>
+          <div id="ltnews_${rid}" class="news-list"></div>
         </div>
       </td>
     </tr>`;
@@ -2493,6 +2511,66 @@ async function fetchPER(stockId) {
   } catch (e) { return null; }
 }
 
+// ── 個股新聞(點擊才載入,省API)──
+async function fetchNews(stockId) {
+  const _ck = "news_" + stockId;
+  const _c = memGet(_ck);
+  if (_c) return _c;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 14);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/news?token=${token}&stock_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockNews&data_id=${stockId}&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!json.data) return [];
+    // 依日期新到舊排序,取最近15則
+    const out = json.data
+      .slice()
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 15)
+      .map(n => ({ date: n.date, title: n.title, link: n.link, source: n.source }));
+    memSet(_ck, out);
+    return out;
+  } catch (e) { return []; }
+}
+
+function renderNewsList(news) {
+  if (!news || !news.length) return `<div class="news-empty">近14天查無相關新聞</div>`;
+  return news.map(n => {
+    const d = (n.date || "").slice(0, 10);
+    return `<a class="news-item" href="${n.link}" target="_blank" rel="noopener">
+      <span class="news-date">${d}</span>
+      <span class="news-title">${esc(n.title || "")}</span>
+      <span class="news-source">${esc(n.source || "")}</span>
+    </a>`;
+  }).join("");
+}
+
+// 個股詳情頁:點按鈕才載入新聞
+async function loadDetailNews(stockId, btn) {
+  const wrap = document.getElementById("newsListWrap");
+  if (!wrap) return;
+  if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
+  wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
+  const news = await fetchNews(stockId);
+  wrap.innerHTML = renderNewsList(news);
+  if (btn) btn.style.display = "none";
+}
+
+// 中長期展開列:點按鈕才載入新聞
+async function loadLtNews(stockId, rid, btn) {
+  const wrap = document.getElementById("ltnews_" + rid);
+  if (!wrap) return;
+  if (btn) { btn.disabled = true; btn.textContent = "載入中..."; }
+  wrap.innerHTML = `<div class="news-loading"><div class="radar-spin"></div>載入新聞中...</div>`;
+  const news = await fetchNews(stockId);
+  wrap.innerHTML = renderNewsList(news);
+  if (btn) btn.style.display = "none";
+}
+
 // ── PWA ──
 function registerPWA() {
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
@@ -2804,9 +2882,10 @@ function updateClock() {
   const s = String(now.getSeconds()).padStart(2,"0");
   document.getElementById("clock").textContent = `${h}:${m}:${s}`;
   const t = `${h}:${m}`;
-  const inMkt = t >= "09:00" && t <= "13:30";
+  const inMkt = isMarketOpen(); // 統一用 isMarketOpen()判斷,含假日排除
   const badge = document.getElementById("marketBadge");
-  badge.textContent = inMkt ? "盤中" : (t < "09:00" ? "開盤前" : "盤後");
+  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  badge.textContent = inMkt ? "盤中" : (isWeekend ? "假日" : (t < "09:00" ? "開盤前" : "盤後"));
   badge.className = "market-badge " + (inMkt ? "open" : "closed");
   document.getElementById("sysMarket").textContent = inMkt ? "盤中 ●" : "非盤中";
   document.getElementById("sysMarket").style.color = inMkt ? "var(--green)" : "var(--text2)";
@@ -3548,7 +3627,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.11 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.13 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -4279,6 +4358,13 @@ async function searchStock() {
         ${perInfo && perInfo.per != null ? `<div class="detail-row"><span class="detail-key">本益比PER</span><span class="detail-val">${perInfo.per}</span></div>` : `<div class="detail-row"><span class="detail-key">本益比PER</span><span class="detail-val" style="color:var(--text2)">--</span></div>`}
         ${perInfo && perInfo.pbr != null ? `<div class="detail-row"><span class="detail-key">股價淨值比PBR</span><span class="detail-val">${perInfo.pbr}</span></div>` : ""}
         ${perInfo && perInfo.yield != null ? `<div class="detail-row"><span class="detail-key">殖利率</span><span class="detail-val ${perInfo.yield>=0?"up":""}">${perInfo.yield}%</span></div>` : ""}
+      </div>
+      <div class="detail-block" style="grid-column:1/-1">
+        <div class="detail-block-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>📰 相關新聞</span>
+          <button class="radar-btn" onclick="loadDetailNews('${stockId}', this)">載入新聞</button>
+        </div>
+        <div id="newsListWrap" class="news-list"></div>
       </div>
     </div>
     <div class="kline-section">
