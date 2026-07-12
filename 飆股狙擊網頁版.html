@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.16</title>
+<title>飆股狙擊系統 v9.17</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -362,6 +362,28 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .lt-card{padding-left:36px}
 
 
+/* 市場情緒儀表板(v9.17) */
+.sent-loading{padding:30px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.sent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.sent-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.sent-title{font-size:11px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:2px}
+.gauge-svg{width:100%;max-width:180px;height:auto}
+.gauge-value{font-size:22px;font-weight:700;font-family:var(--mono)}
+.sent-sub{font-size:13px;font-family:var(--mono);font-weight:600;margin-top:2px}
+.sent-note{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:2px}
+.sent-error{padding:16px 4px;color:var(--amber);font-family:var(--mono);font-size:12px;line-height:1.6}
+.sent-factors{width:100%;display:flex;flex-direction:column;gap:3px;margin-top:6px;padding-top:8px;border-top:1px solid var(--border)}
+.sent-factor{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2)}
+.sent-factor span:last-child{color:var(--text);font-weight:600}
+.sent-factor.dim{opacity:.45}
+.sent-factor.dim span:last-child{color:var(--text2);font-weight:400}
+.sent-sm-value{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:10px}
+.sent-sm-unit{font-size:13px;margin-left:3px;opacity:.7}
+.sent-disclaimer{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:12px;line-height:1.6;text-align:center}
+@media(max-width:900px){
+  .sent-grid{grid-template-columns:1fr}
+}
+
 /* 個股新聞(v9.13) */
 .news-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .news-toggle-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text);user-select:none;transition:border-color .15s}
@@ -554,7 +576,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.16 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.17 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -564,6 +586,17 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切換深色/淺色">🌙</button>
   </div>
 </header>
+
+<!-- 市場情緒儀表板 -->
+<div class="panel" style="margin-bottom:16px">
+  <div class="panel-header">
+    <span class="panel-title">MARKET SENTIMENT · 市場情緒儀表板</span>
+    <button class="radar-btn" id="btnSentimentRefresh" onclick="loadSentimentDashboard()">↻ 更新市場情緒</button>
+  </div>
+  <div id="sentimentBody" style="padding:16px">
+    <div class="sent-loading"><div class="radar-spin"></div>載入市場情緒資料中...</div>
+  </div>
+</div>
 
 <!-- Token 設定 -->
 <!-- 統計卡片 -->
@@ -841,7 +874,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.16 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.17 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2656,6 +2689,316 @@ async function loadLtNews(stockId, rid, btn) {
   }
 }
 
+// ════════════════════════════════════════
+// v9.17 市場情緒儀表板:恐慌指數VIX / 牛熊強度 / 聰明錢指標
+// ════════════════════════════════════════
+var SENTIMENT = { vix: null, smartMoney: null, bullBear: null, loading: false };
+
+// ── 恐慌指數 VIX(官方 TaiwanOptionVix,防禦性欄位解析)──
+async function fetchVix() {
+  const cached = lsCacheGet("vix");
+  if (cached) return cached;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 20);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/vix?token=${token}&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanOptionVix&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, msg: json.error || json.msg || `HTTP ${res.status}` };
+    }
+    if (!json.data || !json.data.length) return { ok: false, msg: "無資料(可能無此資料集權限)" };
+    // 防禦性欄位解析:嘗試常見欄位名
+    const candidates = ["close", "vix", "TaiwanOptionVix", "value", "index_value", "VIX", "Close"];
+    const rows = json.data.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    let field = null;
+    for (const f of candidates) {
+      if (rows[rows.length - 1][f] !== undefined) { field = f; break; }
+    }
+    if (!field) return { ok: false, msg: "回應格式未知,無法解析VIX數值" };
+    const series = rows.map(r => ({ date: r.date, v: parseFloat(r[field]) })).filter(r => !isNaN(r.v));
+    if (!series.length) return { ok: false, msg: "VIX數值解析失敗" };
+    const latest = series[series.length - 1];
+    const prev = series.length >= 2 ? series[series.length - 2] : null;
+    const result = { ok: true, value: latest.v, date: latest.date, chg: prev ? +(latest.v - prev.v).toFixed(2) : null, series };
+    lsCacheSet("vix", result);
+    return result;
+  } catch (e) {
+    return { ok: false, msg: e.message || "連線失敗" };
+  }
+}
+
+// ── 聰明錢指標:外資台指期(TX)未平倉淨部位 ──
+async function fetchSmartMoney() {
+  const cached = lsCacheGet("smartMoney");
+  if (cached) return cached;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 20);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/futures_institutional?token=${token}&futures_id=TX&start_date=${fmt(start)}&end_date=${fmt(end)}`
+    : `${FINMIND_API}?dataset=TaiwanFuturesInstitutionalInvestors&data_id=TX&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, msg: json.error || json.msg || `HTTP ${res.status}` };
+    }
+    if (!json.data || !json.data.length) return { ok: false, msg: "無資料" };
+    // 篩外資,算多方-空方未平倉淨部位(口數)
+    const foreignNames = ["外資", "外資及陸資", "Foreign_Investor"];
+    const byDate = {};
+    json.data.forEach(r => {
+      if (!foreignNames.includes(r.institutional_investors)) return;
+      const net = (parseInt(r.long_open_interest_balance_volume || 0) || 0) - (parseInt(r.short_open_interest_balance_volume || 0) || 0);
+      byDate[r.date] = (byDate[r.date] || 0) + net;
+    });
+    const dates = Object.keys(byDate).sort();
+    if (!dates.length) return { ok: false, msg: "查無外資期貨部位資料" };
+    const series = dates.map(d => ({ date: d, v: byDate[d] }));
+    const latest = series[series.length - 1];
+    const prev = series.length >= 2 ? series[series.length - 2] : null;
+    const result = { ok: true, value: latest.v, date: latest.date, chg: prev ? latest.v - prev.v : null, series };
+    lsCacheSet("smartMoney", result);
+    return result;
+  } catch (e) {
+    return { ok: false, msg: e.message || "連線失敗" };
+  }
+}
+
+// ── 市場寬度:用已快取的中長期長期資料(pxL_*)算站上200MA比例(best-effort,樣本數視當日已掃檔數而定)──
+function calcMarketBreadth() {
+  let above200 = 0, total = 0;
+  memCache.forEach((entry, key) => {
+    if (!key.startsWith("pxL_")) return;
+    const d = entry.v;
+    if (!d || !d.close || d.close.length < 200) return;
+    const price = d.close[d.close.length - 1];
+    const ma200 = avg(d.close.slice(-200));
+    total++;
+    if (price > ma200) above200++;
+  });
+  if (total < 20) return { ok: false, msg: "樣本不足(需先執行過中長期掃描累積資料)", sample: total };
+  return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
+}
+
+// ── 法人動向:近5個交易日 TWSE 全市場三大法人合計淨買超趨勢(免token,複用現有twse_institutional)──
+async function fetchMarketInstitutionalTrend() {
+  const cached = lsCacheGet("instTrend");
+  if (cached) return cached;
+  const fmtTWSE = d => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const days = [];
+  const d0 = new Date();
+  for (let i = 0; i < 8 && days.length < 5; i++) {
+    const d = new Date(d0); d.setDate(d.getDate() - i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    days.push(d);
+  }
+  try {
+    const results = await Promise.allSettled(days.map(d =>
+      fetch(`${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(d)}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json())
+    ));
+    const series = [];
+    results.forEach((r, i) => {
+      if (r.status !== "fulfilled" || !r.value || !r.value.data) return;
+      const sum = r.value.data.reduce((s, row) => s + (parseInt(row.TotalNet) || 0), 0);
+      series.push({ date: days[i].toISOString().slice(0, 10), v: sum });
+    });
+    if (series.length < 2) return { ok: false, msg: "近期資料不足" };
+    series.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const latest = series[series.length - 1];
+    const positiveDays = series.filter(s => s.v > 0).length;
+    const result = { ok: true, value: latest.v, date: latest.date, positiveDays, totalDays: series.length, series };
+    lsCacheSet("instTrend", result);
+    return result;
+  } catch (e) {
+    return { ok: false, msg: e.message || "連線失敗" };
+  }
+}
+
+// ── 融資融券氛圍:用已快取個股籌碼(chip_*)算融資餘額增減比例(best-effort)──
+function calcMarginSentiment() {
+  let down = 0, up = 0, total = 0;
+  memCache.forEach((entry, key) => {
+    if (!key.startsWith("chip_")) return;
+    const chip = entry.v;
+    if (!chip || !chip.margin || chip.margin.length < 2) return;
+    const m = chip.margin;
+    const latest = m[m.length - 1], prev = m[m.length - 2];
+    const lb = parseFloat(latest.MarginPurchaseTodayBalance ?? latest.margin ?? NaN);
+    const pb = parseFloat(prev.MarginPurchaseTodayBalance ?? prev.margin ?? NaN);
+    if (isNaN(lb) || isNaN(pb)) return;
+    total++;
+    if (lb < pb) down++; else if (lb > pb) up++;
+  });
+  if (total < 10) return { ok: false, msg: "樣本不足(需先執行過掃描累積資料)", sample: total };
+  return { ok: true, downPct: +(down / total * 100).toFixed(1), upPct: +(up / total * 100).toFixed(1), sample: total };
+}
+
+// ── 牛熊強度合成(0-100分,越高越偏多頭)──
+function calcBullBearScore(breadth, instTrend, marginSent) {
+  const parts = [];
+  // ①大盤位置(永遠可算,權重最高,因為最即時可靠)
+  let posScore = 50;
+  if (MKT.loaded) {
+    posScore = 50;
+    if (MKT.close > MKT.ma20) posScore += 15; else posScore -= 15;
+    if (MKT.ma20 > MKT.ma60) posScore += 10; else posScore -= 10;
+    posScore = Math.max(0, Math.min(100, posScore));
+    parts.push({ label: "大盤位置", score: posScore, weight: 0.35, ok: true });
+  } else {
+    parts.push({ label: "大盤位置", score: 50, weight: 0.35, ok: false });
+  }
+  // ②市場寬度
+  if (breadth.ok) {
+    parts.push({ label: "市場寬度", score: breadth.pct, weight: 0.25, ok: true });
+  } else {
+    parts.push({ label: "市場寬度", score: 50, weight: 0.25, ok: false });
+  }
+  // ③法人動向
+  if (instTrend.ok) {
+    const s = 50 + (instTrend.positiveDays / instTrend.totalDays - 0.5) * 100;
+    parts.push({ label: "法人動向", score: Math.max(0, Math.min(100, s)), weight: 0.25, ok: true });
+  } else {
+    parts.push({ label: "法人動向", score: 50, weight: 0.25, ok: false });
+  }
+  // ④融資融券氛圍(融資減少=散戶退場=偏多訊號)
+  if (marginSent.ok) {
+    const s = 50 + (marginSent.downPct - marginSent.upPct) / 2;
+    parts.push({ label: "融資融券", score: Math.max(0, Math.min(100, s)), weight: 0.15, ok: true });
+  } else {
+    parts.push({ label: "融資融券", score: 50, weight: 0.15, ok: false });
+  }
+  // 只用有資料的因子,權重正規化
+  const validParts = parts.filter(p => p.ok);
+  if (!validParts.length) {
+    return { score: 50, parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜融資${marginSent.sample || 0}檔（所有因子皆無資料,顯示中性值）` };
+  }
+  const totalW = validParts.reduce((s, p) => s + p.weight, 0) || 1;
+  const finalScore = validParts.reduce((s, p) => s + p.score * p.weight, 0) / totalW;
+  return { score: +finalScore.toFixed(1), parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜融資${marginSent.sample || 0}檔` };
+}
+
+async function loadSentimentDashboard() {
+  if (SENTIMENT.loading) return;
+  SENTIMENT.loading = true;
+  const btn = document.getElementById("btnSentimentRefresh");
+  if (btn) { btn.disabled = true; btn.textContent = "更新中..."; }
+  const [vix, smartMoney, instTrend] = await Promise.all([
+    fetchVix(), fetchSmartMoney(), fetchMarketInstitutionalTrend(),
+  ]);
+  const breadth = calcMarketBreadth();
+  const marginSent = calcMarginSentiment();
+  const bullBear = calcBullBearScore(breadth, instTrend, marginSent);
+  SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.bullBear = bullBear;
+  SENTIMENT.loading = false;
+  if (btn) { btn.disabled = false; btn.textContent = "↻ 更新市場情緒"; }
+  renderSentimentDashboard();
+}
+
+function gaugeColor(pct) {
+  // 0紅(恐慌/空頭) ~ 50黃 ~ 100紅(貪婪,VIX情境下用另一組)
+  if (pct < 35) return "var(--down)";
+  if (pct < 65) return "var(--amber)";
+  return "var(--up)";
+}
+function vixColor(v) {
+  if (v == null) return "var(--text2)";
+  if (v < 18) return "var(--up)";   // 平靜(台股慣例紅=正常/偏多氣氛用紅,這裡借色階表恐慌程度:低=平靜)
+  if (v < 25) return "var(--amber)";
+  return "var(--down)"; // 恐慌時用綠避免與紅漲混淆?這裡改用明確語意色
+}
+
+// 半圓錶(SVG),value 0-100,回傳 SVG 字串
+function renderGaugeSvg(id, pct, label, valueText, color) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const cx = 90, cy = 90, r = 70;
+  const theta = Math.PI - (clamped / 100) * Math.PI; // 180度(左)->0度(右)
+  const tipX = cx + r * Math.cos(theta);
+  const tipY = cy - r * Math.sin(theta);
+  return `
+  <svg viewBox="0 0 180 110" class="gauge-svg">
+    <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="var(--border)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round"
+      stroke-dasharray="${(clamped / 100) * 219.9} 219.9"/>
+    <line x1="${cx}" y1="${cy}" x2="${tipX.toFixed(1)}" y2="${tipY.toFixed(1)}" stroke="var(--text)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="5" fill="var(--text)"/>
+    <text x="90" y="75" text-anchor="middle" class="gauge-value" fill="${color}">${valueText}</text>
+  </svg>`;
+}
+
+function renderSentimentDashboard() {
+  const wrap = document.getElementById("sentimentBody");
+  if (!wrap) return;
+  const { vix, smartMoney, bullBear } = SENTIMENT;
+
+  // VIX 卡
+  let vixHtml;
+  if (vix && vix.ok) {
+    const color = vixColor(vix.value);
+    const label = vix.value < 18 ? "平靜" : vix.value < 25 ? "警戒" : "恐慌";
+    const pct = Math.max(0, Math.min(100, (vix.value - 10) / (40 - 10) * 100));
+    vixHtml = `
+      <div class="sent-card">
+        <div class="sent-title">恐慌指數 VIX</div>
+        ${renderGaugeSvg("vix", pct, "VIX", vix.value.toFixed(1), color)}
+        <div class="sent-sub" style="color:${color}">${label}${vix.chg != null ? `　${vix.chg >= 0 ? "+" : ""}${vix.chg.toFixed(2)}` : ""}</div>
+        <div class="sent-note">臺指選擇權波動率指數｜${vix.date || ""}</div>
+      </div>`;
+  } else {
+    vixHtml = `
+      <div class="sent-card">
+        <div class="sent-title">恐慌指數 VIX</div>
+        <div class="sent-error">⚠ ${esc(vix ? vix.msg : "載入中")}<br><span style="font-size:10px">需 FinMind backer/sponsor 權限</span></div>
+      </div>`;
+  }
+
+  // 牛熊強度卡
+  let bbHtml;
+  if (bullBear) {
+    const color = gaugeColor(bullBear.score);
+    const label = bullBear.score >= 65 ? "偏多" : bullBear.score >= 35 ? "中性" : "偏空";
+    const partsHtml = bullBear.parts.map(p =>
+      `<div class="sent-factor${p.ok ? "" : " dim"}"><span>${p.label}</span><span>${p.ok ? p.score.toFixed(0) : "無資料"}</span></div>`
+    ).join("");
+    bbHtml = `
+      <div class="sent-card">
+        <div class="sent-title">牛熊強度</div>
+        ${renderGaugeSvg("bb", bullBear.score, "牛熊", bullBear.score.toFixed(0), color)}
+        <div class="sent-sub" style="color:${color}">${label}</div>
+        <div class="sent-factors">${partsHtml}</div>
+      </div>`;
+  } else {
+    bbHtml = `<div class="sent-card"><div class="sent-title">牛熊強度</div><div class="sent-error">載入中...</div></div>`;
+  }
+
+  // 聰明錢卡
+  let smHtml;
+  if (smartMoney && smartMoney.ok) {
+    const positive = smartMoney.value >= 0;
+    const color = positive ? "var(--up)" : "var(--down)";
+    smHtml = `
+      <div class="sent-card">
+        <div class="sent-title">聰明錢指標</div>
+        <div class="sent-sm-value" style="color:${color}">${positive ? "+" : ""}${smartMoney.value.toLocaleString()}<span class="sent-sm-unit">口</span></div>
+        <div class="sent-sub" style="color:${color}">${positive ? "外資期貨偏多" : "外資期貨偏空"}${smartMoney.chg != null ? `　${smartMoney.chg >= 0 ? "+" : ""}${smartMoney.chg.toLocaleString()}` : ""}</div>
+        <div class="sent-note">外資台指期(TX)未平倉淨部位｜${smartMoney.date || ""}</div>
+      </div>`;
+  } else {
+    smHtml = `
+      <div class="sent-card">
+        <div class="sent-title">聰明錢指標</div>
+        <div class="sent-error">⚠ ${esc(smartMoney ? smartMoney.msg : "載入中")}</div>
+      </div>`;
+  }
+
+  wrap.innerHTML = `<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}</div>
+    <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入。${bullBear ? bullBear.sampleNote : ""}</div>`;
+}
+
 // ── PWA ──
 function registerPWA() {
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
@@ -3722,7 +4065,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.16 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.17 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -3732,6 +4075,7 @@ async function fetchTopStocks() {
   renderBacktest();
   ltRenderStats();
   registerPWA();
+  loadSentimentDashboard();
 })();
 
 // ════════════════════════════════════════
