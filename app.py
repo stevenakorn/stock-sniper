@@ -343,6 +343,11 @@ def news():
     if end:
         params["end_date"] = end
     data = call_finmind("TaiwanStockNews", params, token)
+    # FinMind 有時以 HTTP 200 包裝錯誤(如權限不足、資料集受限),
+    # 用內部 status/msg 表示,這裡明確攔截轉成 error,避免前端誤判成「查無資料」
+    fm_status = data.get("status")
+    if fm_status is not None and fm_status != 200 and not data.get("data"):
+        return jsonify({"error": data.get("msg", f"FinMind 回應狀態 {fm_status}"), "data": []})
     return jsonify(data)
 
 @app.route("/api/clear_cache")
