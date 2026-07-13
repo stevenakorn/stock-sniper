@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.17</title>
+<title>飆股狙擊系統 v9.19</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -374,6 +374,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .sent-error{padding:16px 4px;color:var(--amber);font-family:var(--mono);font-size:12px;line-height:1.6}
 .sent-factors{width:100%;display:flex;flex-direction:column;gap:3px;margin-top:6px;padding-top:8px;border-top:1px solid var(--border)}
 .sent-factor{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2)}
+.sent-factor-note{font-style:normal;font-size:9px;color:var(--text2);opacity:.7;margin-left:4px}
 .sent-factor span:last-child{color:var(--text);font-weight:600}
 .sent-factor.dim{opacity:.45}
 .sent-factor.dim span:last-child{color:var(--text2);font-weight:400}
@@ -576,7 +577,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.17 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.19 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -874,7 +875,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.17 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.19 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2374,7 +2375,8 @@ function ltRenderStats() {
   const stat = rows.filter(x => (x.stars || 1) >= min);
   const totalArch = Object.values(ltLoadHistory()).reduce((s, day) => s + Object.keys(day).length, 0);
   if (!stat.length) {
-    el.innerHTML = `<div class="lt-stat-empty">尚無中長期勝率資料（已歸檔 ${totalArch} 筆）<br>掃描結果會自動歸檔,隔日後點「↻ 更新勝率」計算後續報酬</div>`;
+    el.innerHTML = `<div class="lt-stat-empty">尚無中長期勝率資料（已歸檔 ${totalArch} 筆）<br>掃描結果會自動歸檔,隔日後點下方按鈕計算後續報酬</div>
+      <div style="text-align:center;margin-top:10px"><button class="radar-btn" id="btnLtBt" onclick="runLtBacktest()">↻ 更新勝率</button></div>`;
     return;
   }
   const bestR = b => (b.r10 !== null && b.r10 !== undefined) ? b.r10 : (b.r5);
@@ -2848,29 +2850,29 @@ function calcBullBearScore(breadth, instTrend, marginSent) {
     if (MKT.close > MKT.ma20) posScore += 15; else posScore -= 15;
     if (MKT.ma20 > MKT.ma60) posScore += 10; else posScore -= 10;
     posScore = Math.max(0, Math.min(100, posScore));
-    parts.push({ label: "大盤位置", score: posScore, weight: 0.35, ok: true });
+    parts.push({ label: "大盤位置", score: posScore, weight: 0.35, ok: true, note: MKT.close > MKT.ma20 ? "站上20MA" : "跌破20MA" });
   } else {
-    parts.push({ label: "大盤位置", score: 50, weight: 0.35, ok: false });
+    parts.push({ label: "大盤位置", score: 50, weight: 0.35, ok: false, note: "大盤資料載入中" });
   }
   // ②市場寬度
   if (breadth.ok) {
-    parts.push({ label: "市場寬度", score: breadth.pct, weight: 0.25, ok: true });
+    parts.push({ label: "市場寬度", score: breadth.pct, weight: 0.25, ok: true, note: `樣本${breadth.sample}檔` });
   } else {
-    parts.push({ label: "市場寬度", score: 50, weight: 0.25, ok: false });
+    parts.push({ label: "市場寬度", score: 50, weight: 0.25, ok: false, note: breadth.msg });
   }
   // ③法人動向
   if (instTrend.ok) {
     const s = 50 + (instTrend.positiveDays / instTrend.totalDays - 0.5) * 100;
-    parts.push({ label: "法人動向", score: Math.max(0, Math.min(100, s)), weight: 0.25, ok: true });
+    parts.push({ label: "法人動向", score: Math.max(0, Math.min(100, s)), weight: 0.25, ok: true, note: `${instTrend.positiveDays}/${instTrend.totalDays}天買超` });
   } else {
-    parts.push({ label: "法人動向", score: 50, weight: 0.25, ok: false });
+    parts.push({ label: "法人動向", score: 50, weight: 0.25, ok: false, note: instTrend.msg });
   }
   // ④融資融券氛圍(融資減少=散戶退場=偏多訊號)
   if (marginSent.ok) {
     const s = 50 + (marginSent.downPct - marginSent.upPct) / 2;
-    parts.push({ label: "融資融券", score: Math.max(0, Math.min(100, s)), weight: 0.15, ok: true });
+    parts.push({ label: "融資融券", score: Math.max(0, Math.min(100, s)), weight: 0.15, ok: true, note: `樣本${marginSent.sample}檔` });
   } else {
-    parts.push({ label: "融資融券", score: 50, weight: 0.15, ok: false });
+    parts.push({ label: "融資融券", score: 50, weight: 0.15, ok: false, note: marginSent.msg });
   }
   // 只用有資料的因子,權重正規化
   const validParts = parts.filter(p => p.ok);
@@ -2962,7 +2964,7 @@ function renderSentimentDashboard() {
     const color = gaugeColor(bullBear.score);
     const label = bullBear.score >= 65 ? "偏多" : bullBear.score >= 35 ? "中性" : "偏空";
     const partsHtml = bullBear.parts.map(p =>
-      `<div class="sent-factor${p.ok ? "" : " dim"}"><span>${p.label}</span><span>${p.ok ? p.score.toFixed(0) : "無資料"}</span></div>`
+      `<div class="sent-factor${p.ok ? "" : " dim"}"><span>${p.label}${p.note ? `<i class="sent-factor-note">(${esc(p.note)})</i>` : ""}</span><span>${p.ok ? p.score.toFixed(0) : "無資料"}</span></div>`
     ).join("");
     bbHtml = `
       <div class="sent-card">
@@ -4065,7 +4067,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.17 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.19 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
