@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.19</title>
+<title>飆股狙擊系統 v9.20</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -406,6 +406,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   .news-title{white-space:normal;width:100%;order:3}
 }
 
+/* 保留追蹤(v9.20) */
+.lt-kept-wrap{margin-bottom:14px}
+.lt-kept-empty{padding:14px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:11px;line-height:1.8;background:var(--bg3);border:1px dashed var(--border);border-radius:var(--radius-s)}
+.lt-kept-head{font-size:12px;font-family:var(--mono);color:var(--gold);letter-spacing:1px;margin-bottom:8px;font-weight:500}
+
 /* 中長期條列表(v9.10) */
 .lt-table tbody tr.lt-row{cursor:pointer}
 .lt-table tbody tr.lt-row:hover td{background:rgba(76,141,255,.05)}
@@ -577,7 +582,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.19 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.20 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -849,6 +854,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="lt-prog-wrap"><div class="lt-prog" id="ltProgress"></div></div>
     <div class="lt-note">趨勢模板(收盤>50>150>200MA、200MA上揚、距高點25%內、離低點25%上)為必要門檻;嚴格版另需 VCP 收縮 + 年報酬≥30%。掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考。</div>
     <div id="ltStats"><div class="lt-stat-empty">掃描後結果會自動歸檔,隔日後可計算中長期勝率</div></div>
+    <div id="ltKeptSection" class="lt-kept-wrap"></div>
     <div id="ltResults"><div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股</div></div>
   </div>
 </div>
@@ -875,7 +881,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.19 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.20 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2149,6 +2155,7 @@ async function startLtScan() {
   ltArchive();
   renderLtResults();
   ltRenderStats();
+  ltRenderKeptSection();
 }
 
 function stopLtScan() {
@@ -2187,6 +2194,7 @@ function renderLtResults() {
   const startI = (LTSCAN.page - 1) * LT_PER_PAGE;
   const pageRows = rows.slice(startI, startI + LT_PER_PAGE);
 
+  const todayH = ltLoadHistory()[todayISO()] || {};
   const trs = pageRows.map(r => {
     const chipTags = [];
     if (r.foreignBuyDays >= 7 && r.foreignNetSum > 0) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日(+${Math.round(r.foreignNetSum)}張)</span>`);
@@ -2195,6 +2203,7 @@ function renderLtResults() {
     if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
     if (r.nearHigh) chipTags.push(`<span class="lt-tag hot">距新高3%內</span>`);
     const rid = "ltx_" + r.id;
+    const isKept = !!(todayH[r.id] && todayH[r.id].kept);
     return `
     <tr class="lt-row" onclick="ltToggleExpand('${rid}')">
       <td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="lt-check" data-id="${r.id}" onchange="ltUpdateCheckCount()"></td>
@@ -2215,6 +2224,7 @@ function renderLtResults() {
           <div class="lt-news-row">
             <button class="radar-btn" onclick="event.stopPropagation();openStockDetail('${r.id}')">查看個股詳情 →</button>
             <button class="radar-btn" onclick="event.stopPropagation();loadLtNews('${r.id}','${rid}',this)">載入新聞</button>
+            <button class="radar-btn" style="${isKept ? "border-color:var(--gold);color:var(--gold)" : ""}" onclick="event.stopPropagation();ltToggleKeep('${todayISO()}','${r.id}')">${isKept ? "📌 取消保留" : "📌 保留"}</button>
           </div>
           <div id="ltnews_${rid}" class="news-list"></div>
         </div>
@@ -2295,11 +2305,33 @@ function ltArchive() {
       scanClose: r.price, yrRet: r.yrRet,
       vcpTight: r.vcpTight, foreignBuyDays: r.foreignBuyDays, trustBuyDays: r.trustBuyDays,
       bt: prev.bt || null,
+      kept: prev.kept || false, // 保留追蹤標記(不受90天自動裁減影響)
     };
   });
-  const dates = Object.keys(h).sort();
-  while (dates.length > LT_HIST_MAX_DAYS) delete h[dates.shift()];
+  ltPruneHistory(h);
   ltSaveHistory(h);
+}
+// 裁減超過上限的舊資料,但保留標記為 kept 的項目(entry層級,不整天砍)
+function ltPruneHistory(h) {
+  let dates = Object.keys(h).sort(); // 舊到新
+  while (dates.length > LT_HIST_MAX_DAYS) {
+    let removed = false;
+    for (let i = 0; i < dates.length && dates.length > LT_HIST_MAX_DAYS; i++) {
+      const dt = dates[i];
+      const day = h[dt];
+      const hasKept = Object.values(day).some(e => e.kept);
+      if (!hasKept) {
+        delete h[dt];
+        dates.splice(i, 1);
+        i--;
+        removed = true;
+      } else {
+        // 該天有保留項目:只清掉非保留的個股,天本身留著(不計入可裁減對象)
+        Object.keys(day).forEach(id => { if (!day[id].kept) delete day[id]; });
+      }
+    }
+    if (!removed) break; // 剩下的天全部受保護,無法再裁減,停止避免死迴圈
+  }
 }
 
 // 中長期回測:算掃描日隔日開盤進場後的報酬(+5/+10/+20日,中長期看較長)
@@ -2352,6 +2384,62 @@ async function runLtBacktest() {
   if (btn) { btn.disabled = false; btn.textContent = "↻ 更新勝率"; }
   addLog(`✅ 中長期回測完成,更新 ${done} 筆`);
   ltRenderStats();
+  ltRenderKeptSection();
+}
+
+// ── 保留追蹤(勾選後永久保留,不受90天裁減、跨頁面重整仍顯示)──
+function ltToggleKeep(date, id, checkbox) {
+  const h = ltLoadHistory();
+  if (!h[date] || !h[date][id]) return;
+  h[date][id].kept = checkbox ? checkbox.checked : !h[date][id].kept;
+  ltSaveHistory(h);
+  ltRenderKeptSection();
+  renderLtResults(); // 同步更新掃描結果表格內的保留勾選狀態
+}
+function ltCollectKept() {
+  const h = ltLoadHistory();
+  const rows = [];
+  Object.keys(h).sort().reverse().forEach(date => {
+    Object.values(h[date]).forEach(sig => {
+      if (sig.kept) rows.push({ date, ...sig });
+    });
+  });
+  return rows;
+}
+function ltRenderKeptSection() {
+  const el = document.getElementById("ltKeptSection");
+  if (!el) return;
+  const rows = ltCollectKept();
+  if (!rows.length) {
+    el.innerHTML = `<div class="lt-kept-empty">尚未保留任何股票。掃描結果列表中可點「📌 保留」加入永久追蹤,不受90天自動裁減、重新整理頁面也不會消失。</div>`;
+    return;
+  }
+  const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  const cls = v => v >= 0 ? "up" : "down";
+  const trs = rows.map(x => {
+    let statusHtml;
+    if (x.bt && x.bt.r5 != null) {
+      statusHtml = `<span class="${cls(x.bt.r5)}">${fmtPct(x.bt.r5)}</span>`;
+    } else if (x.bt && x.bt.expired) {
+      statusHtml = `<span style="color:var(--text2)">已下市/查無資料</span>`;
+    } else {
+      statusHtml = `<span style="color:var(--text2)">尚無回測(按上方更新勝率)</span>`;
+    }
+    return `
+    <tr>
+      <td>${x.date}</td>
+      <td style="cursor:pointer" onclick="openStockDetail('${x.id}')">${x.id} ${esc(x.name)}</td>
+      <td style="color:var(--amber)">${"★".repeat(x.stars || 1)}</td>
+      <td>+5日:${statusHtml}</td>
+      <td style="text-align:center"><button class="radar-btn" style="border-color:var(--down);color:var(--down);padding:4px 10px;font-size:11px" onclick="ltToggleKeep('${x.date}','${x.id}')">取消保留</button></td>
+    </tr>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="lt-kept-head">📌 已保留追蹤（${rows.length} 檔,永久保留不受裁減,重整頁面不消失）</div>
+    <div class="bt-table-wrap"><table class="bt-table">
+      <thead><tr><th>掃描日</th><th>股票</th><th>星級</th><th>後續報酬</th><th></th></tr></thead>
+      <tbody>${trs}</tbody>
+    </table></div>`;
 }
 
 function ltCollectBtRows() {
@@ -4067,7 +4155,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.19 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.20 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -4076,6 +4164,7 @@ async function fetchTopStocks() {
   archiveSignals();
   renderBacktest();
   ltRenderStats();
+  ltRenderKeptSection();
   registerPWA();
   loadSentimentDashboard();
 })();
