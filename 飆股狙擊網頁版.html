@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.20</title>
+<title>飆股狙擊系統 v9.21</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -364,7 +364,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 
 /* 市場情緒儀表板(v9.17) */
 .sent-loading{padding:30px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px}
-.sent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.sent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .sent-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
 .sent-title{font-size:11px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:2px}
 .gauge-svg{width:100%;max-width:180px;height:auto}
@@ -381,6 +381,21 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .sent-sm-value{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:10px}
 .sent-sm-unit{font-size:13px;margin-left:3px;opacity:.7}
 .sent-disclaimer{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:12px;line-height:1.6;text-align:center}
+
+/* 市場狀態環(v9.21) */
+.regime-ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.regime-ring-svg{width:100%;max-width:140px;height:auto}
+.regime-arc{transition:stroke-dasharray 1s cubic-bezier(.4,0,.2,1),stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+.regime-ring-dom{font-size:15px;font-weight:700;font-family:var(--sans)}
+.regime-ring-score{font-size:11px;font-family:var(--mono);fill:var(--text2)}
+.regime-legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.regime-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;font-family:var(--mono);color:var(--text2)}
+.regime-leg-item i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.regime-ring-svg circle:first-child{animation:regimePulse 2.5s ease-in-out infinite}
+@keyframes regimePulse{0%,100%{opacity:1}50%{opacity:.6}}
+@media(max-width:1300px){
+  .sent-grid{grid-template-columns:repeat(2,1fr)}
+}
 @media(max-width:900px){
   .sent-grid{grid-template-columns:1fr}
 }
@@ -582,7 +597,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.20 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.21 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -881,7 +896,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.20 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.21 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -3003,6 +3018,71 @@ function vixColor(v) {
 }
 
 // 半圓錶(SVG),value 0-100,回傳 SVG 字串
+// ════════════════════════════════════════
+// v9.21 市場狀態環(真實牛熊分數視覺化) + 統計卡片數字滾動動畫
+// ════════════════════════════════════════
+
+// 用三角隸屬函數把 0-100 牛熊分數換算成 多頭/盤整/空頭 三態機率(總和100%,非裝飾性,直接源自真實分數)
+function regimeProbs(score) {
+  const tri = (x, center, width) => Math.max(0, 1 - Math.abs(x - center) / width);
+  const bull = tri(score, 100, 50), chop = tri(score, 50, 50), bear = tri(score, 0, 50);
+  const sum = bull + chop + bear || 1;
+  return {
+    bull: +(bull / sum * 100).toFixed(1),
+    chop: +(chop / sum * 100).toFixed(1),
+    bear: +(bear / sum * 100).toFixed(1),
+  };
+}
+
+// 三段式圓環 SVG(多頭綠段/盤整黃段/空頭紅段,依比例分配圓周,帶轉動動畫)
+function renderRegimeRing(score) {
+  const r = regimeProbs(score);
+  const R = 60, C = 2 * Math.PI * R;
+  const bullLen = C * r.bull / 100, chopLen = C * r.chop / 100, bearLen = C * r.bear / 100;
+  const dominant = r.bull >= r.chop && r.bull >= r.bear ? "多頭" : r.bear >= r.chop ? "空頭" : "盤整";
+  const domColor = dominant === "多頭" ? "var(--up)" : dominant === "空頭" ? "var(--down)" : "var(--amber)";
+  return `
+  <div class="regime-ring-wrap">
+    <svg viewBox="0 0 140 140" class="regime-ring-svg">
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--border)" stroke-width="10"/>
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--up)" stroke-width="10"
+        stroke-dasharray="${bullLen} ${C - bullLen}" stroke-dashoffset="0"
+        transform="rotate(-90 70 70)" class="regime-arc regime-arc-bull"/>
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--amber)" stroke-width="10"
+        stroke-dasharray="${chopLen} ${C - chopLen}" stroke-dashoffset="${-bullLen}"
+        transform="rotate(-90 70 70)" class="regime-arc regime-arc-chop"/>
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--down)" stroke-width="10"
+        stroke-dasharray="${bearLen} ${C - bearLen}" stroke-dashoffset="${-(bullLen + chopLen)}"
+        transform="rotate(-90 70 70)" class="regime-arc regime-arc-bear"/>
+      <text x="70" y="65" text-anchor="middle" class="regime-ring-dom" fill="${domColor}">${dominant}</text>
+      <text x="70" y="84" text-anchor="middle" class="regime-ring-score">${score.toFixed(0)}分</text>
+    </svg>
+    <div class="regime-legend">
+      <span class="regime-leg-item"><i style="background:var(--up)"></i>多頭 ${r.bull}%</span>
+      <span class="regime-leg-item"><i style="background:var(--amber)"></i>盤整 ${r.chop}%</span>
+      <span class="regime-leg-item"><i style="background:var(--down)"></i>空頭 ${r.bear}%</span>
+    </div>
+  </div>`;
+}
+
+// ── 統計卡片數字滾動動畫(純視覺增強,不影響數值本身)──
+function animateStatNumber(el, newVal) {
+  if (!el) return;
+  const oldVal = parseInt(el.textContent.replace(/[^\d-]/g, ""), 10) || 0;
+  newVal = parseInt(newVal, 10) || 0;
+  if (oldVal === newVal) { el.textContent = newVal; return; }
+  const dur = 500, start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out
+    const cur = Math.round(oldVal + (newVal - oldVal) * eased);
+    el.textContent = cur;
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = newVal;
+  }
+  requestAnimationFrame(step);
+}
+
 function renderGaugeSvg(id, pct, label, valueText, color) {
   const clamped = Math.max(0, Math.min(100, pct));
   const cx = 90, cy = 90, r = 70;
@@ -3085,8 +3165,21 @@ function renderSentimentDashboard() {
       </div>`;
   }
 
-  wrap.innerHTML = `<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}</div>
-    <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入。${bullBear ? bullBear.sampleNote : ""}</div>`;
+  // 市場狀態環卡(用真實牛熊分數換算,非裝飾性數字)
+  let ringHtml;
+  if (bullBear) {
+    ringHtml = `
+      <div class="sent-card">
+        <div class="sent-title">市場狀態環</div>
+        ${renderRegimeRing(bullBear.score)}
+        <div class="sent-note">依牛熊強度分數即時換算</div>
+      </div>`;
+  } else {
+    ringHtml = `<div class="sent-card"><div class="sent-title">市場狀態環</div><div class="sent-error">載入中...</div></div>`;
+  }
+
+  wrap.innerHTML = `<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
+    <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為牛熊分數的視覺化換算,非獨立指標。${bullBear ? bullBear.sampleNote : ""}</div>`;
 }
 
 // ── PWA ──
@@ -3814,7 +3907,7 @@ async function startScan() {
   const notified = new Set(hits.map(h => h.id));
   scanCount++;
   localStorage.setItem("scan_count", scanCount);
-  document.getElementById("statScans").textContent = scanCount;
+  animateStatNumber(document.getElementById("statScans"), scanCount);
   document.getElementById("sysStatus").textContent = "掃描中...";
   document.getElementById("sysStatus").className = "status-val scanning";
   // Token 已內建，掃描按鈕直接啟用
@@ -3916,7 +4009,7 @@ async function startScan() {
   document.getElementById("progressText").textContent = `掃描完成｜發現 ${newHits} 個新訊號`;
   document.getElementById("connDot").className = "sb-dot";
   document.getElementById("connStatus").textContent = "Finmind API 連線正常";
-  document.getElementById("statHits").textContent = hits.length;
+  animateStatNumber(document.getElementById("statHits"), hits.length);
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
 
   addLog(newHits ? `盤後分析完成，發現 ${newHits} 個訊號` : "盤後分析完成，無符合訊號");
@@ -3977,7 +4070,7 @@ function renderHits() {
   });
 
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
-  document.getElementById("statHits").textContent = hits.length;
+  animateStatNumber(document.getElementById("statHits"), hits.length);
   const _be = document.getElementById("btnExport");    if (_be) _be.disabled = !hits.length;
   const _bc = document.getElementById("btnExportCsv"); if (_bc) _bc.disabled = !hits.length;
 
@@ -4151,11 +4244,11 @@ async function fetchTopStocks() {
   if (localStorage.getItem("scan_date") === today) {
     hits = JSON.parse(localStorage.getItem("hits_today")||"[]");
     scanCount = parseInt(localStorage.getItem("scan_count")||"0");
-    document.getElementById("statScans").textContent = scanCount;
+    animateStatNumber(document.getElementById("statScans"), scanCount);
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.20 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.21 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -5043,7 +5136,7 @@ async function realtimeScanOnce() {
 
   document.getElementById("sysStatus").textContent = isRealtimeMode ? "即時監控中 ●" : "監控中";
   document.getElementById("sysStatus").className = "status-val active";
-  document.getElementById("statHits").textContent = hits.length;
+  animateStatNumber(document.getElementById("statHits"), hits.length);
   document.getElementById("hitCount").textContent = `${hits.length} 訊號`;
 
   const next = new Date(Date.now() + REALTIME_INTERVAL);
