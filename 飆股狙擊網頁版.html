@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.21</title>
+<title>飆股狙擊系統 v9.23</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -380,6 +380,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .sent-factor.dim span:last-child{color:var(--text2);font-weight:400}
 .sent-sm-value{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:10px}
 .sent-sm-unit{font-size:13px;margin-left:3px;opacity:.7}
+.sent-sample-progress{font-size:11px;font-family:var(--mono);color:var(--cyan);text-align:center;padding:6px;margin-bottom:10px;background:rgba(76,141,255,.06);border:1px solid rgba(76,141,255,.2);border-radius:var(--radius-s)}
 .sent-disclaimer{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:12px;line-height:1.6;text-align:center}
 
 /* 市場狀態環(v9.21) */
@@ -450,6 +451,13 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .lt-stop-btn{padding:8px 14px;border-radius:var(--radius-s);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;font-family:var(--mono);cursor:pointer;min-height:36px}
 .lt-stop-btn:hover{border-color:var(--down);color:var(--down)}
 .lt-prog-wrap{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.lt-funnel{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;margin-bottom:10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-s);font-family:var(--mono);font-size:11px}
+.lt-funnel-step{display:flex;align-items:center;gap:5px;color:var(--text2);white-space:nowrap}
+.lt-funnel-step b{color:var(--cyan);font-size:13px;font-weight:700;min-width:20px;text-align:center}
+.lt-funnel-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:lfPulse 1.2s ease-in-out infinite}
+.lt-funnel-arrow{color:var(--border2);font-size:12px}
+@keyframes lfPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@media(max-width:640px){.lt-funnel{font-size:10px;gap:4px}.lt-funnel-arrow{display:none}}
 .lt-prog{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s;width:0%}
 .lt-note{font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.6;margin-bottom:12px}
 .lt-empty{padding:28px;text-align:center;color:var(--text2);font-family:var(--mono);font-size:12px;line-height:2}
@@ -597,7 +605,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.21 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.23 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -867,6 +875,17 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
       <button class="radar-btn" onclick="exportLtCSV()">↓ CSV</button>
     </div>
     <div class="lt-prog-wrap"><div class="lt-prog" id="ltProgress"></div></div>
+    <div class="lt-funnel" id="ltFunnel" style="display:none">
+      <div class="lt-funnel-step" data-step="fetch"><span class="lt-funnel-dot"></span>擷取股價<b id="lfFetch">0</b></div>
+      <div class="lt-funnel-arrow">→</div>
+      <div class="lt-funnel-step" data-step="trend"><span class="lt-funnel-dot"></span>趨勢模板<b id="lfTrend">0</b></div>
+      <div class="lt-funnel-arrow">→</div>
+      <div class="lt-funnel-step" data-step="chip"><span class="lt-funnel-dot"></span>籌碼驗證<b id="lfChip">0</b></div>
+      <div class="lt-funnel-arrow">→</div>
+      <div class="lt-funnel-step" data-step="rev"><span class="lt-funnel-dot"></span>營收濾網<b id="lfRev">0</b></div>
+      <div class="lt-funnel-arrow">→</div>
+      <div class="lt-funnel-step" data-step="score"><span class="lt-funnel-dot"></span>入選<b id="lfScore">0</b></div>
+    </div>
     <div class="lt-note">趨勢模板(收盤>50>150>200MA、200MA上揚、距高點25%內、離低點25%上)為必要門檻;嚴格版另需 VCP 收縮 + 年報酬≥30%。掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考。</div>
     <div id="ltStats"><div class="lt-stat-empty">掃描後結果會自動歸檔,隔日後可計算中長期勝率</div></div>
     <div id="ltKeptSection" class="lt-kept-wrap"></div>
@@ -896,7 +915,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.21 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.23 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1097,14 +1116,14 @@ async function loadMarketFilter() {
       chip.className = "mkt-chip " + (MKT.bearish ? "bear" : "bull");
       chip.innerHTML =
         `<span class="mc-dot"></span>` +
-        `<span>加權</span><span class="mc-val">${MKT.close.toFixed(0)}</span>` +
+        `<span>加權</span><span class="mc-val">${MKT.close.toFixed(2)}</span>` +
         `<span class="mc-trend">${chg}</span>` +
         `<span class="mc-trend">${trendTxt}</span>`;
-      chip.title = `加權指數 ${MKT.date}｜收盤 ${MKT.close.toFixed(2)}｜20MA ${MKT.ma20.toFixed(0)}｜60MA ${MKT.ma60.toFixed(0)}`;
+      chip.title = `加權指數 ${MKT.date}｜收盤 ${MKT.close.toFixed(2)}｜20MA ${MKT.ma20.toFixed(2)}｜60MA ${MKT.ma60.toFixed(2)}`;
     }
     updateMktFilterState();
     if (MKT.filterOn && MKT.bearish) {
-      addLog(`⚠ 大盤濾網:加權 ${MKT.close.toFixed(0)} 跌破 20MA(${MKT.ma20.toFixed(0)}),訊號星級 -1`, "warn");
+      addLog(`⚠ 大盤濾網:加權 ${MKT.close.toFixed(2)} 跌破 20MA(${MKT.ma20.toFixed(2)}),訊號星級 -1`, "warn");
     }
     renderHits();
   } catch(e) {
@@ -2117,6 +2136,15 @@ async function startLtScan() {
   const wrap = document.getElementById("ltResults");
   if (btn) { btn.disabled = true; btn.textContent = "掃描中..."; }
 
+  // 漏斗計數器(即時反映各階段通過檔數,非裝飾性數字)
+  const funnel = { fetch: 0, trend: 0, chip: 0, rev: 0, score: 0 };
+  const funnelEl = document.getElementById("ltFunnel");
+  if (funnelEl) funnelEl.style.display = "";
+  function renderFunnel() {
+    const ids = { fetch: "lfFetch", trend: "lfTrend", chip: "lfChip", rev: "lfRev", score: "lfScore" };
+    Object.keys(ids).forEach(k => { const el = document.getElementById(ids[k]); if (el) el.textContent = funnel[k]; });
+  }
+
   // 範圍
   let list = STOCK_LIST.slice();
   if (LTSCAN.scope === "tse") list = list.filter(id => isListed(id));
@@ -2131,15 +2159,19 @@ async function startLtScan() {
       try {
         const d = await fetchDailyLong(id); // 400天,有快取
         if (!d || d.close.length < 200) return;
+        funnel.fetch++;
         // 先過趨勢模板再決定要不要抓籌碼(省 API)
         const quick = ltAnalyze(id, d, null);
         if (!quick) return;
+        funnel.trend++;
         // 過了才抓籌碼、月營收、PER(省 API)
         let chip = null, rev = null, per = null;
         try { chip = await fetchChipData(id); } catch (e) {}
+        funnel.chip++;
         try { rev = await fetchMonthRevenue(id); } catch (e) {}
         // 月營收年增硬濾網:有資料且 YoY <= 0 則剔除(衰退股)
         if (LTSCAN.revThreshold != null && rev && rev.yoy != null && rev.yoy <= LTSCAN.revThreshold) return;
+        funnel.rev++;
         try { per = await fetchPER(id); } catch (e) {}
         const full = ltAnalyze(id, d, chip);
         if (full) {
@@ -2152,6 +2184,7 @@ async function startLtScan() {
           full.divYield = per ? per.yield : null;
           LTSCAN.results.push(full);
           found++;
+          funnel.score++;
         }
       } catch (e) {}
     }));
@@ -2159,8 +2192,10 @@ async function startLtScan() {
     const pct = Math.round(done / list.length * 100);
     if (prog) prog.style.width = pct + "%";
     if (btn) btn.textContent = `掃描中 ${done}/${list.length}（找到 ${found}）`;
+    renderFunnel();
     await new Promise(r => setTimeout(r, 80));
   }
+  if (funnelEl) funnelEl.style.display = "none";
 
   LTSCAN.running = false;
   if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
@@ -3178,8 +3213,63 @@ function renderSentimentDashboard() {
     ringHtml = `<div class="sent-card"><div class="sent-title">市場狀態環</div><div class="sent-error">載入中...</div></div>`;
   }
 
-  wrap.innerHTML = `<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
+  const sampleProgressHtml = AUTO_SAMPLE_STATUS.running
+    ? `<div class="sent-sample-progress">🔄 背景採樣補齊市場數據中… ${AUTO_SAMPLE_STATUS.done}/${AUTO_SAMPLE_STATUS.total}</div>`
+    : "";
+
+  wrap.innerHTML = `${sampleProgressHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
     <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為牛熊分數的視覺化換算,非獨立指標。${bullBear ? bullBear.sampleNote : ""}</div>`;
+}
+
+// ════════════════════════════════════════
+// v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度/融資融券,
+// 之後有正常掃描資料會自動用更大樣本覆蓋。每日只跑一次。
+// ════════════════════════════════════════
+var AUTO_SAMPLE_TARGET = 150;
+var AUTO_SAMPLE_BATCH = 15;
+var AUTO_SAMPLE_STATUS = { running: false, done: 0, total: 0 };
+
+// 從 STOCK_LIST 均勻抽樣(而非取前N檔,避免代號集中在特定產業/區間造成偏誤)
+function pickEvenSample(list, n) {
+  if (list.length <= n) return list.slice();
+  const step = list.length / n;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push(list[Math.floor(i * step)]);
+  }
+  return out;
+}
+
+async function autoSampleMarketData() {
+  if (AUTO_SAMPLE_STATUS.running) return;
+  if (lsCacheGet("autoSampleDone")) return; // 今天已採樣過,不重複打API
+  if (!token || !STOCK_LIST || !STOCK_LIST.length) return;
+
+  const sample = pickEvenSample(STOCK_LIST, AUTO_SAMPLE_TARGET);
+  AUTO_SAMPLE_STATUS.running = true;
+  AUTO_SAMPLE_STATUS.done = 0;
+  AUTO_SAMPLE_STATUS.total = sample.length;
+
+  for (let i = 0; i < sample.length; i += AUTO_SAMPLE_BATCH) {
+    const batch = sample.slice(i, i + AUTO_SAMPLE_BATCH);
+    await Promise.allSettled(batch.map(async id => {
+      try { await fetchDailyLong(id); } catch (e) {}
+      try { await fetchChipData(id); } catch (e) {}
+    }));
+    AUTO_SAMPLE_STATUS.done = Math.min(i + AUTO_SAMPLE_BATCH, sample.length);
+    if (SENTIMENT.bullBear) {
+      const breadth = calcMarketBreadth();
+      const marginSent = calcMarginSentiment();
+      const cachedInstTrend = lsCacheGet("instTrend") || { ok: false };
+      SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, marginSent);
+      renderSentimentDashboard();
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  lsCacheSet("autoSampleDone", true);
+  AUTO_SAMPLE_STATUS.running = false;
+  addLog(`✅ 背景採樣完成,已補齊市場寬度/融資融券數據(樣本${sample.length}檔)`);
+  await loadSentimentDashboard();
 }
 
 // ── PWA ──
@@ -4248,7 +4338,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.21 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.23 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -4260,6 +4350,7 @@ async function fetchTopStocks() {
   ltRenderKeptSection();
   registerPWA();
   loadSentimentDashboard();
+  autoSampleMarketData();
 })();
 
 // ════════════════════════════════════════
