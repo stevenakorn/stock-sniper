@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.23</title>
+<title>飆股狙擊系統 v9.24</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -381,6 +381,20 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .sent-sm-value{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:10px}
 .sent-sm-unit{font-size:13px;margin-left:3px;opacity:.7}
 .sent-sample-progress{font-size:11px;font-family:var(--mono);color:var(--cyan);text-align:center;padding:6px;margin-bottom:10px;background:rgba(76,141,255,.06);border:1px solid rgba(76,141,255,.2);border-radius:var(--radius-s)}
+
+/* 大盤操作建議(v9.24) */
+.madv-card{border:1px solid;border-radius:var(--radius);padding:14px 18px;margin-bottom:14px}
+.madv-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.madv-title{font-size:11px;font-family:var(--mono);color:var(--text2);letter-spacing:1px;margin-bottom:3px}
+.madv-label{font-size:18px;font-weight:700;font-family:var(--sans)}
+.madv-range{text-align:right}
+.madv-range-val{font-size:22px;font-weight:700;font-family:var(--mono)}
+.madv-range-sub{font-size:10px;font-family:var(--mono);color:var(--text2)}
+.madv-factors{display:flex;gap:16px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)}
+.madv-factor{display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--text)}
+.madv-factor-detail{color:var(--text2)}
+.madv-disclaimer{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:10px;line-height:1.6}
+@media(max-width:640px){.madv-factors{gap:10px;flex-direction:column}}
 .sent-disclaimer{font-size:10px;font-family:var(--mono);color:var(--text2);margin-top:12px;line-height:1.6;text-align:center}
 
 /* 市場狀態環(v9.21) */
@@ -605,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.23 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.24 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -915,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.23 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.24 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -3022,6 +3036,60 @@ function calcBullBearScore(breadth, instTrend, marginSent) {
   return { score: +finalScore.toFixed(1), parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜融資${marginSent.sample || 0}檔` };
 }
 
+// ── 大盤操作建議(機械式規則輸出,非投資建議,依牛熊分數+VIX+市場寬度三項綜合判斷)──
+function calcMarketAdvice(bullBearScore, vixValue, breadthPct) {
+  const scoreSignal = bullBearScore >= 60 ? "green" : bullBearScore >= 40 ? "yellow" : "red";
+  const vixSignal = (vixValue == null) ? null : vixValue < 20 ? "green" : vixValue < 28 ? "yellow" : "red";
+  const breadthSignal = (breadthPct == null) ? null : breadthPct >= 50 ? "green" : breadthPct >= 30 ? "yellow" : "red";
+
+  const signals = [scoreSignal, vixSignal, breadthSignal].filter(s => s !== null);
+  const redCount = signals.filter(s => s === "red").length;
+  const greenCount = signals.filter(s => s === "green").length;
+
+  let level, range, label;
+  if (redCount >= 2) { level = "red"; range = [0, 30]; label = "防禦"; }
+  else if (greenCount >= 2 && redCount === 0) { level = "green"; range = [70, 100]; label = "積極"; }
+  else { level = "yellow"; range = [30, 60]; label = "中性"; }
+
+  return {
+    level, range, label,
+    factors: [
+      { name: "牛熊強度", signal: scoreSignal, detail: `${bullBearScore.toFixed(0)}分` },
+      { name: "恐慌指數", signal: vixSignal, detail: vixValue != null ? `VIX ${vixValue.toFixed(1)}` : "無資料" },
+      { name: "市場寬度", signal: breadthSignal, detail: breadthPct != null ? `${breadthPct}%站上季線` : "無資料" },
+    ],
+  };
+}
+
+function renderMarketAdviceCard(advice) {
+  const colorMap = { red: "var(--down)", yellow: "var(--amber)", green: "var(--up)" };
+  const bgMap = { red: "rgba(34,160,107,.08)", yellow: "rgba(242,169,30,.08)", green: "rgba(240,66,78,.08)" };
+  // 注意:台股紅漲綠跌語意特殊,操作建議燈號用國際通用紅=警戒/綠=積極,不套用股價漲跌色以免混淆
+  const color = advice.level === "red" ? "#e5484d" : advice.level === "yellow" ? "var(--amber)" : "#2fbf71";
+  const bg = advice.level === "red" ? "rgba(229,72,77,.08)" : advice.level === "yellow" ? "rgba(242,169,30,.08)" : "rgba(47,191,113,.08)";
+  const labelText = advice.level === "red" ? "🔴 防禦" : advice.level === "yellow" ? "🟡 中性" : "🟢 積極";
+  const factorsHtml = advice.factors.map(f => {
+    const fc = f.signal === "red" ? "#e5484d" : f.signal === "yellow" ? "var(--amber)" : f.signal === "green" ? "#2fbf71" : "var(--text2)";
+    const dot = f.signal ? "●" : "○";
+    return `<div class="madv-factor"><span style="color:${fc}">${dot}</span><span>${f.name}</span><span class="madv-factor-detail">${f.detail}</span></div>`;
+  }).join("");
+  return `
+  <div class="madv-card" style="border-color:${color}55;background:${bg}">
+    <div class="madv-head">
+      <div>
+        <div class="madv-title">大盤操作建議</div>
+        <div class="madv-label" style="color:${color}">${labelText}</div>
+      </div>
+      <div class="madv-range">
+        <div class="madv-range-val" style="color:${color}">${advice.range[0]}–${advice.range[1]}%</div>
+        <div class="madv-range-sub">建議曝險區間</div>
+      </div>
+    </div>
+    <div class="madv-factors">${factorsHtml}</div>
+    <div class="madv-disclaimer">※ 依牛熊強度／VIX／市場寬度三項機械式規則綜合判斷,任兩項亮紅燈才轉防禦、任兩項亮綠燈且無紅燈才轉積極,其餘為中性。純規則輸出,非投資建議,請自行判斷並承擔風險。</div>
+  </div>`;
+}
+
 async function loadSentimentDashboard() {
   if (SENTIMENT.loading) return;
   SENTIMENT.loading = true;
@@ -3033,7 +3101,8 @@ async function loadSentimentDashboard() {
   const breadth = calcMarketBreadth();
   const marginSent = calcMarginSentiment();
   const bullBear = calcBullBearScore(breadth, instTrend, marginSent);
-  SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.bullBear = bullBear;
+  const advice = calcMarketAdvice(bullBear.score, vix && vix.ok ? vix.value : null, breadth.ok ? breadth.pct : null);
+  SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.bullBear = bullBear; SENTIMENT.advice = advice;
   SENTIMENT.loading = false;
   if (btn) { btn.disabled = false; btn.textContent = "↻ 更新市場情緒"; }
   renderSentimentDashboard();
@@ -3217,7 +3286,9 @@ function renderSentimentDashboard() {
     ? `<div class="sent-sample-progress">🔄 背景採樣補齊市場數據中… ${AUTO_SAMPLE_STATUS.done}/${AUTO_SAMPLE_STATUS.total}</div>`
     : "";
 
-  wrap.innerHTML = `${sampleProgressHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
+  const adviceHtml = SENTIMENT.advice ? renderMarketAdviceCard(SENTIMENT.advice) : "";
+
+  wrap.innerHTML = `${sampleProgressHtml}${adviceHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
     <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為牛熊分數的視覺化換算,非獨立指標。${bullBear ? bullBear.sampleNote : ""}</div>`;
 }
 
@@ -3262,6 +3333,7 @@ async function autoSampleMarketData() {
       const marginSent = calcMarginSentiment();
       const cachedInstTrend = lsCacheGet("instTrend") || { ok: false };
       SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, marginSent);
+      SENTIMENT.advice = calcMarketAdvice(SENTIMENT.bullBear.score, SENTIMENT.vix && SENTIMENT.vix.ok ? SENTIMENT.vix.value : null, breadth.ok ? breadth.pct : null);
       renderSentimentDashboard();
     }
     await new Promise(r => setTimeout(r, 100));
@@ -4338,7 +4410,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.23 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.24 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
