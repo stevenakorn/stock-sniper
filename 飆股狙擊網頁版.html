@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.24</title>
+<title>飆股狙擊系統 v9.25</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.24 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.25 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.24 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.25 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1054,13 +1054,13 @@ var MKT = {
   filterOn: localStorage.getItem("mkt_filter_on") !== "0", // 預設開
   bearish:  false,
   loaded:   false,
-  close: 0, ma20: 0, ma60: 0, chgPct: 0, date: "",
+  close: 0, ma20: 0, ma60: 0, ma200: 0, chgPct: 0, date: "",
 };
 async function fetchIndexData() {
   const cached = lsCacheGet("taiex");
   if (cached) return cached;
   const end   = new Date();
-  const start = new Date(); start.setDate(start.getDate() - 120);
+  const start = new Date(); start.setDate(start.getDate() - 280); // 拉長以供200MA(年線)計算
   const fmt = d => d.toISOString().split("T")[0];
   const url = USE_BACKEND
     ? `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=TAIEX&start_date=${fmt(start)}&end_date=${fmt(end)}`
@@ -1120,12 +1120,20 @@ async function loadMarketFilter() {
     MKT.close  = closeArr[n-1];
     MKT.ma20   = avg(last(closeArr, 20));
     MKT.ma60   = avg(last(closeArr, Math.min(60, n)));
+    MKT.ma200  = n >= 200 ? avg(last(closeArr, 200)) : null; // 資料不足200天時不強算,避免失真
     MKT.chgPct = n >= 2 ? (closeArr[n-1] - closeArr[n-2]) / closeArr[n-2] * 100 : 0;
     MKT.date   = d.date[n-1];
     MKT.bearish = MKT.close < MKT.ma20;
     MKT.loaded  = true;
     if (chip) {
-      const trendTxt = MKT.bearish ? "▼ 跌破20MA 空方" : "▲ 站上20MA 多方";
+      // 同時檢視月/季/年三線,破越多線警示越重
+      const breaks = [];
+      if (MKT.close < MKT.ma20) breaks.push("月");
+      if (MKT.close < MKT.ma60) breaks.push("季");
+      if (MKT.ma200 != null && MKT.close < MKT.ma200) breaks.push("年");
+      let trendTxt;
+      if (breaks.length === 0) trendTxt = "▲ 站上月季年線 多方";
+      else trendTxt = `▼ 跌破${breaks.join("")}線 ${breaks.length >= 2 ? "空方" : "轉弱"}`;
       const chg = (MKT.chgPct >= 0 ? "+" : "") + MKT.chgPct.toFixed(2) + "%";
       chip.className = "mkt-chip " + (MKT.bearish ? "bear" : "bull");
       chip.innerHTML =
@@ -1133,11 +1141,15 @@ async function loadMarketFilter() {
         `<span>加權</span><span class="mc-val">${MKT.close.toFixed(2)}</span>` +
         `<span class="mc-trend">${chg}</span>` +
         `<span class="mc-trend">${trendTxt}</span>`;
-      chip.title = `加權指數 ${MKT.date}｜收盤 ${MKT.close.toFixed(2)}｜20MA ${MKT.ma20.toFixed(2)}｜60MA ${MKT.ma60.toFixed(2)}`;
+      chip.title = `加權指數 ${MKT.date}｜收盤 ${MKT.close.toFixed(2)}｜月線(20)${MKT.ma20.toFixed(2)}｜季線(60)${MKT.ma60.toFixed(2)}｜年線(200)${MKT.ma200 != null ? MKT.ma200.toFixed(2) : "資料不足"}`;
     }
     updateMktFilterState();
     if (MKT.filterOn && MKT.bearish) {
-      addLog(`⚠ 大盤濾網:加權 ${MKT.close.toFixed(2)} 跌破 20MA(${MKT.ma20.toFixed(2)}),訊號星級 -1`, "warn");
+      const breaks2 = [];
+      if (MKT.close < MKT.ma20) breaks2.push(`月線${MKT.ma20.toFixed(2)}`);
+      if (MKT.close < MKT.ma60) breaks2.push(`季線${MKT.ma60.toFixed(2)}`);
+      if (MKT.ma200 != null && MKT.close < MKT.ma200) breaks2.push(`年線${MKT.ma200.toFixed(2)}`);
+      addLog(`⚠ 大盤濾網:加權 ${MKT.close.toFixed(2)} 跌破${breaks2.join("、")},訊號星級 -1`, "warn");
     }
     renderHits();
   } catch(e) {
@@ -1777,7 +1789,7 @@ function renderKlineChart() {
   const startAbs = all.length - N;
 
   const UP = cssVar("--up"), DOWN = cssVar("--down"), GRID = cssVar("--border"), TXT = cssVar("--text2");
-  const MA5C = cssVar("--amber"), MA20C = cssVar("--cyan");
+  const MA5C = cssVar("--amber"), MA20C = cssVar("--cyan"), MA60C = cssVar("--purple"), MA200C = cssVar("--gold");
   const padL = 6, padR = 52, padT = 8, padB = 4;
   const priceH = H - padB;
   const plotW = W - padL - padR;
@@ -1795,8 +1807,8 @@ function renderKlineChart() {
     }
     return out;
   };
-  const ma5 = maSeries(5), ma20 = maSeries(20);
-  const allP = [...hi, ...lo, ...ma5.filter(x => x), ...ma20.filter(x => x)];
+  const ma5 = maSeries(5), ma20 = maSeries(20), ma60 = maSeries(60), ma200 = maSeries(200);
+  const allP = [...hi, ...lo, ...ma5.filter(x => x), ...ma20.filter(x => x), ...ma60.filter(x => x), ...ma200.filter(x => x)];
   let pMin = Math.min(...allP), pMax = Math.max(...allP);
   const pad = (pMax - pMin) * 0.06 || 1; pMin -= pad; pMax += pad;
   const y = p => padT + (pMax - p) / (pMax - pMin) * (priceH - padT);
@@ -1825,7 +1837,7 @@ function renderKlineChart() {
     arr.forEach((p, i) => { if (p === null) return; if (!started) { ctx.moveTo(x(i), y(p)); started = true; } else ctx.lineTo(x(i), y(p)); });
     ctx.stroke(); ctx.lineWidth = 1;
   };
-  drawMA(ma5, MA5C); drawMA(ma20, MA20C);
+  drawMA(ma5, MA5C); drawMA(ma20, MA20C); drawMA(ma60, MA60C); drawMA(ma200, MA200C);
 
   // 準星(垂直線 + 收盤水平線)
   const hidx = KLINE.hoverIdx;
@@ -4410,7 +4422,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.24 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.25 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -5161,7 +5173,7 @@ async function searchStock() {
             <button class="kperiod-btn" onclick="klineSetPeriod('W',this)">週K</button>
             <button class="kperiod-btn" onclick="klineSetPeriod('M',this)">月K</button>
           </div>
-          <div class="kline-legend"><span class="lg"><i style="background:var(--amber)"></i>MA5</span><span class="lg"><i style="background:var(--cyan)"></i>MA20</span><span>紅漲綠跌</span></div>
+          <div class="kline-legend"><span class="lg"><i style="background:var(--amber)"></i>MA5</span><span class="lg"><i style="background:var(--cyan)"></i>MA20</span><span class="lg"><i style="background:var(--purple)"></i>季線60</span><span class="lg"><i style="background:var(--gold)"></i>年線200</span><span>紅漲綠跌</span></div>
         </div>
         <div class="kline-info" id="klineInfo"><span style="color:var(--text2)">移動游標查看每根 K 棒詳情</span></div>
         <canvas id="klineCanvas"></canvas>
