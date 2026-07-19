@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.27</title>
+<title>飆股狙擊系統 v9.28</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.27 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.28 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.27 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.28 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2935,6 +2935,52 @@ async function fetchSmartMoney() {
   }
 }
 
+// ── 聰明錢指標升級版(v9.28,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
+// 抓台指期前十大交易人(不分身分別,真正大戶,概念近似國際CFTC COT報告)買方-賣方未平倉部位淨額,
+// 較上面只看「外資」單一身分別的 fetchSmartMoney 更貼近「聰明錢」本意。無 Sponsor 權限時由呼叫端 fallback 回 fetchSmartMoney ──
+async function fetchLargeTraderPosition() {
+  const cached = lsCacheGet("largeTrader");
+  if (cached) return cached;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 20);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = `${FINMIND_API}?dataset=TaiwanFuturesOpenInterestLargeTraders&data_id=TX&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, msg: json.error || json.msg || `HTTP ${res.status}` };
+    }
+    if (!json.data || !json.data.length) return { ok: false, msg: "無資料(需 FinMind Sponsor 權限)" };
+    // 同一天可能有近月/遠月多個合約月份,依未沖銷部位加總,近似當日全市場前十大交易人淨部位
+    const byDate = {};
+    json.data.forEach(r => {
+      const buy10 = parseInt(r.buy_top10_trader_open_interest || 0) || 0;
+      const sell10 = parseInt(r.sell_top10_trader_open_interest || 0) || 0;
+      const mkt = parseInt(r.market_open_interest || 0) || 0;
+      if (!byDate[r.date]) byDate[r.date] = { net: 0, mkt: 0 };
+      byDate[r.date].net += buy10 - sell10;
+      byDate[r.date].mkt += mkt;
+    });
+    const dates = Object.keys(byDate).sort();
+    if (!dates.length) return { ok: false, msg: "查無大額交易人部位資料" };
+    const series = dates.map(d => ({
+      date: d, v: byDate[d].net,
+      pct: byDate[d].mkt ? +(byDate[d].net / byDate[d].mkt * 100).toFixed(1) : null,
+    }));
+    const latest = series[series.length - 1];
+    const prev = series.length >= 2 ? series[series.length - 2] : null;
+    const result = {
+      ok: true, value: latest.v, pct: latest.pct, date: latest.date,
+      chg: prev ? latest.v - prev.v : null, series,
+    };
+    lsCacheSet("largeTrader", result);
+    return result;
+  } catch (e) {
+    return { ok: false, msg: e.message || "連線失敗" };
+  }
+}
+
 // ── 市場寬度:用已快取的中長期長期資料(pxL_*)算站上200MA比例(best-effort,樣本數視當日已掃檔數而定)──
 function calcMarketBreadth() {
   let above200 = 0, total = 0;
@@ -2951,30 +2997,29 @@ function calcMarketBreadth() {
   return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
 }
 
-// ── 法人動向:近5個交易日 TWSE 全市場三大法人合計淨買超趨勢(免token,複用現有twse_institutional)──
+// ── 法人動向(v9.28升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
+// 取代先前逐日打 backend/twse_institutional 的作法,一次呼叫拿到官方加總數字,更準、更省API ──
 async function fetchMarketInstitutionalTrend() {
   const cached = lsCacheGet("instTrend");
   if (cached) return cached;
-  const fmtTWSE = d => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const days = [];
-  const d0 = new Date();
-  for (let i = 0; i < 8 && days.length < 5; i++) {
-    const d = new Date(d0); d.setDate(d.getDate() - i);
-    if (d.getDay() === 0 || d.getDay() === 6) continue;
-    days.push(d);
-  }
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 12); // 抓約12個日曆天,確保涵蓋5個以上交易日
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = `${FINMIND_API}?dataset=TaiwanStockTotalInstitutionalInvestors&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
   try {
-    const results = await Promise.allSettled(days.map(d =>
-      fetch(`${BACKEND_URL}/api/twse_institutional?date=${fmtTWSE(d)}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json())
-    ));
-    const series = [];
-    results.forEach((r, i) => {
-      if (r.status !== "fulfilled" || !r.value || !r.value.data) return;
-      const sum = r.value.data.reduce((s, row) => s + (parseInt(row.TotalNet) || 0), 0);
-      series.push({ date: days[i].toISOString().slice(0, 10), v: sum });
-    });
-    if (series.length < 2) return { ok: false, msg: "近期資料不足" };
-    series.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, msg: json.error || json.msg || `HTTP ${res.status}` };
+    }
+    if (!json.data || !json.data.length) return { ok: false, msg: "無資料" };
+    // name === "total" 即自營商+投信+外資三大法人全市場合計買賣金額
+    const rows = json.data
+      .filter(r => r.name === "total")
+      .map(r => ({ date: r.date, v: (parseFloat(r.buy) || 0) - (parseFloat(r.sell) || 0) }));
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (!rows.length) return { ok: false, msg: "查無三大法人合計資料" };
+    const series = rows.slice(-5); // 近5個交易日
     const latest = series[series.length - 1];
     const positiveDays = series.filter(s => s.v > 0).length;
     const result = { ok: true, value: latest.v, date: latest.date, positiveDays, totalDays: series.length, series };
@@ -2985,28 +3030,47 @@ async function fetchMarketInstitutionalTrend() {
   }
 }
 
-// ── 融資融券氛圍:用已快取個股籌碼(chip_*)算融資餘額增減比例(best-effort)──
-function calcMarginSentiment() {
-  let down = 0, up = 0, total = 0;
-  memCache.forEach((entry, key) => {
-    if (!key.startsWith("chip_")) return;
-    const chip = entry.v;
-    if (!chip || !chip.margin || chip.margin.length < 2) return;
-    const m = chip.margin;
-    const latest = m[m.length - 1], prev = m[m.length - 2];
-    const lb = parseFloat(latest.MarginPurchaseTodayBalance ?? latest.margin ?? NaN);
-    const pb = parseFloat(prev.MarginPurchaseTodayBalance ?? prev.margin ?? NaN);
-    if (isNaN(lb) || isNaN(pb)) return;
-    total++;
-    if (lb < pb) down++; else if (lb > pb) up++;
-  });
-  if (total < 10) {
-    // 診斷:附上最近與融資相關的API失敗原因,幫助排查為何樣本不足
-    const marginErrors = LAST_API_ERRORS.filter(e => e.source.includes("margin") || e.source.includes("Margin"));
-    const diag = marginErrors.length ? `｜最近失敗原因:${marginErrors[marginErrors.length - 1].reason}` : "";
-    return { ok: false, msg: `樣本不足(需先執行過掃描累積資料)${diag}`, sample: total };
+// ── 融資融券氛圍(v9.28升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
+// 取代先前抽樣150檔個股籌碼(chip_*)推算的作法,直接用官方全市場真實數字判斷散戶進退場 ──
+async function fetchTotalMarginSentiment() {
+  const cached = lsCacheGet("marginTotal");
+  if (cached) return cached;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 20);
+  const fmt = d => d.toISOString().split("T")[0];
+  const url = `${FINMIND_API}?dataset=TaiwanStockTotalMarginPurchaseShortSale&start_date=${fmt(start)}&end_date=${fmt(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      return { ok: false, msg: json.error || json.msg || `HTTP ${res.status}` };
+    }
+    if (!json.data || !json.data.length) return { ok: false, msg: "無資料" };
+    // name === "MarginPurchase" 即全市場融資餘額(張)
+    const rows = json.data
+      .filter(r => r.name === "MarginPurchase")
+      .map(r => ({ date: r.date, v: parseFloat(r.TodayBalance) }))
+      .filter(r => !isNaN(r.v));
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (rows.length < 2) return { ok: false, msg: "近期資料不足" };
+    const series = rows.slice(-6); // 抓6筆算出近5組日增減
+    const latest = series[series.length - 1];
+    const prev = series[series.length - 2];
+    let downDays = 0, totalDays = 0;
+    for (let i = 1; i < series.length; i++) {
+      totalDays++;
+      if (series[i].v < series[i - 1].v) downDays++;
+    }
+    const result = {
+      ok: true, value: latest.v, date: latest.date,
+      chg: prev ? latest.v - prev.v : null,
+      downDays, totalDays: totalDays || 1, series,
+    };
+    lsCacheSet("marginTotal", result);
+    return result;
+  } catch (e) {
+    return { ok: false, msg: e.message || "連線失敗" };
   }
-  return { ok: true, downPct: +(down / total * 100).toFixed(1), upPct: +(up / total * 100).toFixed(1), sample: total };
 }
 
 // ── 牛熊強度合成(0-100分,越高越偏多頭)──
@@ -3036,21 +3100,21 @@ function calcBullBearScore(breadth, instTrend, marginSent) {
   } else {
     parts.push({ label: "法人動向", score: 50, weight: 0.25, ok: false, note: instTrend.msg });
   }
-  // ④融資融券氛圍(融資減少=散戶退場=偏多訊號)
+  // ④融資融券氛圍(官方全市場數字,融資餘額減少=散戶退場=偏多訊號)
   if (marginSent.ok) {
-    const s = 50 + (marginSent.downPct - marginSent.upPct) / 2;
-    parts.push({ label: "融資融券", score: Math.max(0, Math.min(100, s)), weight: 0.15, ok: true, note: `樣本${marginSent.sample}檔` });
+    const s = 50 + (marginSent.downDays / marginSent.totalDays - 0.5) * 100;
+    parts.push({ label: "融資融券", score: Math.max(0, Math.min(100, s)), weight: 0.15, ok: true, note: `${marginSent.downDays}/${marginSent.totalDays}天減少(全市場)` });
   } else {
     parts.push({ label: "融資融券", score: 50, weight: 0.15, ok: false, note: marginSent.msg });
   }
   // 只用有資料的因子,權重正規化
   const validParts = parts.filter(p => p.ok);
   if (!validParts.length) {
-    return { score: 50, parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜融資${marginSent.sample || 0}檔（所有因子皆無資料,顯示中性值）` };
+    return { score: 50, parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔（所有因子皆無資料,顯示中性值）` };
   }
   const totalW = validParts.reduce((s, p) => s + p.weight, 0) || 1;
   const finalScore = validParts.reduce((s, p) => s + p.score * p.weight, 0) / totalW;
-  return { score: +finalScore.toFixed(1), parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜融資${marginSent.sample || 0}檔` };
+  return { score: +finalScore.toFixed(1), parts, sampleNote: `樣本:寬度${breadth.sample || 0}檔｜法人/融資為FinMind官方全市場數字` };
 }
 
 // ── 大盤操作建議(機械式規則輸出,非投資建議,依牛熊分數+VIX+市場寬度三項綜合判斷)──
@@ -3112,14 +3176,13 @@ async function loadSentimentDashboard() {
   SENTIMENT.loading = true;
   const btn = document.getElementById("btnSentimentRefresh");
   if (btn) { btn.disabled = true; btn.textContent = "更新中..."; }
-  const [vix, smartMoney, instTrend] = await Promise.all([
-    fetchVix(), fetchSmartMoney(), fetchMarketInstitutionalTrend(),
+  const [vix, smartMoney, instTrend, marginSent, largeTrader] = await Promise.all([
+    fetchVix(), fetchSmartMoney(), fetchMarketInstitutionalTrend(), fetchTotalMarginSentiment(), fetchLargeTraderPosition(),
   ]);
   const breadth = calcMarketBreadth();
-  const marginSent = calcMarginSentiment();
   const bullBear = calcBullBearScore(breadth, instTrend, marginSent);
   const advice = calcMarketAdvice(bullBear.score, vix && vix.ok ? vix.value : null, breadth.ok ? breadth.pct : null);
-  SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.bullBear = bullBear; SENTIMENT.advice = advice;
+  SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.largeTrader = largeTrader; SENTIMENT.bullBear = bullBear; SENTIMENT.advice = advice;
   SENTIMENT.raw = { breadth, instTrend, marginSent }; // 保留原始子項,供市場狀態環獨立投票(不透過複合分數)
   SENTIMENT.loading = false;
   if (btn) { btn.disabled = false; btn.textContent = "↻ 更新市場情緒"; }
@@ -3146,7 +3209,7 @@ function vixColor(v) {
 
 // 六項指標各自獨立投票(不透過牛熊複合分數),票數比例=多頭/盤整/空頭百分比。
 // 缺資料的指標直接棄權,不用中性值頂替,避免稀釋有效樣本。
-function regimeVote(raw, vix, smartMoney) {
+function regimeVote(raw, vix, smartMoney, largeTrader) {
   const votes = [];
   const breadth = raw ? raw.breadth : null;
   const instTrend = raw ? raw.instTrend : null;
@@ -3160,16 +3223,16 @@ function regimeVote(raw, vix, smartMoney) {
     votes.push(breadth.pct >= 55 ? "bull" : breadth.pct <= 35 ? "bear" : "chop");
   }
 
-  // ③法人動向(現貨市場):近5日買超天數比例
+  // ③法人動向(現貨市場,官方全市場數字):近5日買超天數比例
   if (instTrend && instTrend.ok) {
     const ratio = instTrend.positiveDays / instTrend.totalDays;
     votes.push(ratio >= 0.6 ? "bull" : ratio <= 0.2 ? "bear" : "chop");
   }
 
-  // ④融資融券(現貨市場):融資減少比例(散戶退場=偏多訊號)
+  // ④融資融券(現貨市場,官方全市場數字):融資餘額減少天數比例(散戶退場=偏多訊號)
   if (marginSent && marginSent.ok) {
-    const net = marginSent.downPct - marginSent.upPct;
-    votes.push(net >= 30 ? "bull" : net <= -30 ? "bear" : "chop");
+    const ratio = marginSent.downDays / marginSent.totalDays;
+    votes.push(ratio >= 0.6 ? "bull" : ratio <= 0.2 ? "bear" : "chop");
   }
 
   // ⑤VIX恐慌指數(選擇權市場,獨立於現貨面):低=平靜偏多,高=恐慌偏空
@@ -3177,9 +3240,10 @@ function regimeVote(raw, vix, smartMoney) {
     votes.push(vix.value < 18 ? "bull" : vix.value >= 28 ? "bear" : "chop");
   }
 
-  // ⑥聰明錢(期貨市場,獨立於現貨面):外資期貨淨部位方向
-  if (smartMoney && smartMoney.ok) {
-    votes.push(smartMoney.value > 0 ? "bull" : smartMoney.value < 0 ? "bear" : "chop");
+  // ⑥聰明錢(期貨市場,獨立於現貨面):優先用大額交易人前十大淨部位(不分身分別,更貼近COT報告),無Sponsor權限時fallback外資期貨淨部位
+  const smValue = (largeTrader && largeTrader.ok) ? largeTrader.value : (smartMoney && smartMoney.ok ? smartMoney.value : null);
+  if (smValue != null) {
+    votes.push(smValue > 0 ? "bull" : smValue < 0 ? "bear" : "chop");
   }
 
   const total = votes.length;
@@ -3196,8 +3260,8 @@ function regimeVote(raw, vix, smartMoney) {
 }
 
 // 三段式圓環 SVG(多頭綠段/盤整黃段/空頭紅段,依票數比例分配圓周,帶轉動動畫)
-function renderRegimeRing(raw, vix, smartMoney) {
-  const r = regimeVote(raw, vix, smartMoney);
+function renderRegimeRing(raw, vix, smartMoney, largeTrader) {
+  const r = regimeVote(raw, vix, smartMoney, largeTrader);
   const R = 60, C = 2 * Math.PI * R;
   const bullLen = C * r.bull / 100, chopLen = C * r.chop / 100, bearLen = C * r.bear / 100;
   const dominant = r.votes === 0 ? "無資料" : (r.bull >= r.chop && r.bull >= r.bear ? "多頭" : r.bear >= r.chop ? "空頭" : "盤整");
@@ -3265,7 +3329,7 @@ function renderGaugeSvg(id, pct, label, valueText, color) {
 function renderSentimentDashboard() {
   const wrap = document.getElementById("sentimentBody");
   if (!wrap) return;
-  const { vix, smartMoney, bullBear } = SENTIMENT;
+  const { vix, smartMoney, bullBear, largeTrader } = SENTIMENT;
 
   // VIX 卡
   let vixHtml;
@@ -3307,17 +3371,32 @@ function renderSentimentDashboard() {
     bbHtml = `<div class="sent-card"><div class="sent-title">牛熊強度</div><div class="sent-error">載入中...</div></div>`;
   }
 
-  // 聰明錢卡
+  // 聰明錢卡(v9.28升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
   let smHtml;
-  if (smartMoney && smartMoney.ok) {
+  if (largeTrader && largeTrader.ok) {
+    const positive = largeTrader.value >= 0;
+    const color = positive ? "var(--up)" : "var(--down)";
+    const foreignRefHtml = (smartMoney && smartMoney.ok)
+      ? `<div class="sent-note">對照:外資台指期淨部位 ${smartMoney.value >= 0 ? "+" : ""}${smartMoney.value.toLocaleString()}口</div>`
+      : "";
+    smHtml = `
+      <div class="sent-card">
+        <div class="sent-title">聰明錢指標</div>
+        <div class="sent-sm-value" style="color:${color}">${positive ? "+" : ""}${largeTrader.value.toLocaleString()}<span class="sent-sm-unit">口</span></div>
+        <div class="sent-sub" style="color:${color}">${positive ? "前十大交易人偏多" : "前十大交易人偏空"}${largeTrader.pct != null ? `　佔全市場${largeTrader.pct}%` : ""}</div>
+        <div class="sent-note">台指期前十大交易人淨未平倉部位｜${largeTrader.date || ""}</div>
+        ${foreignRefHtml}
+      </div>`;
+  } else if (smartMoney && smartMoney.ok) {
     const positive = smartMoney.value >= 0;
     const color = positive ? "var(--up)" : "var(--down)";
+    const fallbackNote = largeTrader ? `<br><span style="font-size:10px">⚠ 大額交易人資料:${esc(largeTrader.msg || "")}</span>` : "";
     smHtml = `
       <div class="sent-card">
         <div class="sent-title">聰明錢指標</div>
         <div class="sent-sm-value" style="color:${color}">${positive ? "+" : ""}${smartMoney.value.toLocaleString()}<span class="sent-sm-unit">口</span></div>
         <div class="sent-sub" style="color:${color}">${positive ? "外資期貨偏多" : "外資期貨偏空"}${smartMoney.chg != null ? `　${smartMoney.chg >= 0 ? "+" : ""}${smartMoney.chg.toLocaleString()}` : ""}</div>
-        <div class="sent-note">外資台指期(TX)未平倉淨部位｜${smartMoney.date || ""}</div>
+        <div class="sent-note">外資台指期(TX)未平倉淨部位｜${smartMoney.date || ""}${fallbackNote}</div>
       </div>`;
   } else {
     smHtml = `
@@ -3333,7 +3412,7 @@ function renderSentimentDashboard() {
     ringHtml = `
       <div class="sent-card">
         <div class="sent-title">市場狀態環</div>
-        ${renderRegimeRing(SENTIMENT.raw, vix, smartMoney)}
+        ${renderRegimeRing(SENTIMENT.raw, vix, smartMoney, largeTrader)}
         <div class="sent-note">六項指標獨立投票(大盤位置/市場寬度/法人動向/融資融券/VIX/聰明錢)</div>
       </div>`;
   } else {
@@ -3351,8 +3430,9 @@ function renderSentimentDashboard() {
 }
 
 // ════════════════════════════════════════
-// v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度/融資融券,
+// v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度(200MA),
 // 之後有正常掃描資料會自動用更大樣本覆蓋。每日只跑一次。
+// (v9.28:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
 // ════════════════════════════════════════
 var AUTO_SAMPLE_TARGET = 150;
 var AUTO_SAMPLE_BATCH = 15;
@@ -3383,30 +3463,22 @@ async function autoSampleMarketData() {
     const batch = sample.slice(i, i + AUTO_SAMPLE_BATCH);
     await Promise.allSettled(batch.map(async id => {
       try { await fetchDailyLong(id); } catch (e) {}
-      try { await fetchChipData(id); } catch (e) {}
     }));
     AUTO_SAMPLE_STATUS.done = Math.min(i + AUTO_SAMPLE_BATCH, sample.length);
     if (SENTIMENT.bullBear) {
       const breadth = calcMarketBreadth();
-      const marginSent = calcMarginSentiment();
       const cachedInstTrend = lsCacheGet("instTrend") || { ok: false };
-      SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, marginSent);
+      const cachedMarginSent = lsCacheGet("marginTotal") || { ok: false };
+      SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, cachedMarginSent);
       SENTIMENT.advice = calcMarketAdvice(SENTIMENT.bullBear.score, SENTIMENT.vix && SENTIMENT.vix.ok ? SENTIMENT.vix.value : null, breadth.ok ? breadth.pct : null);
-      SENTIMENT.raw = { breadth, instTrend: cachedInstTrend, marginSent };
+      SENTIMENT.raw = { breadth, instTrend: cachedInstTrend, marginSent: cachedMarginSent };
       renderSentimentDashboard();
     }
     await new Promise(r => setTimeout(r, 100));
   }
   lsCacheSet("autoSampleDone", true);
   AUTO_SAMPLE_STATUS.running = false;
-  addLog(`✅ 背景採樣完成,已補齊市場寬度/融資融券數據(樣本${sample.length}檔)`);
-  // 診斷:回報融資資料實際取得成功率,幫助排查若融資樣本偏低的原因
-  const marginOkCount = calcMarginSentiment().sample;
-  if (marginOkCount < sample.length * 0.5) {
-    const marginErrors = LAST_API_ERRORS.filter(e => e.source.includes("margin") || e.source.includes("Margin"));
-    const lastReason = marginErrors.length ? marginErrors[marginErrors.length - 1].reason : "無記錄";
-    addLog(`⚠ 融資資料取得率偏低(${marginOkCount}/${sample.length}檔),最近失敗原因:${lastReason}`, "warn");
-  }
+  addLog(`✅ 背景採樣完成,已補齊市場寬度數據(樣本${sample.length}檔｜法人動向/融資融券已改用FinMind官方全市場數字,免抽樣)`);
   await loadSentimentDashboard();
 }
 
@@ -4487,7 +4559,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.27 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.28 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
