@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.25</title>
+<title>飆股狙擊系統 v9.26</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.25 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.26 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.25 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.26 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -3000,7 +3000,12 @@ function calcMarginSentiment() {
     total++;
     if (lb < pb) down++; else if (lb > pb) up++;
   });
-  if (total < 10) return { ok: false, msg: "樣本不足(需先執行過掃描累積資料)", sample: total };
+  if (total < 10) {
+    // 診斷:附上最近與融資相關的API失敗原因,幫助排查為何樣本不足
+    const marginErrors = LAST_API_ERRORS.filter(e => e.source.includes("margin") || e.source.includes("Margin"));
+    const diag = marginErrors.length ? `｜最近失敗原因:${marginErrors[marginErrors.length - 1].reason}` : "";
+    return { ok: false, msg: `樣本不足(需先執行過掃描累積資料)${diag}`, sample: total };
+  }
   return { ok: true, downPct: +(down / total * 100).toFixed(1), upPct: +(up / total * 100).toFixed(1), sample: total };
 }
 
@@ -3353,6 +3358,13 @@ async function autoSampleMarketData() {
   lsCacheSet("autoSampleDone", true);
   AUTO_SAMPLE_STATUS.running = false;
   addLog(`✅ 背景採樣完成,已補齊市場寬度/融資融券數據(樣本${sample.length}檔)`);
+  // 診斷:回報融資資料實際取得成功率,幫助排查若融資樣本偏低的原因
+  const marginOkCount = calcMarginSentiment().sample;
+  if (marginOkCount < sample.length * 0.5) {
+    const marginErrors = LAST_API_ERRORS.filter(e => e.source.includes("margin") || e.source.includes("Margin"));
+    const lastReason = marginErrors.length ? marginErrors[marginErrors.length - 1].reason : "無記錄";
+    addLog(`⚠ 融資資料取得率偏低(${marginOkCount}/${sample.length}檔),最近失敗原因:${lastReason}`, "warn");
+  }
   await loadSentimentDashboard();
 }
 
@@ -3773,7 +3785,15 @@ const min  = arr => Math.min(...arr);
 // ════════════════════════════════════════
 // 籌碼資料抓取（三大法人＋融資）
 // ════════════════════════════════════════
+var LAST_API_ERRORS = []; // 診斷用:記錄最近API失敗原因,不影響原有回傳行為(仍回傳null)
+function _logApiError(source, reason) {
+  const safeReason = String(reason).replace(/([?&]token=)[^&\s]*/gi, "$1***").slice(0, 150);
+  LAST_API_ERRORS.push({ time: new Date().toISOString(), source, reason: safeReason });
+  if (LAST_API_ERRORS.length > 40) LAST_API_ERRORS.shift();
+}
 async function callFinmind(apiUrl, backendPath) {
+  // 診斷用的網址標記需去除token,避免任何顯示途徑意外洩漏使用者金鑰
+  const source = (backendPath || apiUrl).replace(/([?&])token=[^&]*/i, "$1token=***");
   try {
     let url = apiUrl;
     let options = { signal: AbortSignal.timeout(10000) };
@@ -3784,8 +3804,11 @@ async function callFinmind(apiUrl, backendPath) {
     }
     const res  = await fetch(url, options);
     const json = await res.json();
-    return json && json.data ? json.data : null;
+    if (json && json.data) return json.data;
+    _logApiError(source, json ? (json.msg || json.error || "回應無data欄位") : "空回應");
+    return null;
   } catch(e) {
+    _logApiError(source, e.message || "連線失敗/逾時");
     return null;
   }
 }
@@ -4422,7 +4445,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.25 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.26 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
