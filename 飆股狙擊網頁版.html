@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.26</title>
+<title>飆股狙擊系統 v9.27</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.26 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.27 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.26 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.27 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -3120,6 +3120,7 @@ async function loadSentimentDashboard() {
   const bullBear = calcBullBearScore(breadth, instTrend, marginSent);
   const advice = calcMarketAdvice(bullBear.score, vix && vix.ok ? vix.value : null, breadth.ok ? breadth.pct : null);
   SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.bullBear = bullBear; SENTIMENT.advice = advice;
+  SENTIMENT.raw = { breadth, instTrend, marginSent }; // 保留原始子項,供市場狀態環獨立投票(不透過複合分數)
   SENTIMENT.loading = false;
   if (btn) { btn.disabled = false; btn.textContent = "↻ 更新市場情緒"; }
   renderSentimentDashboard();
@@ -3143,25 +3144,64 @@ function vixColor(v) {
 // v9.21 市場狀態環(真實牛熊分數視覺化) + 統計卡片數字滾動動畫
 // ════════════════════════════════════════
 
-// 用三角隸屬函數把 0-100 牛熊分數換算成 多頭/盤整/空頭 三態機率(總和100%,非裝飾性,直接源自真實分數)
-function regimeProbs(score) {
-  const tri = (x, center, width) => Math.max(0, 1 - Math.abs(x - center) / width);
-  const bull = tri(score, 100, 50), chop = tri(score, 50, 50), bear = tri(score, 0, 50);
-  const sum = bull + chop + bear || 1;
+// 六項指標各自獨立投票(不透過牛熊複合分數),票數比例=多頭/盤整/空頭百分比。
+// 缺資料的指標直接棄權,不用中性值頂替,避免稀釋有效樣本。
+function regimeVote(raw, vix, smartMoney) {
+  const votes = [];
+  const breadth = raw ? raw.breadth : null;
+  const instTrend = raw ? raw.instTrend : null;
+  const marginSent = raw ? raw.marginSent : null;
+
+  // ①大盤位置(現貨市場):站上20MA=多頭,跌破=空頭
+  if (MKT.loaded) votes.push(MKT.bearish ? "bear" : "bull");
+
+  // ②市場寬度(現貨市場):全市場站上季線比例
+  if (breadth && breadth.ok) {
+    votes.push(breadth.pct >= 55 ? "bull" : breadth.pct <= 35 ? "bear" : "chop");
+  }
+
+  // ③法人動向(現貨市場):近5日買超天數比例
+  if (instTrend && instTrend.ok) {
+    const ratio = instTrend.positiveDays / instTrend.totalDays;
+    votes.push(ratio >= 0.6 ? "bull" : ratio <= 0.2 ? "bear" : "chop");
+  }
+
+  // ④融資融券(現貨市場):融資減少比例(散戶退場=偏多訊號)
+  if (marginSent && marginSent.ok) {
+    const net = marginSent.downPct - marginSent.upPct;
+    votes.push(net >= 30 ? "bull" : net <= -30 ? "bear" : "chop");
+  }
+
+  // ⑤VIX恐慌指數(選擇權市場,獨立於現貨面):低=平靜偏多,高=恐慌偏空
+  if (vix && vix.ok) {
+    votes.push(vix.value < 18 ? "bull" : vix.value >= 28 ? "bear" : "chop");
+  }
+
+  // ⑥聰明錢(期貨市場,獨立於現貨面):外資期貨淨部位方向
+  if (smartMoney && smartMoney.ok) {
+    votes.push(smartMoney.value > 0 ? "bull" : smartMoney.value < 0 ? "bear" : "chop");
+  }
+
+  const total = votes.length;
+  if (total === 0) return { bull: 0, chop: 100, bear: 0, votes: 0 };
+  const bull = votes.filter(v => v === "bull").length;
+  const chop = votes.filter(v => v === "chop").length;
+  const bear = votes.filter(v => v === "bear").length;
   return {
-    bull: +(bull / sum * 100).toFixed(1),
-    chop: +(chop / sum * 100).toFixed(1),
-    bear: +(bear / sum * 100).toFixed(1),
+    bull: +(bull / total * 100).toFixed(1),
+    chop: +(chop / total * 100).toFixed(1),
+    bear: +(bear / total * 100).toFixed(1),
+    votes: total,
   };
 }
 
-// 三段式圓環 SVG(多頭綠段/盤整黃段/空頭紅段,依比例分配圓周,帶轉動動畫)
-function renderRegimeRing(score) {
-  const r = regimeProbs(score);
+// 三段式圓環 SVG(多頭綠段/盤整黃段/空頭紅段,依票數比例分配圓周,帶轉動動畫)
+function renderRegimeRing(raw, vix, smartMoney) {
+  const r = regimeVote(raw, vix, smartMoney);
   const R = 60, C = 2 * Math.PI * R;
   const bullLen = C * r.bull / 100, chopLen = C * r.chop / 100, bearLen = C * r.bear / 100;
-  const dominant = r.bull >= r.chop && r.bull >= r.bear ? "多頭" : r.bear >= r.chop ? "空頭" : "盤整";
-  const domColor = dominant === "多頭" ? "var(--up)" : dominant === "空頭" ? "var(--down)" : "var(--amber)";
+  const dominant = r.votes === 0 ? "無資料" : (r.bull >= r.chop && r.bull >= r.bear ? "多頭" : r.bear >= r.chop ? "空頭" : "盤整");
+  const domColor = dominant === "多頭" ? "var(--up)" : dominant === "空頭" ? "var(--down)" : dominant === "無資料" ? "var(--text2)" : "var(--amber)";
   return `
   <div class="regime-ring-wrap">
     <svg viewBox="0 0 140 140" class="regime-ring-svg">
@@ -3176,12 +3216,13 @@ function renderRegimeRing(score) {
         stroke-dasharray="${bearLen} ${C - bearLen}" stroke-dashoffset="${-(bullLen + chopLen)}"
         transform="rotate(-90 70 70)" class="regime-arc regime-arc-bear"/>
       <text x="70" y="65" text-anchor="middle" class="regime-ring-dom" fill="${domColor}">${dominant}</text>
-      <text x="70" y="84" text-anchor="middle" class="regime-ring-score">${score.toFixed(0)}分</text>
+      <text x="70" y="84" text-anchor="middle" class="regime-ring-score">${r.votes}/6 項有效</text>
     </svg>
     <div class="regime-legend">
       <span class="regime-leg-item"><i style="background:var(--up)"></i>多頭 ${r.bull}%</span>
       <span class="regime-leg-item"><i style="background:var(--amber)"></i>盤整 ${r.chop}%</span>
       <span class="regime-leg-item"><i style="background:var(--down)"></i>空頭 ${r.bear}%</span>
+
     </div>
   </div>`;
 }
@@ -3286,14 +3327,14 @@ function renderSentimentDashboard() {
       </div>`;
   }
 
-  // 市場狀態環卡(用真實牛熊分數換算,非裝飾性數字)
+  // 市場狀態環卡(六項指標各自獨立投票,不透過牛熊複合分數,避免單一數字被重複畫成兩張卡)
   let ringHtml;
-  if (bullBear) {
+  if (SENTIMENT.raw || vix || smartMoney) {
     ringHtml = `
       <div class="sent-card">
         <div class="sent-title">市場狀態環</div>
-        ${renderRegimeRing(bullBear.score)}
-        <div class="sent-note">依牛熊強度分數即時換算</div>
+        ${renderRegimeRing(SENTIMENT.raw, vix, smartMoney)}
+        <div class="sent-note">六項指標獨立投票(大盤位置/市場寬度/法人動向/融資融券/VIX/聰明錢)</div>
       </div>`;
   } else {
     ringHtml = `<div class="sent-card"><div class="sent-title">市場狀態環</div><div class="sent-error">載入中...</div></div>`;
@@ -3306,7 +3347,7 @@ function renderSentimentDashboard() {
   const adviceHtml = SENTIMENT.advice ? renderMarketAdviceCard(SENTIMENT.advice) : "";
 
   wrap.innerHTML = `${sampleProgressHtml}${adviceHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
-    <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為牛熊分數的視覺化換算,非獨立指標。${bullBear ? bullBear.sampleNote : ""}</div>`;
+    <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為六項指標各自獨立投票結果,與牛熊強度分數計算方式不同,兩者可能不一致,此為正常現象(交叉驗證用)。${bullBear ? bullBear.sampleNote : ""}</div>`;
 }
 
 // ════════════════════════════════════════
@@ -3351,6 +3392,7 @@ async function autoSampleMarketData() {
       const cachedInstTrend = lsCacheGet("instTrend") || { ok: false };
       SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, marginSent);
       SENTIMENT.advice = calcMarketAdvice(SENTIMENT.bullBear.score, SENTIMENT.vix && SENTIMENT.vix.ok ? SENTIMENT.vix.value : null, breadth.ok ? breadth.pct : null);
+      SENTIMENT.raw = { breadth, instTrend: cachedInstTrend, marginSent };
       renderSentimentDashboard();
     }
     await new Promise(r => setTimeout(r, 100));
@@ -4445,7 +4487,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.26 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.27 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
