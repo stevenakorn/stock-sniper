@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.28</title>
+<title>飆股狙擊系統 v9.29</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.28 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.29 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.28 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.29 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2935,7 +2935,7 @@ async function fetchSmartMoney() {
   }
 }
 
-// ── 聰明錢指標升級版(v9.28,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
+// ── 聰明錢指標升級版(v9.29,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
 // 抓台指期前十大交易人(不分身分別,真正大戶,概念近似國際CFTC COT報告)買方-賣方未平倉部位淨額,
 // 較上面只看「外資」單一身分別的 fetchSmartMoney 更貼近「聰明錢」本意。無 Sponsor 權限時由呼叫端 fallback 回 fetchSmartMoney ──
 async function fetchLargeTraderPosition() {
@@ -2997,7 +2997,7 @@ function calcMarketBreadth() {
   return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
 }
 
-// ── 法人動向(v9.28升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
+// ── 法人動向(v9.29升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
 // 取代先前逐日打 backend/twse_institutional 的作法,一次呼叫拿到官方加總數字,更準、更省API ──
 async function fetchMarketInstitutionalTrend() {
   const cached = lsCacheGet("instTrend");
@@ -3030,7 +3030,7 @@ async function fetchMarketInstitutionalTrend() {
   }
 }
 
-// ── 融資融券氛圍(v9.28升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
+// ── 融資融券氛圍(v9.29升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
 // 取代先前抽樣150檔個股籌碼(chip_*)推算的作法,直接用官方全市場真實數字判斷散戶進退場 ──
 async function fetchTotalMarginSentiment() {
   const cached = lsCacheGet("marginTotal");
@@ -3371,13 +3371,13 @@ function renderSentimentDashboard() {
     bbHtml = `<div class="sent-card"><div class="sent-title">牛熊強度</div><div class="sent-error">載入中...</div></div>`;
   }
 
-  // 聰明錢卡(v9.28升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
+  // 聰明錢卡(v9.29升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
   let smHtml;
   if (largeTrader && largeTrader.ok) {
     const positive = largeTrader.value >= 0;
     const color = positive ? "var(--up)" : "var(--down)";
     const foreignRefHtml = (smartMoney && smartMoney.ok)
-      ? `<div class="sent-note">對照:外資台指期淨部位 ${smartMoney.value >= 0 ? "+" : ""}${smartMoney.value.toLocaleString()}口</div>`
+      ? `<div class="sent-note" style="font-size:15px;font-weight:700;font-family:var(--mono);margin-top:6px;color:${smartMoney.value >= 0 ? "var(--up)" : "var(--down)"}">對照:外資台指期淨部位 ${smartMoney.value >= 0 ? "+" : ""}${smartMoney.value.toLocaleString()}口</div>`
       : "";
     smHtml = `
       <div class="sent-card">
@@ -3432,7 +3432,7 @@ function renderSentimentDashboard() {
 // ════════════════════════════════════════
 // v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度(200MA),
 // 之後有正常掃描資料會自動用更大樣本覆蓋。每日只跑一次。
-// (v9.28:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
+// (v9.29:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
 // ════════════════════════════════════════
 var AUTO_SAMPLE_TARGET = 150;
 var AUTO_SAMPLE_BATCH = 15;
@@ -4559,7 +4559,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.28 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.29 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -5155,6 +5155,65 @@ function exportReport() {
 }
 
 
+// ── 技術面多空研判(v9.29):綜合5項技術訊號(月線/均線排列/季線/量價關係/20日高低點相對位置)給出多空分數 ──
+function calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20) {
+  const factors = [];
+  let bull = 0, bear = 0;
+  const ma5n = parseFloat(ma5), ma10n = parseFloat(ma10), ma20n = parseFloat(ma20), ma60n = parseFloat(ma60);
+
+  // ①股價 vs 月線(20MA)
+  if (todayClose > ma20n) { factors.push({ label: "站上月線(20MA)", signal: "bull" }); bull++; }
+  else { factors.push({ label: "跌破月線(20MA)", signal: "bear" }); bear++; }
+
+  // ②均線排列
+  if (ma5n > ma10n && ma10n > ma20n) { factors.push({ label: "均線多頭排列", signal: "bull" }); bull++; }
+  else if (ma5n < ma10n && ma10n < ma20n) { factors.push({ label: "均線空頭排列", signal: "bear" }); bear++; }
+  else { factors.push({ label: "均線糾結整理", signal: "chop" }); }
+
+  // ③股價 vs 季線(60MA)
+  if (todayClose > ma60n) { factors.push({ label: "站上季線(60MA)", signal: "bull" }); bull++; }
+  else { factors.push({ label: "跌破季線(60MA)", signal: "bear" }); bear++; }
+
+  // ④量價關係
+  const vr = parseFloat(volRatio), chg = parseFloat(changePct);
+  if (vr >= 1.5 && chg > 0) { factors.push({ label: "量增價漲", signal: "bull" }); bull++; }
+  else if (vr >= 1.5 && chg < 0) { factors.push({ label: "量增價跌", signal: "bear" }); bear++; }
+  else { factors.push({ label: "量能持平", signal: "chop" }); }
+
+  // ⑤相對20日高低點位置
+  const h = parseFloat(high20), l = parseFloat(low20);
+  const range = h - l;
+  const posPct = range > 0 ? (todayClose - l) / range * 100 : 50;
+  if (posPct >= 70) { factors.push({ label: `近20日相對高檔(${posPct.toFixed(0)}%)`, signal: "bull" }); bull++; }
+  else if (posPct <= 30) { factors.push({ label: `近20日相對低檔(${posPct.toFixed(0)}%)`, signal: "bear" }); bear++; }
+  else { factors.push({ label: `近20日區間中段(${posPct.toFixed(0)}%)`, signal: "chop" }); }
+
+  const total = factors.length;
+  let verdict, color;
+  if (bull > bear) { verdict = "偏多"; color = "var(--up)"; }
+  else if (bear > bull) { verdict = "偏空"; color = "var(--down)"; }
+  else { verdict = "中性"; color = "var(--amber)"; }
+
+  return { verdict, color, bull, bear, total, factors };
+}
+
+function renderTechVerdictBlock(tv) {
+  const rows = tv.factors.map(f => {
+    const fc = f.signal === "bull" ? "var(--up)" : f.signal === "bear" ? "var(--down)" : "var(--text2)";
+    const tag = f.signal === "bull" ? "多" : f.signal === "bear" ? "空" : "中性";
+    return `<div class="detail-row"><span class="detail-key">${esc(f.label)}</span><span class="detail-val" style="color:${fc}">${tag}</span></div>`;
+  }).join("");
+  return `
+      <div class="detail-block">
+        <div class="detail-block-title">🧭 技術面多空研判</div>
+        <div style="text-align:center;padding:2px 0 10px;border-bottom:1px solid var(--border);margin-bottom:4px">
+          <span style="font-size:22px;font-weight:700;font-family:var(--mono);color:${tv.color}">${tv.verdict}</span>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${tv.bull}項偏多／${tv.bear}項偏空／${tv.total - tv.bull - tv.bear}項中性</div>
+        </div>
+        ${rows}
+      </div>`;
+}
+
 // ════════════════════════════════════════
 // 個股搜尋與深度分析
 // ════════════════════════════════════════
@@ -5245,6 +5304,9 @@ async function searchStock() {
     const maUp = parseFloat(ma5) > parseFloat(ma10) &&
                  parseFloat(ma10) > parseFloat(ma20) ? "多頭排列✅" : "非多頭排列";
 
+    // 技術面多空研判(v9.29)
+    const techVerdict = calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20);
+
     detail.innerHTML = `
     <div class="stock-detail-header">
       <div>
@@ -5294,6 +5356,7 @@ async function searchStock() {
         ${perInfo && perInfo.pbr != null ? `<div class="detail-row"><span class="detail-key">股價淨值比PBR</span><span class="detail-val">${perInfo.pbr}</span></div>` : ""}
         ${perInfo && perInfo.yield != null ? `<div class="detail-row"><span class="detail-key">殖利率</span><span class="detail-val ${perInfo.yield>=0?"up":""}">${perInfo.yield}%</span></div>` : ""}
       </div>
+      ${renderTechVerdictBlock(techVerdict)}
       <div class="detail-block" style="grid-column:1/-1">
         <div class="detail-block-title" style="display:flex;align-items:center;justify-content:space-between">
           <span>📰 相關新聞</span>
