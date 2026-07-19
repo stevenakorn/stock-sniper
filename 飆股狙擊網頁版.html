@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.29</title>
+<title>飆股狙擊系統 v9.30</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.29 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.30 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.29 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.30 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -2935,7 +2935,7 @@ async function fetchSmartMoney() {
   }
 }
 
-// ── 聰明錢指標升級版(v9.29,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
+// ── 聰明錢指標升級版(v9.30,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
 // 抓台指期前十大交易人(不分身分別,真正大戶,概念近似國際CFTC COT報告)買方-賣方未平倉部位淨額,
 // 較上面只看「外資」單一身分別的 fetchSmartMoney 更貼近「聰明錢」本意。無 Sponsor 權限時由呼叫端 fallback 回 fetchSmartMoney ──
 async function fetchLargeTraderPosition() {
@@ -2997,7 +2997,7 @@ function calcMarketBreadth() {
   return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
 }
 
-// ── 法人動向(v9.29升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
+// ── 法人動向(v9.30升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
 // 取代先前逐日打 backend/twse_institutional 的作法,一次呼叫拿到官方加總數字,更準、更省API ──
 async function fetchMarketInstitutionalTrend() {
   const cached = lsCacheGet("instTrend");
@@ -3030,7 +3030,7 @@ async function fetchMarketInstitutionalTrend() {
   }
 }
 
-// ── 融資融券氛圍(v9.29升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
+// ── 融資融券氛圍(v9.30升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
 // 取代先前抽樣150檔個股籌碼(chip_*)推算的作法,直接用官方全市場真實數字判斷散戶進退場 ──
 async function fetchTotalMarginSentiment() {
   const cached = lsCacheGet("marginTotal");
@@ -3371,7 +3371,7 @@ function renderSentimentDashboard() {
     bbHtml = `<div class="sent-card"><div class="sent-title">牛熊強度</div><div class="sent-error">載入中...</div></div>`;
   }
 
-  // 聰明錢卡(v9.29升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
+  // 聰明錢卡(v9.30升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
   let smHtml;
   if (largeTrader && largeTrader.ok) {
     const positive = largeTrader.value >= 0;
@@ -3432,7 +3432,7 @@ function renderSentimentDashboard() {
 // ════════════════════════════════════════
 // v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度(200MA),
 // 之後有正常掃描資料會自動用更大樣本覆蓋。每日只跑一次。
-// (v9.29:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
+// (v9.30:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
 // ════════════════════════════════════════
 var AUTO_SAMPLE_TARGET = 150;
 var AUTO_SAMPLE_BATCH = 15;
@@ -4559,7 +4559,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.29 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.30 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -5155,7 +5155,7 @@ function exportReport() {
 }
 
 
-// ── 技術面多空研判(v9.29):綜合5項技術訊號(月線/均線排列/季線/量價關係/20日高低點相對位置)給出多空分數 ──
+// ── 技術面多空研判(v9.30):綜合5項技術訊號(月線/均線排列/季線/量價關係/20日高低點相對位置)給出多空分數 ──
 function calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20) {
   const factors = [];
   let bull = 0, bear = 0;
@@ -5211,6 +5211,72 @@ function renderTechVerdictBlock(tv) {
           <div style="font-size:11px;color:var(--text2);margin-top:2px">${tv.bull}項偏多／${tv.bear}項偏空／${tv.total - tv.bull - tv.bear}項中性</div>
         </div>
         ${rows}
+      </div>`;
+}
+
+// ── 支撐壓力建議(v9.30):取價格上下最近的均線做為支撐/壓力參考,無均線可用時退回20日高低點 ──
+function calcSupportResistance(todayClose, ma5, ma10, ma20, ma60, high20, low20) {
+  const mas = [
+    { label: "5MA", v: parseFloat(ma5) },
+    { label: "10MA", v: parseFloat(ma10) },
+    { label: "20MA", v: parseFloat(ma20) },
+    { label: "60MA", v: parseFloat(ma60) },
+  ];
+  const below = mas.filter(m => m.v < todayClose).sort((a, b) => b.v - a.v);
+  const above = mas.filter(m => m.v > todayClose).sort((a, b) => a.v - b.v);
+  const support = below.length ? below[0] : { label: "20日低點", v: parseFloat(low20) };
+  const resistance = above.length ? above[0] : { label: "20日高點", v: parseFloat(high20) };
+  const stopLoss = support.v * 0.97;
+  return { support, resistance, stopLoss };
+}
+
+function renderSupportResistanceBlock(sr) {
+  return `
+      <div class="detail-block">
+        <div class="detail-block-title">📐 支撐壓力建議</div>
+        <div class="detail-row"><span class="detail-key">最近支撐(${esc(sr.support.label)})</span><span class="detail-val">$${sr.support.v.toFixed(2)}</span></div>
+        <div class="detail-row"><span class="detail-key">最近壓力(${esc(sr.resistance.label)})</span><span class="detail-val">$${sr.resistance.v.toFixed(2)}</span></div>
+        <div class="detail-row"><span class="detail-key">參考停損價</span><span class="detail-val down">$${sr.stopLoss.toFixed(2)}</span></div>
+        <div style="font-size:10px;color:var(--text2);margin-top:8px;line-height:1.4">※支撐/壓力取鄰近均線或20日高低點,停損為支撐下方3%參考值,非投資建議</div>
+      </div>`;
+}
+
+// ── 綜合操作建議(v9.30):技術面研判+籌碼評分+策略訊號三項機械式規則綜合判斷,與大盤操作建議同一套紅黃綠邏輯 ──
+function calcStockAdvice(techVerdict, chipInfo, strategy) {
+  const techSignal = techVerdict.verdict === "偏多" ? "green" : techVerdict.verdict === "偏空" ? "red" : "yellow";
+  const chipSignal = chipInfo.chipScore >= 4 ? "green" : chipInfo.chipScore <= 1 ? "red" : "yellow";
+  const stratSignal = strategy !== "觀望" ? "green" : "yellow";
+  const signals = [techSignal, chipSignal, stratSignal];
+  const redCount = signals.filter(s => s === "red").length;
+  const greenCount = signals.filter(s => s === "green").length;
+  let level, label;
+  if (redCount >= 2) { level = "red"; label = "保守觀望"; }
+  else if (greenCount >= 2 && redCount === 0) { level = "green"; label = "積極留意"; }
+  else { level = "yellow"; label = "正常操作"; }
+  return {
+    level, label,
+    factors: [
+      { name: "技術面", signal: techSignal, detail: techVerdict.verdict },
+      { name: "籌碼面", signal: chipSignal, detail: `${chipInfo.chipScore}★` },
+      { name: "策略訊號", signal: stratSignal, detail: strategy },
+    ],
+  };
+}
+
+function renderStockAdviceBlock(advice) {
+  const color = advice.level === "red" ? "var(--down)" : advice.level === "yellow" ? "var(--amber)" : "var(--up)";
+  const rows = advice.factors.map(f => {
+    const fc = f.signal === "red" ? "var(--down)" : f.signal === "yellow" ? "var(--amber)" : "var(--up)";
+    return `<div class="detail-row"><span class="detail-key">${esc(f.name)}</span><span class="detail-val" style="color:${fc}">${esc(f.detail)}</span></div>`;
+  }).join("");
+  return `
+      <div class="detail-block">
+        <div class="detail-block-title">💡 綜合操作建議</div>
+        <div style="text-align:center;padding:2px 0 10px;border-bottom:1px solid var(--border);margin-bottom:4px">
+          <span style="font-size:20px;font-weight:700;font-family:var(--mono);color:${color}">${advice.label}</span>
+        </div>
+        ${rows}
+        <div style="font-size:10px;color:var(--text2);margin-top:8px;line-height:1.4">※機械式規則綜合判斷,非投資建議,請自行評估風險並自負盈虧</div>
       </div>`;
 }
 
@@ -5304,8 +5370,11 @@ async function searchStock() {
     const maUp = parseFloat(ma5) > parseFloat(ma10) &&
                  parseFloat(ma10) > parseFloat(ma20) ? "多頭排列✅" : "非多頭排列";
 
-    // 技術面多空研判(v9.29)
+    // 技術面多空研判(v9.30)
     const techVerdict = calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20);
+    // 支撐壓力建議 + 綜合操作建議(v9.30)
+    const supportResistance = calcSupportResistance(todayClose, ma5, ma10, ma20, ma60, high20, low20);
+    const stockAdvice = calcStockAdvice(techVerdict, chipInfo, strategy);
 
     detail.innerHTML = `
     <div class="stock-detail-header">
@@ -5357,6 +5426,8 @@ async function searchStock() {
         ${perInfo && perInfo.yield != null ? `<div class="detail-row"><span class="detail-key">殖利率</span><span class="detail-val ${perInfo.yield>=0?"up":""}">${perInfo.yield}%</span></div>` : ""}
       </div>
       ${renderTechVerdictBlock(techVerdict)}
+      ${renderSupportResistanceBlock(supportResistance)}
+      ${renderStockAdviceBlock(stockAdvice)}
       <div class="detail-block" style="grid-column:1/-1">
         <div class="detail-block-title" style="display:flex;align-items:center;justify-content:space-between">
           <span>📰 相關新聞</span>
