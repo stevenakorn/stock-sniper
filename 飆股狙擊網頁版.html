@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.30</title>
+<title>飆股狙擊系統 v9.31</title>
 <meta name="theme-color" content="#0d1017">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -619,7 +619,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <div class="logo-icon">🎯</div>
     <div class="logo-text">
       <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.30 · PRO</p>
+      <p>STOCK SNIPER SYSTEM v9.31 · PRO</p>
     </div>
   </div>
   <div class="header-right">
@@ -929,7 +929,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.30 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v9.31 PRO ── 僅供參考，投資有風險</span>
 </div>
 
 </div><!-- /wrap -->
@@ -1222,6 +1222,71 @@ function calcStarsRaw(hh) {
   if (Math.abs(parseFloat(hh.changePct)) >= 3) score += 1;
   if (hh.type === "breakout") score = Math.min(score + 1, 5);
   return Math.min(Math.max(score, 1), 5);
+}
+
+
+// ── 信心分數(v9.32):用掃描當下可得的訊號強度即時算出0-100分,是啟發式規則加權,不是歷史統計勝率,僅供參考 ──
+function calcConfidenceScore(h) {
+  let score = 0;
+  // 量能倍數(0~25分):倍數越高分越高,但超過15倍視為異常量,酌情打折(可能是除權息/單一大單等雜訊)
+  const vr = parseFloat(h.volRatio) || 0;
+  if (vr >= 15) score += 12;
+  else if (vr >= 8) score += 20;
+  else if (vr >= 5) score += 25;
+  else if (vr >= 3) score += 22;
+  else if (vr >= 2) score += 16;
+  else if (vr >= 1.5) score += 8;
+  // 籌碼評分(0~30分):直接對應既有籌碼評分0~5分
+  const cs = h.chipScore || 0;
+  score += cs * 6;
+  // 策略型態(0~10分):爆量突破是即時觸發訊號,主力蓄勢屬於觀察名單、還沒真正突破
+  if (h.type === "breakout") score += 10;
+  else if (h.type === "consolidation") score += 6;
+  else score += 2;
+  // 法人買超廣度(0~10分):外資、投信同步偏多給分較高
+  const fUp = (h.foreignNet5 || 0) > 0, tUp = (h.trustNet5 || 0) > 0;
+  if (fUp && tUp) score += 10;
+  else if (fUp || tUp) score += 5;
+  // 漲幅健康度(0~15分):留有空間(1~6%)較佳,貼近/觸及漲停或異常暴衝的追價風險打折
+  const chgRaw = parseFloat(h.changePct);
+  const chg = Math.abs(chgRaw);
+  if (!isFinite(chgRaw)) score += 0; // Infinity%等異常值不給分
+  else if (chg >= 1 && chg <= 6) score += 15;
+  else if (chg > 6 && chg < 9.5) score += 10;
+  else if (chg >= 9.5) score += 4; // 貼近或觸及漲停,追價風險偏高
+  else score += 6; // <1%,剛啟動
+  // 融資健康度(0~10分):從訊號說明文字判斷籌碼洗淨/主力訊號
+  const detail = h.detail || h.chipDetail || "";
+  if (detail.includes("籌碼洗淨")) score += 10;
+  else if (detail.includes("主力訊號")) score += 6;
+  else score += 3;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// ── 歷史勝率查表(v9.32):用同「策略型態+星級(不含大盤濾網)」桶內已回測的歷史訊號,以隔日(進場後第1個交易日)漲幅是否超過門檻為「勝」的定義 ──
+var WIN_THRESHOLD = 2;  // 隔日漲幅門檻(%),超過才算「勝」
+var MIN_SAMPLE = 8;     // 樣本數低於此視為不足採信,前端會標示「樣本不足」
+
+function getHistoricalWinRate(h) {
+  const bucketStars = calcStarsRaw({ type: h.type, volRatio: h.volRatio, chipScore: h.chipScore, changePct: h.changePct });
+  const hist = loadHistory();
+  const r1s = [];
+  Object.keys(hist).forEach(date => {
+    const day = hist[date];
+    Object.values(day).forEach(sig => {
+      if (sig.type === h.type && sig.stars === bucketStars && sig.bt &&
+          sig.bt.r1 !== null && sig.bt.r1 !== undefined && !sig.bt.expired) {
+        r1s.push(sig.bt.r1);
+      }
+    });
+  });
+  const n = r1s.length;
+  if (n < MIN_SAMPLE) return { n, sufficient: false, bucketStars };
+  const wins = r1s.filter(r => r > WIN_THRESHOLD).length;
+  const winRate = wins / n * 100;
+  const avgR1 = r1s.reduce((a, b) => a + b, 0) / n;
+  return { n, sufficient: true, winRate, avgR1, bucketStars };
 }
 
 // ── 回測引擎 ──
@@ -2935,7 +3000,7 @@ async function fetchSmartMoney() {
   }
 }
 
-// ── 聰明錢指標升級版(v9.30,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
+// ── 聰明錢指標升級版(v9.31,Sponsor限定):TaiwanFuturesOpenInterestLargeTraders 期貨大額交易人未沖銷部位,
 // 抓台指期前十大交易人(不分身分別,真正大戶,概念近似國際CFTC COT報告)買方-賣方未平倉部位淨額,
 // 較上面只看「外資」單一身分別的 fetchSmartMoney 更貼近「聰明錢」本意。無 Sponsor 權限時由呼叫端 fallback 回 fetchSmartMoney ──
 async function fetchLargeTraderPosition() {
@@ -2997,7 +3062,7 @@ function calcMarketBreadth() {
   return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
 }
 
-// ── 法人動向(v9.30升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
+// ── 法人動向(v9.31升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
 // 取代先前逐日打 backend/twse_institutional 的作法,一次呼叫拿到官方加總數字,更準、更省API ──
 async function fetchMarketInstitutionalTrend() {
   const cached = lsCacheGet("instTrend");
@@ -3030,7 +3095,7 @@ async function fetchMarketInstitutionalTrend() {
   }
 }
 
-// ── 融資融券氛圍(v9.30升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
+// ── 融資融券氛圍(v9.31升級):FinMind官方 TaiwanStockTotalMarginPurchaseShortSale 全市場融資餘額,
 // 取代先前抽樣150檔個股籌碼(chip_*)推算的作法,直接用官方全市場真實數字判斷散戶進退場 ──
 async function fetchTotalMarginSentiment() {
   const cached = lsCacheGet("marginTotal");
@@ -3140,6 +3205,26 @@ function calcMarketAdvice(bullBearScore, vixValue, breadthPct) {
       { name: "市場寬度", signal: breadthSignal, detail: breadthPct != null ? `${breadthPct}%站上季線` : "無資料" },
     ],
   };
+}
+
+// ── 融資餘額卡(v9.31):顯示全市場官方融資餘額+今日增減,僅涵蓋上市(TWSE),上櫃(TPEx)無官方彙總資料集,暫不含 ──
+function renderMarginBalanceCard(marginSent) {
+  if (!marginSent || !marginSent.ok) {
+    return `
+      <div class="sent-card">
+        <div class="sent-title">融資餘額(上市)</div>
+        <div class="sent-error">⚠ ${esc(marginSent ? marginSent.msg : "載入中")}</div>
+      </div>`;
+  }
+  const chg = marginSent.chg;
+  const color = chg == null ? "var(--text2)" : chg > 0 ? "var(--up)" : chg < 0 ? "var(--down)" : "var(--text2)";
+  return `
+      <div class="sent-card">
+        <div class="sent-title">融資餘額(上市)</div>
+        <div class="sent-sm-value">${marginSent.value.toLocaleString()}<span class="sent-sm-unit">張</span></div>
+        <div class="sent-sub" style="color:${color}">今日融資增減　${chg != null ? `${chg >= 0 ? "+" : ""}${chg.toLocaleString()}張` : "--"}</div>
+        <div class="sent-note">僅涵蓋上市(TWSE)集中市場,不含上櫃(TPEx)｜${marginSent.date || ""}</div>
+      </div>`;
 }
 
 function renderMarketAdviceCard(advice) {
@@ -3330,6 +3415,7 @@ function renderSentimentDashboard() {
   const wrap = document.getElementById("sentimentBody");
   if (!wrap) return;
   const { vix, smartMoney, bullBear, largeTrader } = SENTIMENT;
+  const marginSent = SENTIMENT.raw ? SENTIMENT.raw.marginSent : null;
 
   // VIX 卡
   let vixHtml;
@@ -3371,7 +3457,7 @@ function renderSentimentDashboard() {
     bbHtml = `<div class="sent-card"><div class="sent-title">牛熊強度</div><div class="sent-error">載入中...</div></div>`;
   }
 
-  // 聰明錢卡(v9.30升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
+  // 聰明錢卡(v9.31升級:優先顯示大額交易人前十大淨部位,更貼近國際COT報告概念；外資期貨淨部位作為輔助對照/fallback)
   let smHtml;
   if (largeTrader && largeTrader.ok) {
     const positive = largeTrader.value >= 0;
@@ -3425,14 +3511,15 @@ function renderSentimentDashboard() {
 
   const adviceHtml = SENTIMENT.advice ? renderMarketAdviceCard(SENTIMENT.advice) : "";
 
-  wrap.innerHTML = `${sampleProgressHtml}${adviceHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}</div>
+  const marginBalanceHtml = renderMarginBalanceCard(marginSent);
+  wrap.innerHTML = `${sampleProgressHtml}${adviceHtml}<div class="sent-grid">${vixHtml}${bbHtml}${smHtml}${ringHtml}${marginBalanceHtml}</div>
     <div class="sent-disclaimer">※ 聰明錢指標混合避險與投機部位,僅供參考；牛熊強度為多因子綜合分數,樣本不足的因子以中性50分計入；市場狀態環為六項指標各自獨立投票結果,與牛熊強度分數計算方式不同,兩者可能不一致,此為正常現象(交叉驗證用)。${bullBear ? bullBear.sampleNote : ""}</div>`;
 }
 
 // ════════════════════════════════════════
 // v9.23 自動採樣(方案C):開站背景採樣150檔補齊市場寬度(200MA),
 // 之後有正常掃描資料會自動用更大樣本覆蓋。每日只跑一次。
-// (v9.30:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
+// (v9.31:法人動向/融資融券已改用FinMind官方全市場數字,不再需要抽樣推算,故移除相關抽樣負擔)
 // ════════════════════════════════════════
 var AUTO_SAMPLE_TARGET = 150;
 var AUTO_SAMPLE_BATCH = 15;
@@ -4416,6 +4503,18 @@ function renderHits() {
           ${(h.trustNet5||0)   > 0 ? `<span class="chip-badge mid" style="color:var(--purple);border-color:rgba(124,77,255,.3);background:rgba(124,77,255,.1)">投信↑</span>` : ""}
         </div>
         <div class="hit-detail">${esc(h.detail)}</div>
+        ${(function(){
+          const conf = calcConfidenceScore(h);
+          const wr = getHistoricalWinRate(h);
+          const confColor = conf >= 70 ? "var(--up)" : conf >= 45 ? "var(--amber)" : "var(--down)";
+          const wrHtml = wr.sufficient
+            ? `<span class="chip-badge ${wr.winRate>=55?"good":wr.winRate>=40?"mid":"low"}" title="同型態同星級歷史${wr.n}筆,隔日漲幅>${WIN_THRESHOLD}%的比例">歷史勝率${wr.winRate.toFixed(0)}%(${wr.n}筆)</span>`
+            : `<span class="chip-badge low" title="需要更多歷史回測資料才能估算">歷史勝率樣本不足(${wr.n}/${MIN_SAMPLE})</span>`;
+          return `<div class="hit-detail" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px">
+            <span class="chip-badge" style="color:${confColor};border-color:${confColor}">信心分數 ${conf}/100</span>
+            ${wrHtml}
+          </div>`;
+        })()}
       </div>
       <div class="hit-vol">
         <div class="hit-vol-val">${h.volRatio}x</div>
@@ -4559,7 +4658,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.30 專業版初始化完成");
+  addLog("飆股狙擊系統 v9.31 專業版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -5093,12 +5192,19 @@ function exportReport() {
     let line3 = chipStr;
     if (fNet) line3 += sep + fNet;
     if (tNet) line3 += sep + tNet;
+    const conf = calcConfidenceScore(h);
+    const wr = getHistoricalWinRate(h);
+    const wrStr = wr.sufficient
+      ? ("歷史勝率 " + wr.winRate.toFixed(0) + "%（同型態同星級近 " + wr.n + " 筆,隔日漲幅>" + WIN_THRESHOLD + "%為勝,均酬" + (wr.avgR1>=0?"+":"") + wr.avgR1.toFixed(1) + "%）")
+      : ("歷史勝率 樣本不足（" + wr.n + "/" + MIN_SAMPLE + " 筆,暫不採計）");
     return [
       "  " + stars + " " + h.id + " " + (h.name || ""),
       "  策略型態：" + h.label,
       "  現價：$" + parseFloat(h.close).toFixed(2) + "　漲幅：" + (h.changePct > 0 ? "+" : "") + h.changePct + "%　量能：" + h.volRatio + "倍",
       "  " + line3,
       "  訊號說明：" + h.detail,
+      "  信心分數：" + conf + "/100（即時規則加權,非歷史統計）",
+      "  " + wrStr,
       "  掃描時間：" + (h.time || "--"),
       "",
     ].join("\n");
@@ -5129,6 +5235,11 @@ function exportReport() {
     "  籌碼評分（≥4分+2分、≥2分+1分）",
     "  漲幅≥3%（+1分）、爆量突破策略（+1分）",
     "",
+    "【信心分數／歷史勝率說明】(v9.32新增)",
+    "  信心分數：用當下量能倍數/籌碼評分/策略型態/法人買超廣度/漲幅健康度/融資動向即時加權算出的0-100分,是規則式評分,不是統計勝率",
+    "  歷史勝率：從本機已回測歸檔的歷史訊號中,篩出「相同策略型態＋相同星級」的樣本,計算隔日漲幅>" + WIN_THRESHOLD + "%的比例",
+    "  樣本數低於" + MIN_SAMPLE + "筆會標示「樣本不足」,代表目前資料量還不夠,數字僅供參考、非保證",
+    "",
     THIN,
   ];
 
@@ -5155,7 +5266,7 @@ function exportReport() {
 }
 
 
-// ── 技術面多空研判(v9.30):綜合5項技術訊號(月線/均線排列/季線/量價關係/20日高低點相對位置)給出多空分數 ──
+// ── 技術面多空研判(v9.31):綜合5項技術訊號(月線/均線排列/季線/量價關係/20日高低點相對位置)給出多空分數 ──
 function calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20) {
   const factors = [];
   let bull = 0, bear = 0;
@@ -5214,7 +5325,7 @@ function renderTechVerdictBlock(tv) {
       </div>`;
 }
 
-// ── 支撐壓力建議(v9.30):取價格上下最近的均線做為支撐/壓力參考,無均線可用時退回20日高低點 ──
+// ── 支撐壓力建議(v9.31):取價格上下最近的均線做為支撐/壓力參考,無均線可用時退回20日高低點 ──
 function calcSupportResistance(todayClose, ma5, ma10, ma20, ma60, high20, low20) {
   const mas = [
     { label: "5MA", v: parseFloat(ma5) },
@@ -5241,7 +5352,7 @@ function renderSupportResistanceBlock(sr) {
       </div>`;
 }
 
-// ── 綜合操作建議(v9.30):技術面研判+籌碼評分+策略訊號三項機械式規則綜合判斷,與大盤操作建議同一套紅黃綠邏輯 ──
+// ── 綜合操作建議(v9.31):技術面研判+籌碼評分+策略訊號三項機械式規則綜合判斷,與大盤操作建議同一套紅黃綠邏輯 ──
 function calcStockAdvice(techVerdict, chipInfo, strategy) {
   const techSignal = techVerdict.verdict === "偏多" ? "green" : techVerdict.verdict === "偏空" ? "red" : "yellow";
   const chipSignal = chipInfo.chipScore >= 4 ? "green" : chipInfo.chipScore <= 1 ? "red" : "yellow";
@@ -5370,9 +5481,9 @@ async function searchStock() {
     const maUp = parseFloat(ma5) > parseFloat(ma10) &&
                  parseFloat(ma10) > parseFloat(ma20) ? "多頭排列✅" : "非多頭排列";
 
-    // 技術面多空研判(v9.30)
+    // 技術面多空研判(v9.31)
     const techVerdict = calcTechnicalVerdict(todayClose, ma5, ma10, ma20, ma60, volRatio, changePct, high20, low20);
-    // 支撐壓力建議 + 綜合操作建議(v9.30)
+    // 支撐壓力建議 + 綜合操作建議(v9.31)
     const supportResistance = calcSupportResistance(todayClose, ma5, ma10, ma20, ma60, high20, low20);
     const stockAdvice = calcStockAdvice(techVerdict, chipInfo, strategy);
 
