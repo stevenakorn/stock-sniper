@@ -4166,12 +4166,16 @@ const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYest
 // 方法一：排除爆量日，往前抓5天乾淨基準量，避免爆量灌高均量
 // 方法二：若前一日本身是爆量日，額外比對今日量能是否延續達標
 // ════════════════════════════════════════
-var DT_SPIKE_MULT = 3;    // 爆量日判定倍數（當日量 > 前5日均量 × 此倍數）
-var DT_FOLLOW_MIN = 0.8;  // 延續確認：今日量至少要達爆量日量能的比例
-var DT_ENTRY_MULT = 2;    // 建議進場門檻倍數（校正基準量 × 此倍數＝當沖建議關注量）
+var DT_SPIKE_MULT = 3;      // 爆量日判定倍數（當日量 > 前5日均量 × 此倍數）
+var DT_FOLLOW_MIN = 0.8;    // 延續確認：今日量至少要達爆量日量能的比例
+var DT_WATCH_MULT = 2;      // 次日觀察門檻倍數（校正基準量 × 此倍數＝全日應設定關注量,對應爆量突破策略門檻,篩選次日候選股用）
+var DT_TRADING_MIN = 270;   // 台股一般交易時段 9:00-13:30 = 270分鐘,全日量換算成每分鐘基準流速用
+var DT_IGNITION_MULT = 8;   // 當沖首分鐘明確進場訊號倍數（首分鐘量 ÷ 每分鐘基準量 ≥ 此倍數才算明確訊號,實務校準值）
 
-function calcDayTradeVolCheck(volume) {
-  if (!volume || volume.length < 12) return null;
+function calcDayTradeVolCheck(volumeShares) {
+  if (!volumeShares || volumeShares.length < 12) return null;
+  // FinMind Trading_Volume 單位為「股」，換算成「張」（1張=1000股）方便對照看盤軟體
+  const volume = volumeShares.map(v => v / 1000);
   const today = volume[volume.length - 1];
   const hist  = volume.slice(0, -1); // 不含今日，hist最後一筆＝昨日(T-1)
 
@@ -4208,12 +4212,20 @@ function calcDayTradeVolCheck(volume) {
     };
   }
 
+  // 次日觀察門檻（全日量,篩選候選股用）
+  const dailyWatchVol = Math.round(baselineAdj * DT_WATCH_MULT);
+  // 當沖首分鐘明確進場訊號量：先算每分鐘基準流速,再乘上8倍(實務校準值)
+  const perMinBaseline = baselineAdj / DT_TRADING_MIN;
+  const ignitionVol = Math.round(perMinBaseline * DT_IGNITION_MULT);
+
   return {
     baselineRaw: Math.round(baselineRaw),
     baselineAdj: Math.round(baselineAdj),
     volRatioRaw: +volRatioRaw.toFixed(2),
     volRatioAdj: +volRatioAdj.toFixed(2),
-    entryTargetVol: Math.round(baselineAdj * DT_ENTRY_MULT),
+    dailyWatchVol,
+    perMinBaseline: +perMinBaseline.toFixed(1),
+    ignitionVol,
     spikeExcluded,
     yestIsSpike,
     followThrough,
@@ -4580,7 +4592,7 @@ function renderHits() {
           const dv = h.dtVol;
           const parts = [];
           if (dv.spikeExcluded > 0) {
-            parts.push(`<span class="chip-badge mid" title="原始5日均量${dv.baselineRaw}張，排除${dv.spikeExcluded}個爆量日後校正為${dv.baselineAdj}張，應設定關注量${dv.entryTargetVol}張">校正量比${dv.volRatioAdj}x（原${dv.volRatioRaw}x）</span>`);
+            parts.push(`<span class="chip-badge mid" title="原始5日均量${dv.baselineRaw}張，排除${dv.spikeExcluded}個爆量日後校正為${dv.baselineAdj}張，次日觀察門檻${dv.dailyWatchVol}張，當沖首分鐘明確進場量${dv.ignitionVol}張（每分鐘基準${dv.perMinBaseline}張×8）">校正量比${dv.volRatioAdj}x（原${dv.volRatioRaw}x）</span>`);
           }
           if (dv.followThrough) {
             const ft = dv.followThrough;
@@ -5273,7 +5285,9 @@ function exportReport() {
     let dtStr = "";
     if (h.dtVol) {
       const dv = h.dtVol;
-      dtStr = "  當沖基準量：五日均量 " + dv.baselineRaw + "張→排除爆量校正 " + dv.baselineAdj + "張（排除 " + dv.spikeExcluded + " 天），應設定關注量 " + dv.entryTargetVol + "張，校正量比 " + dv.volRatioAdj + "倍（原始 " + dv.volRatioRaw + "倍）";
+      dtStr = "  當沖基準量：五日均量 " + dv.baselineRaw + "張→排除爆量校正 " + dv.baselineAdj + "張（排除 " + dv.spikeExcluded + " 天），校正量比 " + dv.volRatioAdj + "倍（原始 " + dv.volRatioRaw + "倍）\n" +
+              "  次日觀察門檻：" + dv.dailyWatchVol + "張（全日,校正基準×" + DT_WATCH_MULT + "，篩選次日候選股用）\n" +
+              "  當沖首分鐘進場門檻：每分鐘基準 " + dv.perMinBaseline + "張 → 明確進場訊號 " + dv.ignitionVol + "張（基準×" + DT_IGNITION_MULT + "，開盤首分鐘量達此標準才視為明確訊號）";
       if (dv.followThrough) {
         const ft = dv.followThrough;
         dtStr += "\n  延續確認：昨日爆量 " + ft.spikeVol + "張，今日量能達昨日 " + (ft.followRatio*100).toFixed(0) + "%（" + (ft.pass ? "達標✓" : "未達標✗，動能可能已減弱") + "）";
@@ -5328,7 +5342,9 @@ function exportReport() {
     "  方法一(基準校正)：往前跳過爆量日(單日量>前5日均量×" + DT_SPIKE_MULT + "倍),抓5天乾淨數據重算基準量與量比",
     "  方法二(延續確認)：若昨日本身是爆量日,額外檢查今日量是否至少達昨日爆量量的" + (DT_FOLLOW_MIN*100).toFixed(0) + "%,避免追進動能已經退潮的假訊號",
     "  兩者同時列出,校正量比較貼近真實基準,延續確認未達標時代表隔日追價風險較高,請謹慎評估",
-    "  應設定的量：校正基準量 × " + DT_ENTRY_MULT + "倍,是換算成實際張數的建議關注門檻,方便直接設定看盤軟體的成交量告警",
+    "  次日觀察門檻：校正基準量 × " + DT_WATCH_MULT + "倍,是換算成實際張數的全日參考門檻,篩選次日候選股用",
+    "  首分鐘明確進場量：校正基準量 ÷ " + DT_TRADING_MIN + "分鐘（9:00-13:30交易時段）算出每分鐘基準流速,再乘上 " + DT_IGNITION_MULT + "倍,得出開盤首分鐘應達到的張數才算「明確進場訊號」（源自2421實際案例校準：首分鐘量達基準8倍以上視為明確訊號）",
+    "  ※ 以上皆為EOD資料換算的參考值,非即時分鐘資料,盤中仍需搭配看盤軟體實際跳動的成交量判斷",
     "",
     THIN,
   ];
@@ -5605,7 +5621,9 @@ async function searchStock() {
         ${dtVol ? `
         <div class="detail-row"><span class="detail-key">五日平均量</span><span class="detail-val">${dtVol.baselineRaw.toLocaleString()} 張</span></div>
         <div class="detail-row"><span class="detail-key">排除爆量平均量</span><span class="detail-val cyan">${dtVol.baselineAdj.toLocaleString()} 張</span></div>
-        <div class="detail-row"><span class="detail-key">應設定的量</span><span class="detail-val up">${dtVol.entryTargetVol.toLocaleString()} 張</span></div>
+        <div class="detail-row"><span class="detail-key">次日觀察門檻（全日×${DT_WATCH_MULT}）</span><span class="detail-val">${dtVol.dailyWatchVol.toLocaleString()} 張</span></div>
+        <div class="detail-row"><span class="detail-key">每分鐘基準量</span><span class="detail-val">${dtVol.perMinBaseline.toLocaleString()} 張/分</span></div>
+        <div class="detail-row"><span class="detail-key">首分鐘明確進場量（×${DT_IGNITION_MULT}）</span><span class="detail-val up">${dtVol.ignitionVol.toLocaleString()} 張</span></div>
         <div class="detail-row"><span class="detail-key">原始量比</span><span class="detail-val">×${dtVol.volRatioRaw}</span></div>
         <div class="detail-row"><span class="detail-key">校正量比</span><span class="detail-val ${dtVol.volRatioAdj>=2?"up":""}">×${dtVol.volRatioAdj}</span></div>
         <div class="detail-row"><span class="detail-key">排除爆量日</span><span class="detail-val">${dtVol.spikeExcluded} 天</span></div>
