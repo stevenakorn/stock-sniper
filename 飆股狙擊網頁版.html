@@ -4162,6 +4162,63 @@ const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYest
 }
 
 // ════════════════════════════════════════
+// 當沖基準量校正（v9.33）
+// 方法一：排除爆量日，往前抓5天乾淨基準量，避免爆量灌高均量
+// 方法二：若前一日本身是爆量日，額外比對今日量能是否延續達標
+// ════════════════════════════════════════
+var DT_SPIKE_MULT = 3;    // 爆量日判定倍數（當日量 > 前5日均量 × 此倍數）
+var DT_FOLLOW_MIN = 0.8;  // 延續確認：今日量至少要達爆量日量能的比例
+
+function calcDayTradeVolCheck(volume) {
+  if (!volume || volume.length < 12) return null;
+  const today = volume[volume.length - 1];
+  const hist  = volume.slice(0, -1); // 不含今日，hist最後一筆＝昨日(T-1)
+
+  // 方法一：從昨日往前找5天「非爆量日」當基準，遇到爆量日就跳過繼續往前抓
+  const clean = [];
+  let spikeExcluded = 0;
+  let i = hist.length - 1;
+  while (clean.length < 5 && i >= 5) {
+    const v = hist[i];
+    const priorAvg = avg(hist.slice(i - 5, i));
+    if (priorAvg > 0 && v > priorAvg * DT_SPIKE_MULT) {
+      spikeExcluded++;
+    } else {
+      clean.push(v);
+    }
+    i--;
+  }
+  const baselineRaw = avg(last(hist, 5));
+  const baselineAdj = clean.length ? avg(clean) : baselineRaw;
+  const volRatioRaw = baselineRaw > 0 ? today / baselineRaw : 0;
+  const volRatioAdj = baselineAdj > 0 ? today / baselineAdj : 0;
+
+  // 方法二：昨日(T-1)若本身是爆量日，檢查今日量能是否延續（今日量 / 昨日爆量量）
+  const yestVol      = hist[hist.length - 1];
+  const yestPriorAvg  = avg(hist.slice(-6, -1));
+  const yestIsSpike   = yestPriorAvg > 0 && yestVol > yestPriorAvg * DT_SPIKE_MULT;
+  let followThrough = null;
+  if (yestIsSpike) {
+    const followRatio = yestVol > 0 ? today / yestVol : 0;
+    followThrough = {
+      spikeVol: Math.round(yestVol),
+      followRatio: +followRatio.toFixed(2),
+      pass: followRatio >= DT_FOLLOW_MIN,
+    };
+  }
+
+  return {
+    baselineRaw: Math.round(baselineRaw),
+    baselineAdj: Math.round(baselineAdj),
+    volRatioRaw: +volRatioRaw.toFixed(2),
+    volRatioAdj: +volRatioAdj.toFixed(2),
+    spikeExcluded,
+    yestIsSpike,
+    followThrough,
+  };
+}
+
+// ════════════════════════════════════════
 // 策略一：爆量突破
 // ════════════════════════════════════════
 function checkBreakout(id, d) {
@@ -4365,6 +4422,7 @@ async function startScan() {
           }
           // 整合 detail
           result.detail = result.detail + (chipInfo.chipDetail ? `｜${chipInfo.chipDetail}` : "");
+          result.dtVol = calcDayTradeVolCheck(result.d.volume);
           delete result.d;
           return result;
         } catch(e) {
@@ -4514,6 +4572,19 @@ function renderHits() {
             <span class="chip-badge" style="color:${confColor};border-color:${confColor}">信心分數 ${conf}/100</span>
             ${wrHtml}
           </div>`;
+        })()}
+        ${(function(){
+          if (!h.dtVol) return "";
+          const dv = h.dtVol;
+          const parts = [];
+          if (dv.spikeExcluded > 0) {
+            parts.push(`<span class="chip-badge mid" title="原始5日均量${dv.baselineRaw}張，排除${dv.spikeExcluded}個爆量日後校正為${dv.baselineAdj}張">校正量比${dv.volRatioAdj}x（原${dv.volRatioRaw}x）</span>`);
+          }
+          if (dv.followThrough) {
+            const ft = dv.followThrough;
+            parts.push(`<span class="chip-badge ${ft.pass?"good":"low"}" title="昨日爆量${ft.spikeVol}張，今日量能需達昨日${(DT_FOLLOW_MIN*100).toFixed(0)}%以上才算延續">延續確認${ft.pass?"✓":"✗"}（今日達昨日${(ft.followRatio*100).toFixed(0)}%）</span>`);
+          }
+          return parts.length ? `<div class="hit-detail" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px">${parts.join("")}</div>` : "";
         })()}
       </div>
       <div class="hit-vol">
@@ -5197,6 +5268,15 @@ function exportReport() {
     const wrStr = wr.sufficient
       ? ("歷史勝率 " + wr.winRate.toFixed(0) + "%（同型態同星級近 " + wr.n + " 筆,隔日漲幅>" + WIN_THRESHOLD + "%為勝,均酬" + (wr.avgR1>=0?"+":"") + wr.avgR1.toFixed(1) + "%）")
       : ("歷史勝率 樣本不足（" + wr.n + "/" + MIN_SAMPLE + " 筆,暫不採計）");
+    let dtStr = "";
+    if (h.dtVol) {
+      const dv = h.dtVol;
+      dtStr = "  當沖基準量：校正量比 " + dv.volRatioAdj + "倍（原始 " + dv.volRatioRaw + "倍，基準 " + dv.baselineRaw + "張→校正 " + dv.baselineAdj + "張，排除爆量日 " + dv.spikeExcluded + " 天）";
+      if (dv.followThrough) {
+        const ft = dv.followThrough;
+        dtStr += "\n  延續確認：昨日爆量 " + ft.spikeVol + "張，今日量能達昨日 " + (ft.followRatio*100).toFixed(0) + "%（" + (ft.pass ? "達標✓" : "未達標✗，動能可能已減弱") + "）";
+      }
+    }
     return [
       "  " + stars + " " + h.id + " " + (h.name || ""),
       "  策略型態：" + h.label,
@@ -5205,9 +5285,10 @@ function exportReport() {
       "  訊號說明：" + h.detail,
       "  信心分數：" + conf + "/100（即時規則加權,非歷史統計）",
       "  " + wrStr,
+      (dtStr ? dtStr : null),
       "  掃描時間：" + (h.time || "--"),
       "",
-    ].join("\n");
+    ].filter(function(x){ return x !== null; }).join("\n");
   }
 
   const sections = [
@@ -5239,6 +5320,12 @@ function exportReport() {
     "  信心分數：用當下量能倍數/籌碼評分/策略型態/法人買超廣度/漲幅健康度/融資動向即時加權算出的0-100分,是規則式評分,不是統計勝率",
     "  歷史勝率：從本機已回測歸檔的歷史訊號中,篩出「相同策略型態＋相同星級」的樣本,計算隔日漲幅>" + WIN_THRESHOLD + "%的比例",
     "  樣本數低於" + MIN_SAMPLE + "筆會標示「樣本不足」,代表目前資料量還不夠,數字僅供參考、非保證",
+    "",
+    "【當沖基準量說明】(v9.33新增)",
+    "  問題：若近5日內出現爆量日,直接用trailing 5日均量當基準會被那天灌高,導致隔天量比失真、訊號變鈍",
+    "  方法一(基準校正)：往前跳過爆量日(單日量>前5日均量×" + DT_SPIKE_MULT + "倍),抓5天乾淨數據重算基準量與量比",
+    "  方法二(延續確認)：若昨日本身是爆量日,額外檢查今日量是否至少達昨日爆量量的" + (DT_FOLLOW_MIN*100).toFixed(0) + "%,避免追進動能已經退潮的假訊號",
+    "  兩者同時列出,校正量比較貼近真實基準,延續確認未達標時代表隔日追價風險較高,請謹慎評估",
     "",
     THIN,
   ];
@@ -5657,6 +5744,7 @@ async function realtimeScanOnce() {
             result.time = new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
             result.date = todayISO();
             result.realtime = true; // 標記為即時掃描
+            result.dtVol = calcDayTradeVolCheck(d.volume);
           }
           return result;
         } catch(e) { return null; }
