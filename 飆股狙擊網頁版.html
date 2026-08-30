@@ -5549,6 +5549,7 @@ async function searchStock() {
     const mv20 = avg(last(d.volume, 20));
     const volRatio = (mv5 / mv20).toFixed(1);
     const todayVol = d.volume[d.volume.length-1];
+    const dtVol = calcDayTradeVolCheck(d.volume);
 
     // 策略判斷
     const breakoutOk = todayClose >= parseFloat(high20) && mv5 > mv20 * 2;
@@ -5595,6 +5596,17 @@ async function searchStock() {
         <div class="detail-row"><span class="detail-key">20日低點</span><span class="detail-val">$${low20}</span></div>
         <div class="detail-row"><span class="detail-key">量能倍數</span><span class="detail-val ${parseFloat(volRatio)>=2?"up":""}">×${volRatio}</span></div>
         <div class="detail-row"><span class="detail-key">均線狀態</span><span class="detail-val ${maUp.includes("多頭")?"up":""}">${maUp}</span></div>
+      </div>
+      <div class="detail-block">
+        <div class="detail-block-title">⚡ 當沖基準量（校正）</div>
+        ${dtVol ? `
+        <div class="detail-row"><span class="detail-key">原始量比</span><span class="detail-val">×${dtVol.volRatioRaw}</span></div>
+        <div class="detail-row"><span class="detail-key">校正量比</span><span class="detail-val ${dtVol.volRatioAdj>=2?"up":""}">×${dtVol.volRatioAdj}</span></div>
+        <div class="detail-row"><span class="detail-key">排除爆量日</span><span class="detail-val">${dtVol.spikeExcluded} 天</span></div>
+        ${dtVol.followThrough
+          ? `<div class="detail-row"><span class="detail-key">延續確認</span><span class="detail-val ${dtVol.followThrough.pass?"up":"down"}">${dtVol.followThrough.pass?"✓ 達標":"✗ 未達標"}（今日達昨日${(dtVol.followThrough.followRatio*100).toFixed(0)}%）</span></div>`
+          : `<div class="detail-row"><span class="detail-key">延續確認</span><span class="detail-val" style="color:var(--text2)">昨日非爆量日</span></div>`}
+        ` : `<div class="detail-row"><span class="detail-key">狀態</span><span class="detail-val" style="color:var(--text2)">資料不足</span></div>`}
       </div>
       <div class="detail-block">
         <div class="detail-block-title">📈 均線</div>
