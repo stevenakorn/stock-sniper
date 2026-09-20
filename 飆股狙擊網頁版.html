@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>飆股狙擊系統 v9.31</title>
-<meta name="theme-color" content="#0d1017">
+<title>飆股狙擊系統 v10.0</title>
+<meta name="theme-color" content="#070c18">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="飆股狙擊">
@@ -608,40 +608,289 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   .statusbar{flex-direction:column;align-items:flex-start;gap:4px}
 }
 
+
+/* ══════════════════════════════════════════════════════
+   v10 儀表板風格(覆寫層):深藍科技感 / 18 格個股 AI 分析儀表板
+   放在原 CSS 之後,只覆寫變數與新增 .dash-* 樣式,舊元件沿用變數自動換膚
+   ══════════════════════════════════════════════════════ */
+:root{
+  --bg:#070c18; --bg2:#0c1428; --bg3:#111c36;
+  --border:#1a2a4a; --border2:#2a4270;
+  --cyan:#4c8dff; --cyan2:#3a76e0;
+  --text:#e2e9f5; --text2:#93a3bf;
+  --up:#ff4d57; --down:#26b578;
+  --amber:#f5a623; --gold:#f2c14e; --purple:#9a8cff;
+  --good:#26c6a2; --bad:#ff4d57;
+  --panel-grad:linear-gradient(180deg,#0f1a33 0%,#0b1326 100%);
+  --panel-glow:0 0 0 1px rgba(76,141,255,.06),0 4px 18px rgba(0,0,0,.45);
+  --heat0:#0a1a55; --heat1:#1447b8; --heat2:#1aa7c9; --heat3:#33d17a; --heat4:#f2d13a; --heat5:#ff5a36;
+}
+:root[data-theme="light"]{
+  --bg:#eef2f9; --bg2:#ffffff; --bg3:#f1f5fb;
+  --border:#d6deec; --border2:#b8c6de;
+  --text:#18233a; --text2:#5b6b86;
+  --up:#e0313c; --down:#1a9463; --good:#12a583; --bad:#e0313c;
+  --panel-grad:linear-gradient(180deg,#ffffff 0%,#f6f9fe 100%);
+  --panel-glow:0 1px 4px rgba(30,50,90,.10);
+  --heat0:#dfe8ff; --heat1:#9cc0ff; --heat2:#63d2e4; --heat3:#6fdc9c; --heat4:#f5d94a; --heat5:#ff7a55;
+}
+body{
+  background:
+    radial-gradient(900px 480px at 12% -8%,rgba(52,110,230,.20),transparent 62%),
+    radial-gradient(700px 400px at 95% 0%,rgba(60,180,220,.10),transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+}
+:root[data-theme="light"] body{background:var(--bg)}
+.wrap{max-width:1720px;padding:10px 12px 64px}
+
+/* 舊元件換膚 */
+.panel,.stat-card,.scan-panel,.token-bar,.statusbar{background:var(--panel-grad);border-color:var(--border);box-shadow:var(--panel-glow)}
+.panel-header{background:transparent}
+.panel-title{letter-spacing:1px}
+.hit-card,.bt-card,.detail-block{background:rgba(255,255,255,.02)}
+:root[data-theme="light"] .hit-card,:root[data-theme="light"] .bt-card,:root[data-theme="light"] .detail-block{background:var(--bg3)}
+
+/* ── 頂部列 ── */
+.dash-head{display:flex;align-items:stretch;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.dh-chips{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--panel-grad);border:1px solid var(--border);border-radius:10px;box-shadow:var(--panel-glow)}
+.dh-chip{display:flex;align-items:center;gap:7px;padding:2px 9px;border-right:1px solid var(--border);min-width:0}
+.dh-chip:last-of-type{border-right:none}
+.dh-ico{width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;color:var(--cyan);border:1.5px solid var(--cyan);font-weight:700}
+.dh-chip.warn .dh-ico{color:var(--amber);border-color:var(--amber);border-radius:6px}
+.dh-chip.danger .dh-ico{color:var(--up);border-color:var(--up);border-radius:6px}
+.dh-chip.ok .dh-ico{color:var(--good);border-color:var(--good)}
+.dh-txt{font-family:var(--mono);font-size:10px;line-height:1.15;letter-spacing:.5px;color:var(--cyan);font-weight:700;text-transform:uppercase}
+.dh-txt small{display:block;font-size:9.5px;font-weight:400;color:var(--text2);letter-spacing:.2px;text-transform:none;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dh-chip.warn .dh-txt{color:var(--amber)}
+.dh-chip.danger .dh-txt{color:var(--up)}
+.dh-chip.ok .dh-txt{color:var(--good)}
+.dh-tools{display:flex;align-items:center;gap:8px;padding:0 4px}
+.dh-search{display:flex;align-items:center;gap:0;background:var(--panel-grad);border:1.5px solid var(--border2);border-radius:10px;overflow:hidden;box-shadow:var(--panel-glow);min-width:300px;flex:0 1 380px}
+.dh-search input{background:transparent;border:0;outline:0;color:var(--text);font-family:var(--mono);font-size:26px;font-weight:500;width:120px;padding:6px 10px 6px 16px;letter-spacing:1px}
+.dh-search input::placeholder{color:var(--text2);font-size:15px}
+.dh-name{flex:1;font-size:21px;font-weight:500;color:var(--text);padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.dh-go{align-self:stretch;border:0;background:var(--cyan);color:#fff;font-weight:700;font-size:15px;padding:0 16px;cursor:pointer;font-family:var(--sans);letter-spacing:2px}
+.dh-go:hover{background:var(--cyan2)}
+.dh-kpis{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;flex:1 1 640px;background:var(--panel-grad);border:1px solid var(--border);border-radius:10px;box-shadow:var(--panel-glow);overflow:hidden;min-width:0}
+.kpi{padding:7px 8px 6px;text-align:center;border-right:1px solid var(--border);min-width:0}
+.kpi:last-child{border-right:none}
+.kpi-l{font-size:11px;color:var(--text2);white-space:nowrap}
+.kpi-v{font-family:var(--mono);font-size:21px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.25;white-space:nowrap}
+.kpi-v.sm{font-size:16px;padding-top:3px}
+.kpi-v.up{color:var(--up)}.kpi-v.down{color:var(--down)}
+.dh-end{display:flex;align-items:center;gap:8px;margin-left:auto}
+
+.dash-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:12px}
+.di-src{display:inline-flex;align-items:center;padding:4px 12px;border-radius:14px;border:1px solid var(--border2);background:rgba(76,141,255,.08);color:var(--cyan);font-size:12px;white-space:nowrap}
+.di-range{color:var(--text2)}
+.di-btns{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.dbtn{padding:5px 11px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:11.5px;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.dbtn:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* 主導覽 */
+.dash-nav{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.dnav{padding:9px 16px;border:0;background:transparent;color:var(--text2);font-size:13px;cursor:pointer;font-family:var(--sans);border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.5px}
+.dnav:hover{color:var(--text)}
+.dnav.active{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:700}
+.view{display:none}
+.view.active{display:block}
+
+/* ── 18 格網格 ── */
+.dgrid{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:8px}
+.dp{grid-column:span var(--s,8);background:var(--panel-grad);border:1px solid var(--border);border-radius:8px;box-shadow:var(--panel-glow);padding:9px 11px 9px;min-width:0;position:relative;display:flex;flex-direction:column}
+.dp-h{display:flex;align-items:center;gap:7px;margin-bottom:6px;min-height:22px}
+.dp-n{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#fff;background:var(--cyan2);padding:1.5px 5px;border-radius:4px;letter-spacing:.5px;flex-shrink:0}
+.dp-t{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap}
+.dp-s{font-size:10.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dp-dl{margin-left:auto;border:0;background:transparent;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;flex-shrink:0}
+.dp-dl:hover{color:var(--cyan)}
+.dp-b{flex:1;min-height:0;display:flex;flex-direction:column}
+.dp-b.fill{justify-content:space-around}
+.dp-f{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--text2);margin-top:6px;flex-wrap:wrap}
+.dp-f b{font-family:var(--mono);font-weight:700}
+.dp svg{display:block;width:100%;height:auto}
+.dp .note{font-size:10px;color:var(--text2);margin-top:5px;line-height:1.4;opacity:.85}
+.up{color:var(--up)}.down{color:var(--down)}.amb{color:var(--amber)}.cy{color:var(--cyan)}.gd{color:var(--good)}
+.t2{color:var(--text2)}
+.mono{font-family:var(--mono)}
+
+/* 02 決策核心 */
+.warnbar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:5px;font-weight:700;font-size:13px;margin-bottom:6px;letter-spacing:.5px}
+.warnbar.red{background:rgba(255,77,87,.16);color:var(--up);border:1px solid rgba(255,77,87,.4)}
+.warnbar.amb{background:rgba(245,166,35,.14);color:var(--amber);border:1px solid rgba(245,166,35,.4)}
+.warnbar.grn{background:rgba(38,181,120,.14);color:var(--down);border:1px solid rgba(38,181,120,.4)}
+.krow{display:flex;align-items:center;gap:7px;padding:3.2px 0;font-size:12px;white-space:nowrap}
+.krow .ki{width:14px;text-align:center;flex-shrink:0;opacity:.85;font-size:11px}
+.krow .kk{color:var(--text2);min-width:62px}
+.krow .kv{font-weight:700;margin-left:2px;font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+
+/* 進度條列 */
+.prow{display:flex;align-items:center;gap:8px;padding:3.5px 0;font-size:12px}
+.prow .pl{min-width:76px;color:var(--text);white-space:nowrap}
+.prow .pb{flex:1;height:7px;background:rgba(147,163,191,.16);border-radius:4px;overflow:hidden}
+.prow .pb i{display:block;height:100%;border-radius:4px}
+.prow .pv{min-width:42px;text-align:right;font-family:var(--mono);font-weight:700;font-size:12px}
+.b-red i{background:linear-gradient(90deg,#ff7a3c,#ff4d57)}
+.b-grn i{background:linear-gradient(90deg,#1e9c68,#3fd28c)}
+.b-blu i{background:linear-gradient(90deg,#3a76e0,#6fa3ff)}
+.b-amb i{background:linear-gradient(90deg,#d98a10,#f5c04a)}
+
+/* 環形 */
+.rings{display:flex;justify-content:space-around;align-items:flex-start;gap:4px;flex:1;align-items:center}
+.ring{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;flex:1}
+.ring svg{width:100%;max-width:92px}
+.ring-l{font-size:11px;color:var(--text);text-align:center;white-space:nowrap}
+.rings.big .ring svg{max-width:120px}
+.rings.big .ring-l{font-size:13px;font-weight:700}
+
+/* 表格 */
+.mtab{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)}
+.mtab th{color:var(--text2);font-weight:500;padding:3px 4px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+.mtab td{padding:3.5px 4px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mtab th:first-child,.mtab td:first-child{text-align:left}
+.legend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:var(--text2)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.legend i.ln{height:2px;width:14px;vertical-align:3px;border-radius:1px}
+
+/* 18 主力語意 */
+.mlp{display:flex;align-items:center;gap:14px;margin:4px 0 8px}
+.mlp .k{font-size:17px;font-weight:700;white-space:nowrap}
+.mlp .v{font-size:38px;font-weight:900;letter-spacing:2px;white-space:nowrap}
+.mlp .btn2{margin-left:auto;padding:8px 16px;border:1.5px solid var(--cyan);background:rgba(76,141,255,.12);color:var(--cyan);border-radius:7px;font-weight:700;cursor:pointer;font-size:13px;font-family:var(--sans)}
+.mlp .btn2:hover{background:rgba(76,141,255,.25)}
+.concl{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:9px 11px;font-size:12.5px;line-height:1.55;color:var(--text)}
+:root[data-theme="light"] .concl{background:var(--bg3)}
+
+/* 12 紅綠燈 */
+.tl{display:flex;gap:14px;align-items:center;flex:1}
+.tl-lamp{display:flex;flex-direction:column;gap:6px;padding:7px 8px;border-radius:24px;background:#04070f;border:1px solid var(--border2);flex-shrink:0}
+.tl-lamp i{width:24px;height:24px;border-radius:50%;background:#1a2438;display:block;opacity:.55}
+.tl-lamp i.on.r{background:#ff4d57;box-shadow:0 0 12px #ff4d57;opacity:1}
+.tl-lamp i.on.y{background:#f5a623;box-shadow:0 0 12px #f5a623;opacity:1}
+.tl-lamp i.on.g{background:#26b578;box-shadow:0 0 12px #26b578;opacity:1}
+.tl-rows{flex:1;min-width:0}
+.tl-rows .krow{padding:2.5px 0}
+
+/* 底部任務分頁列 */
+.dock{position:sticky;bottom:0;z-index:20;display:flex;gap:4px;padding:6px 8px 0;background:linear-gradient(180deg,transparent,var(--bg) 35%);margin-top:10px;flex-wrap:wrap}
+.dtab{padding:8px 18px;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:12.5px;font-family:var(--sans)}
+.dtab:hover{color:var(--text)}
+.dtab.active{background:var(--bg3);color:var(--cyan);border-color:var(--border2);font-weight:700}
+.dtab .d-i{margin-right:6px}
+.task{display:none}
+.task.active{display:block}
+
+/* 空狀態 / 載入 */
+.dash-empty{padding:70px 20px;text-align:center;color:var(--text2);font-size:14px;line-height:1.9;border:1px dashed var(--border2);border-radius:10px}
+.dash-empty b{color:var(--cyan)}
+.dash-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:80px 0;color:var(--text2);font-family:var(--mono);font-size:13px}
+
+/* 警示報告 / 原始資料 */
+.alert-list{display:flex;flex-direction:column;gap:6px}
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:9px 12px;border:1px solid var(--border);border-left-width:3px;border-radius:6px;background:rgba(255,255,255,.02)}
+.alert-item.hi{border-left-color:var(--up)}.alert-item.mid{border-left-color:var(--amber)}.alert-item.lo{border-left-color:var(--cyan)}
+.al-date{font-family:var(--mono);font-size:11.5px;color:var(--text2);min-width:78px;padding-top:1px}
+.al-t{font-weight:700;font-size:13px}
+.al-d{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.5}
+.al-tag{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:9px;margin-left:auto;white-space:nowrap;border:1px solid}
+.al-tag.hi{color:var(--up);border-color:rgba(255,77,87,.45);background:rgba(255,77,87,.1)}
+.al-tag.mid{color:var(--amber);border-color:rgba(245,166,35,.45);background:rgba(245,166,35,.1)}
+.al-tag.lo{color:var(--cyan);border-color:rgba(76,141,255,.45);background:rgba(76,141,255,.1)}
+.raw-wrap{max-height:640px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.raw-wrap .mtab th{position:sticky;top:0;background:var(--bg3);z-index:1;padding:8px 8px}
+.raw-wrap .mtab td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.task-box{background:var(--panel-grad);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--panel-glow)}
+.task-box h3{font-size:14px;margin-bottom:10px;color:var(--text)}
+
+/* 舊 header 元件 */
+.dh-mini{display:flex;align-items:center;gap:8px}
+.dh-mini .clock{font-size:15px}
+.theme-toggle{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:14px;color:var(--text)}
+
+/* 響應式 */
+@media (max-width:1500px){
+  .dgrid{grid-template-columns:repeat(12,minmax(0,1fr))}
+  .dp{grid-column:span var(--s2,6)}
+}
+@media (max-width:1100px){
+  .dp{grid-column:span var(--s3,12)}
+  .dh-kpis{grid-auto-flow:row;grid-template-columns:repeat(5,1fr)}
+  .kpi{border-bottom:1px solid var(--border)}
+}
+@media (max-width:640px){
+  .dash-head>*{min-width:0;max-width:100%}
+  .dh-chips{flex-wrap:wrap;width:100%}
+  .dh-chip{border-right:0;flex:1 1 45%}
+  .dh-end{margin-left:0;width:100%}
+  .dh-mini{flex-wrap:wrap}
+  .dh-search input{width:90px;font-size:22px}
+  .dgrid{grid-template-columns:1fr}
+  .dp{grid-column:auto}
+  .dh-search{min-width:100%}
+  .dh-kpis{grid-template-columns:repeat(2,1fr)}
+  .mlp .v{font-size:28px}
+  .stats-row,.radar-grid,.bt-summary-grid,.main-grid{grid-template-columns:1fr}
+}
+@media print{
+  body{background:#fff!important}
+  .dash-nav,.dock,.di-btns,.dh-go,.dp-dl,.statusbar,.dh-mini{display:none!important}
+  .view{display:none!important}.view#view-dash{display:block!important}
+  .dp{break-inside:avoid}
+}
+
+.dp.flash{box-shadow:0 0 0 2px var(--cyan),0 0 18px rgba(76,141,255,.5)}
+.dp{transition:box-shadow .3s}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<!-- Header -->
-<header>
-  <div class="logo">
-    <div class="logo-icon">🎯</div>
-    <div class="logo-text">
-      <h1>飆股狙擊系統</h1>
-      <p>STOCK SNIPER SYSTEM v9.31 · PRO</p>
+<!-- Header / 儀表板頂部列 -->
+<div id="dashHead" class="dash-head">
+  <div class="dh-chips">
+    <div class="dh-chip" id="chipScanBox"><span class="dh-ico">◉</span><div class="dh-txt"><span id="chipScanT">AI SCAN STANDBY</span><small id="chipScanS">盤後分析待機</small></div></div>
+    <div class="dh-chip" id="chipMainBox"><span class="dh-ico">◎</span><div class="dh-txt">MAIN FORCE TRACKING<small id="chipMainS">--</small></div></div>
+    <div class="dh-chip" id="chipMktBox"><span class="dh-ico">▮</span><div class="dh-txt">MARKET STATUS<small id="chipMktS">--</small></div></div>
+    <div class="dh-chip warn" id="chipVol"><span class="dh-ico">!</span><div class="dh-txt">VOLATILITY ALERT<small id="chipVolS">--</small></div></div>
+  </div>
+  <div class="dh-search">
+    <input id="dashInput" type="text" maxlength="12" placeholder="代號 / 名稱" autocomplete="off" onkeydown="if(event.key==='Enter')dashSearch()">
+    <div class="dh-name" id="dashName">--</div>
+    <button class="dh-go" onclick="dashSearch()">分析</button>
+  </div>
+  <div class="dh-kpis" id="dashKpis"></div>
+  <div class="dh-end">
+    <div class="dh-mini">
+      <div class="mkt-chip" id="mktChip"><span class="mc-dot"></span><span>大盤載入中…</span></div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="market-badge closed" id="marketBadge">盤後</div>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切換深色/淺色">🌙</button>
     </div>
   </div>
-  <div class="header-right">
-    <div class="mkt-chip" id="mktChip"><span class="mc-dot"></span><span>大盤載入中…</span></div>
-    <div class="clock" id="clock">--:--:--</div>
-    <div class="market-badge closed" id="marketBadge">盤後</div>
-    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切換深色/淺色">🌙</button>
-  </div>
-</header>
-
-<!-- 市場情緒儀表板 -->
-<div class="panel" style="margin-bottom:16px">
-  <div class="panel-header">
-    <span class="panel-title">MARKET SENTIMENT · 市場情緒儀表板</span>
-    <button class="radar-btn" id="btnSentimentRefresh" onclick="loadSentimentDashboard()">↻ 更新市場情緒</button>
-  </div>
-  <div id="sentimentBody" style="padding:16px">
-    <div class="sent-loading"><div class="radar-spin"></div>載入市場情緒資料中...</div>
+</div>
+<div class="dash-info" id="dashInfo">
+  <span class="di-src" id="diSrc">資料來源:日K FinMind｜法人 FinMind｜融資券 FinMind</span>
+  <span class="di-range" id="diRange">輸入股票代號後開始分析</span>
+  <div class="di-btns">
+    <button class="dbtn" onclick="dashPng()">⤓ 下載儀表板 PNG</button>
+    <button class="dbtn" onclick="dashCsv()">⤓ 下載資料 CSV</button>
+    <button class="dbtn" onclick="dashHtml()">⤓ 下載離線報告 HTML</button>
+    <button class="dbtn" onclick="dashPrint()">⎙ 列印 / PDF</button>
   </div>
 </div>
+<nav class="dash-nav">
+  <button class="dnav active" data-view="dash">個股儀表板</button>
+  <button class="dnav" data-view="scan">選股掃描</button>
+  <button class="dnav" data-view="radar">資金雷達</button>
+  <button class="dnav" data-view="lt">中長期潛力</button>
+  <button class="dnav" data-view="bt">回測績效</button>
+  <button class="dnav" data-view="sent">市場情緒</button>
+</nav>
 
-<!-- Token 設定 -->
+<div class="view active" id="view-dash"><div id="dashRoot"><div class="dash-empty">輸入上方股票代號(例如 <b>2330</b>)並按「分析」,<br>即可產生 18 格個股 AI 分析儀表板。</div></div></div>
+
+<div class="view" id="view-scan">
 <!-- 統計卡片 -->
 <div class="stats-row">
   <div class="stat-card" style="--accent:var(--green)">
@@ -667,7 +916,6 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 </div>
 
 
-<!-- 資金雷達 -->
 
 <!-- 盤後分析選股面板 -->
 <div class="scan-panel">
@@ -707,42 +955,6 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   <div class="mq-hint" id="mqHint">輸入代號後按 Enter 或點查詢</div>
 </div>
 
-<div class="radar-section">
-  <div class="radar-grid">
-
-    <!-- 左：產業資金流向排行 -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">MONEY FLOW RADAR · 產業資金流向</span>
-        <div style="display:flex;gap:6px;align-items:center">
-          <span class="panel-badge" id="radarDate">--</span>
-          <button class="radar-btn" onclick="loadMoneyFlow()" style="padding:2px 8px">↻ 更新</button>
-        </div>
-      </div>
-      <div class="radar-btn-row">
-        <button class="radar-btn active" onclick="setRadarMode('all',this)">全部</button>
-        <button class="radar-btn" onclick="setRadarMode('foreign',this)">🌐 外資</button>
-        <button class="radar-btn" onclick="setRadarMode('trust',this)">🏦 投信</button>
-        <button class="radar-btn" onclick="setRadarMode('dealer',this)">🏢 自營商</button>
-      </div>
-      <div class="treemap-wrap" id="treemapWrap">
-        <div class="radar-loading" id="treemapLoading"><div class="radar-spin"></div>載入資金流向中...</div>
-      </div>
-    </div>
-
-    <!-- 右：法人合計淨買超長條圖 -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">INSTITUTIONAL FLOW · 三大法人淨買超</span>
-        <span class="panel-badge" id="flowTotal">--</span>
-      </div>
-      <div id="flowChart" class="flow-chart">
-        <div class="radar-loading"><div class="radar-spin"></div>載入中...</div>
-      </div>
-    </div>
-
-  </div>
-</div>
 
 <!-- 主內容 -->
 <div class="main-grid">
@@ -753,16 +965,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
       <span class="panel-title">SIGNAL MONITOR</span>
       <span class="panel-badge" id="hitCount">0 訊號</span>
     </div>
-    <!-- 個股搜尋 -->
-    <div class="search-bar">
-      <input class="search-input" id="stockSearchInput" type="text"
-        placeholder="輸入股票代號或名稱（如 2330 或 台積電）..."
-        onkeydown="if(event.key==='Enter') searchStock()">
-      <button class="btn-search" onclick="searchStock()">🔍 分析個股</button>
-    </div>
-    <!-- 個股詳細分析結果 -->
-    <div class="stock-detail" id="stockDetail"></div>
-    <div class="filter-bar">
+        <div class="filter-bar">
       <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">全部</button>
       <button class="filter-btn f-breakout" data-filter="breakout" onclick="setFilter('breakout',this)">🚀 爆量突破</button>
       <button class="filter-btn f-consolidation" data-filter="consolidation" onclick="setFilter('consolidation',this)">📦 強勢整理</button>
@@ -857,6 +1060,51 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   </div>
 </div>
 
+
+</div>
+
+<div class="view" id="view-radar">
+<div class="radar-section">
+  <div class="radar-grid">
+
+    <!-- 左：產業資金流向排行 -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">MONEY FLOW RADAR · 產業資金流向</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="panel-badge" id="radarDate">--</span>
+          <button class="radar-btn" onclick="loadMoneyFlow()" style="padding:2px 8px">↻ 更新</button>
+        </div>
+      </div>
+      <div class="radar-btn-row">
+        <button class="radar-btn active" onclick="setRadarMode('all',this)">全部</button>
+        <button class="radar-btn" onclick="setRadarMode('foreign',this)">🌐 外資</button>
+        <button class="radar-btn" onclick="setRadarMode('trust',this)">🏦 投信</button>
+        <button class="radar-btn" onclick="setRadarMode('dealer',this)">🏢 自營商</button>
+      </div>
+      <div class="treemap-wrap" id="treemapWrap">
+        <div class="radar-loading" id="treemapLoading"><div class="radar-spin"></div>載入資金流向中...</div>
+      </div>
+    </div>
+
+    <!-- 右：法人合計淨買超長條圖 -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">INSTITUTIONAL FLOW · 三大法人淨買超</span>
+        <span class="panel-badge" id="flowTotal">--</span>
+      </div>
+      <div id="flowChart" class="flow-chart">
+        <div class="radar-loading"><div class="radar-spin"></div>載入中...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+</div>
+
+<div class="view" id="view-lt">
 <!-- 中長期潛力掃描 -->
 <div class="panel" style="margin-top:14px">
   <div class="panel-header">
@@ -907,6 +1155,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   </div>
 </div>
 
+
+</div>
+
+<div class="view" id="view-bt">
 <!-- 回測績效 -->
 <div class="panel bt-section">
   <div class="panel-header">
@@ -923,14 +1175,33 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
   </div>
 </div>
 
+
+</div>
+
+<div class="view" id="view-sent">
+<!-- 市場情緒儀表板 -->
+<div class="panel" style="margin-bottom:16px">
+  <div class="panel-header">
+    <span class="panel-title">MARKET SENTIMENT · 市場情緒儀表板</span>
+    <button class="radar-btn" id="btnSentimentRefresh" onclick="loadSentimentDashboard()">↻ 更新市場情緒</button>
+  </div>
+  <div id="sentimentBody" style="padding:16px">
+    <div class="sent-loading"><div class="radar-spin"></div>載入市場情緒資料中...</div>
+  </div>
+</div>
+
+
+</div>
+
 <!-- 底部狀態列 -->
 <div class="statusbar">
   <div style="display:flex;align-items:center;gap:16px">
     <span><span class="sb-dot off" id="connDot"></span><span id="connStatus">未連線</span></span>
     <span>資料來源：Finmind Open API</span>
   </div>
-  <span>飆股狙擊系統 v9.31 PRO ── 僅供參考，投資有風險</span>
+  <span>飆股狙擊系統 v10.0 PRO ── 僅供參考，投資有風險</span>
 </div>
+
 
 </div><!-- /wrap -->
 
@@ -4743,7 +5014,7 @@ async function fetchTopStocks() {
   }
 
   renderHits();
-  addLog("飆股狙擊系統 v9.31 專業版初始化完成");
+  addLog("飆股狙擊系統 v10.0 儀表板版初始化完成");
   if (token) loadMoneyFlow(); // 自動載入資金雷達
   addLog("資料來源：FinMind API｜日快取已啟用");
   // ── v9.0 初始化 ──
@@ -6174,6 +6445,949 @@ function switchBrokerTab(tab) {
     sellTab?.classList.add("active");
   }
 }
+
+</script>
+<script>
+
+// ════════════════════════════════════════════════════════
+// v10 儀表板模組 A:資料抓取 + 指標計算 + 分析模型
+// 全部由 FinMind 既有資料以「規則式公式」在前端計算,不呼叫任何 AI API
+// ════════════════════════════════════════════════════════
+(function () {
+"use strict";
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const nf = (v, d = 0) => (v == null || !isFinite(v)) ? "--" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const sg = (v, d = 0) => (v == null || !isFinite(v)) ? "--" : (v > 0 ? "+" : "") + nf(v, d);
+const escH = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sumA = a => a.reduce((x, y) => x + y, 0);
+const meanA = a => a.length ? sumA(a) / a.length : 0;
+const stdA = a => { if (a.length < 2) return 0; const m = meanA(a); return Math.sqrt(meanA(a.map(x => (x - m) * (x - m)))); };
+const pickMax = a => a.reduce((x, y) => y > x ? y : x, -Infinity);
+const pickMin = a => a.reduce((x, y) => y < x ? y : x, Infinity);
+
+function smaS(a, n) { const o = []; let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; o.push(i >= n - 1 ? s / n : null); } return o; }
+function emaS(a, n) { const k = 2 / (n + 1); const o = []; let e = null; for (const v of a) { e = e == null ? v : v * k + e * (1 - k); o.push(e); } return o; }
+function rsiS(c, n) {
+  n = n || 14; const o = new Array(c.length).fill(null); if (c.length < n + 1) return o;
+  let g = 0, l = 0; for (let i = 1; i <= n; i++) { const d = c[i] - c[i - 1]; if (d >= 0) g += d; else l -= d; }
+  g /= n; l /= n; o[n] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+  for (let i = n + 1; i < c.length; i++) { const d = c[i] - c[i - 1]; g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); }
+  return o;
+}
+const lastNN = a => { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+
+// ── 資料抓取(價量:含成交金額/成交筆數)──
+async function fetchPx(id) {
+  const ck = "pxD_" + id; const c = memGet(ck); if (c) return c;
+  const end = new Date(), st = new Date(); st.setDate(st.getDate() - 165);
+  const f = d => d.toISOString().split("T")[0];
+  const url = USE_BACKEND
+    ? `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=${id}&start_date=${f(st)}&end_date=${f(end)}`
+    : `${FINMIND_API}?dataset=TaiwanStockPrice&data_id=${id}&start_date=${f(st)}&end_date=${f(end)}&token=${token}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const j = await res.json();
+    const rows = (j.data || []).filter(r => parseFloat(r.close) > 0);
+    if (rows.length < 30) return null;
+    const o = { date: [], open: [], high: [], low: [], close: [], vol: [], amt: [], cnt: [] };
+    rows.forEach(r => {
+      o.date.push(r.date); o.open.push(parseFloat(r.open)); o.high.push(parseFloat(r.max)); o.low.push(parseFloat(r.min));
+      o.close.push(parseFloat(r.close)); o.vol.push(parseFloat(r.Trading_Volume) || 0);
+      o.amt.push(parseFloat(r.Trading_money) || 0); o.cnt.push(parseFloat(r.Trading_turnover) || 0);
+    });
+    memSet(ck, o); return o;
+  } catch (e) { return null; }
+}
+
+// ── 三大法人每日彙總(單位:張)──
+function buildInst(chip) {
+  if (!chip || !chip.inst || !chip.inst.length) return null;
+  const M = { Foreign_Investor: "f", "外資": "f", "外資及陸資": "f", Investment_Trust: "t", "投信": "t", Dealer_self: "d", Dealer_Hedging: "d", "自營商": "d" };
+  const by = {};
+  chip.inst.forEach(r => {
+    const k = M[r.name]; if (!k) return;
+    const b = parseInt(r.buy || r.Buy || 0) || 0, s = parseInt(r.sell || r.Sell || 0) || 0;
+    const o = by[r.date] || (by[r.date] = { date: r.date, f: 0, t: 0, d: 0, buy: 0, sell: 0 });
+    o[k] += (b - s) / 1000; o.buy += b / 1000; o.sell += s / 1000;
+  });
+  const days = Object.values(by).sort((a, b) => a.date.localeCompare(b.date));
+  days.forEach(d => d.tot = d.f + d.t + d.d);
+  return days.length ? days : null;
+}
+function buildMargin(chip) {
+  if (!chip || !chip.margin || !chip.margin.length) return null;
+  const arr = [...chip.margin].sort((a, b) => a.date.localeCompare(b.date));
+  return arr.map(r => ({ date: r.date, bal: parseInt(r.MarginPurchaseTodayBalance || 0) || 0, short: parseInt(r.ShortSaleTodayBalance || 0) || 0 }));
+}
+
+// ── 價量分佈(把每日成交量按 高~低 區間均攤到價格區間)──
+function volProfile(px, w, nb) {
+  const n = px.close.length, s = Math.max(0, n - w);
+  let lo = Infinity, hi = -Infinity;
+  for (let j = s; j < n; j++) { if (px.low[j] < lo) lo = px.low[j]; if (px.high[j] > hi) hi = px.high[j]; }
+  if (!(hi > lo)) hi = lo + 1;
+  const bw = (hi - lo) / nb, p = new Array(nb).fill(0), rows = [];
+  for (let j = s; j < n; j++) {
+    const arr = new Array(nb).fill(0), l = px.low[j], h = px.high[j], v = px.vol[j];
+    if (h <= l) { arr[Math.min(nb - 1, Math.max(0, Math.floor((l - lo) / bw)))] += v; }
+    else {
+      const span = h - l;
+      for (let b = 0; b < nb; b++) {
+        const b0 = lo + b * bw, b1 = b0 + bw, ov = Math.max(0, Math.min(h, b1) - Math.max(l, b0));
+        if (ov > 0) arr[b] += v * ov / span;
+      }
+    }
+    rows.push(arr); for (let b = 0; b < nb; b++) p[b] += arr[b];
+  }
+  return { lo, hi, bw, nb, p, rows, s, dates: px.date.slice(s) };
+}
+const binCenter = (pf, b) => pf.lo + (b + 0.5) * pf.bw;
+
+// 局部高量節點
+function volNodes(pf) {
+  const sm = pf.p.map((v, b) => (v * 2 + (pf.p[b - 1] || v) + (pf.p[b + 1] || v)) / 4);
+  const avgv = meanA(sm), nodes = [];
+  for (let b = 0; b < pf.nb; b++) {
+    const l = sm[b - 1] == null ? -1 : sm[b - 1], r = sm[b + 1] == null ? -1 : sm[b + 1];
+    if (sm[b] >= l && sm[b] >= r && sm[b] > avgv) nodes.push({ price: binCenter(pf, b), v: sm[b] });
+  }
+  return nodes;
+}
+
+// 分數標籤
+function tierLabel(s) { return s >= 70 ? "良好" : s >= 50 ? "普通" : "偏弱"; }
+function gradeOf(s) { return s >= 80 ? "A" : s >= 65 ? "B" : s >= 50 ? "C" : s >= 35 ? "D" : "E"; }
+function riskLabel(r) { return r < 30 ? "低" : r < 50 ? "中" : r < 65 ? "中高" : "高"; }
+
+// ════════════ 主模型 ════════════
+function buildModel(id, name, px, chip, rev, per) {
+  const n = px.close.length, i = n - 1, C = px.close, H = px.high, L = px.low, O = px.open, V = px.vol;
+  const m = { id, name, n, px, chip, rev, per };
+  m.close = C[i]; m.prev = C[i - 1]; m.chg = m.close - m.prev; m.chgPct = m.chg / m.prev * 100;
+  m.open = O[i]; m.high = H[i]; m.low = L[i];
+  m.volLots = V[i] / 1000; m.cnt = px.cnt[i]; m.date = px.date[i];
+
+  // 均線
+  m.maS = { 5: smaS(C, 5), 10: smaS(C, 10), 20: smaS(C, 20), 60: smaS(C, 60) };
+  const maAt = k => m.maS[k][i] != null ? m.maS[k][i] : meanA(C);
+  m.ma5 = maAt(5); m.ma10 = maAt(10); m.ma20 = maAt(20); m.ma60 = maAt(60);
+  const slope = k => { const a = m.maS[k][i], b = m.maS[k][i - 5]; return (a != null && b != null) ? a - b : 0; };
+
+  // 主力成本 VWAP20(成交金額/成交量)
+  const vwapAt = (t, w) => { let sa = 0, sv = 0; for (let j = Math.max(0, t - w + 1); j <= t; j++) { sa += (px.amt[j] > 0 ? px.amt[j] : C[j] * V[j]); sv += V[j]; } return sv ? sa / sv : C[t]; };
+  m.vwapAt = vwapAt; m.vwap = vwapAt(i, 20);
+  m.vwapDev = (m.close / m.vwap - 1) * 100;
+
+  // KD / MACD / RSI
+  const bars = px.date.map((d, j) => ({ high: H[j], low: L[j], close: C[j] }));
+  const kd = calcKD(bars, 9); m.K = kd.K; m.D = kd.D; m.k = kd.K[i]; m.d = kd.D[i];
+  const e12 = emaS(C, 12), e26 = emaS(C, 26); m.dif = e12.map((v, j) => v - e26[j]); m.dea = emaS(m.dif, 9); m.macd = m.dif.map((v, j) => (v - m.dea[j]) * 2);
+  m.rsiSer = rsiS(C, 14); m.rsi = lastNN(m.rsiSer) == null ? 50 : lastNN(m.rsiSer);
+
+  // 報酬 / 波動
+  const r = []; for (let j = 1; j < n; j++) r.push(Math.log(C[j] / C[j - 1]));
+  m.rets = r;
+  m.sig20 = stdA(r.slice(-20)) * 100;
+  let trs = []; for (let j = Math.max(1, n - 14); j < n; j++) trs.push(Math.max(H[j] - L[j], Math.abs(H[j] - C[j - 1]), Math.abs(L[j] - C[j - 1])));
+  m.atrPct = meanA(trs) / m.close * 100;
+  m.ret5 = (C[i] / C[Math.max(0, i - 5)] - 1) * 100;
+  m.ret10 = (C[i] / C[Math.max(0, i - 10)] - 1) * 100;
+  const w60 = Math.min(60, n);
+  m.high60 = pickMax(H.slice(-w60)); m.low60 = pickMin(L.slice(-w60));
+  m.high20 = pickMax(C.slice(-21, -1)); m.low20 = pickMin(C.slice(-21, -1));
+  m.pos20 = (m.high20 - m.low20) > 0 ? clamp((m.close - m.low20) / (m.high20 - m.low20) * 100) : 50;
+
+  // 量能
+  const lots = V.map(v => v / 1000);
+  m.avgVol20 = meanA(lots.slice(-21, -1)); m.vr = m.avgVol20 ? lots[i] / m.avgVol20 : 1;
+  m.mv5 = meanA(V.slice(-5)); m.mv20 = meanA(V.slice(-20)); m.volRatio5_20 = m.mv20 ? m.mv5 / m.mv20 : 1;
+  m.amt20 = meanA(px.amt.slice(-20).map((a, k) => a > 0 ? a : C[n - 20 + k] * V[n - 20 + k] || 0));
+  let upV = 0, dnV = 0; for (let j = Math.max(1, n - 20); j < n; j++) { if (C[j] > C[j - 1]) upV += V[j]; else if (C[j] < C[j - 1]) dnV += V[j]; }
+  m.upV = upV; m.dnV = dnV; m.lsRatio = dnV > 0 ? upV / dnV : (upV > 0 ? 9.99 : 1);
+  m.bullPct = (upV + dnV) > 0 ? upV / (upV + dnV) * 100 : 50;
+
+  // 法人 / 融資
+  m.inst = buildInst(chip); m.mg = buildMargin(chip);
+  m.chipInfo = analyzeChip(chip || { inst: null, margin: null });
+  if (m.inst) {
+    const l5 = m.inst.slice(-5);
+    m.f5 = sumA(l5.map(d => d.f)); m.t5 = sumA(l5.map(d => d.t)); m.d5 = sumA(l5.map(d => d.d)); m.net5 = m.f5 + m.t5 + m.d5;
+    m.net20 = sumA(m.inst.map(d => d.tot));
+    m.instLast = m.inst[m.inst.length - 1];
+    m.instVol5 = sumA(V.slice(-5)) / 1000;
+    const tail = m.inst.slice(-10); m.instPosDays = tail.filter(d => d.tot > 0).length; m.instDays10 = tail.length;
+  }
+  if (m.mg && m.mg.length >= 2) {
+    const a = m.mg[m.mg.length - 1].bal, b = m.mg[Math.max(0, m.mg.length - 6)].bal;
+    m.mgChg5 = b > 0 ? (a / b - 1) * 100 : 0; m.mgBal = a;
+  }
+
+  // 技術研判(沿用既有規則)
+  m.tv = calcTechnicalVerdict(m.close, m.ma5, m.ma10, m.ma20, m.ma60, m.volRatio5_20, m.chgPct, m.high20, m.low20);
+
+  // 策略型態(沿用既有三策略)
+  const dLegacy = { close: C, open: O, high: H, low: L, volume: V, date: px.date };
+  m.strategy = "觀望"; m.stratType = null;
+  try {
+    if (m.close >= m.high20 && m.mv5 > m.mv20 * 2) { m.strategy = "爆量突破"; m.stratType = "breakout"; }
+    else if (checkConsolidation(id, dLegacy)) { m.strategy = "強勢整理"; m.stratType = "consolidation"; }
+    else if (checkAccumulation(id, dLegacy)) { m.strategy = "主力蓄勢"; m.stratType = "accumulation"; }
+  } catch (e) {}
+
+  // ── 趨勢分數 ──
+  let ts = 0;
+  ts += m.close > m.ma5 ? 1 : 0; ts += m.close > m.ma10 ? 1 : 0; ts += m.close > m.ma20 ? 1 : 0; ts += m.close > m.ma60 ? 1 : 0;
+  ts += slope(20) > 0 ? 1 : 0; ts += slope(60) > 0 ? 1 : 0; ts += (m.ma5 > m.ma10 && m.ma10 > m.ma20) ? 1 : 0;
+  m.trendScore = ts / 7 * 100;
+  m.trendLabel = m.trendScore >= 85 ? "多頭強勢" : m.trendScore >= 65 ? "中性偏多" : m.trendScore >= 40 ? "中性震盪" : m.trendScore >= 20 ? "中性偏空" : "空頭走弱";
+
+  // ── 六維分數(0~100,越高越好)──
+  const sc = {};
+  sc.trend = m.trendScore;
+  sc.mom = clamp(0.5 * m.rsi + 0.5 * clamp(50 + m.ret10 * 2.5));
+  if (m.inst) {
+    const ratio = m.instVol5 ? m.net5 / m.instVol5 : 0;
+    sc.inst = clamp(0.5 * clamp(50 + ratio * 250) + 0.5 * (m.instPosDays / m.instDays10 * 100));
+  } else sc.inst = null;
+  const mgScore = m.mgChg5 != null ? clamp(50 - m.mgChg5 * 2) : 50;
+  sc.chip = m.inst || m.mg ? clamp(0.7 * (m.chipInfo.chipScore * 20) + 0.3 * mgScore) : null;
+  sc.liq = clamp((Math.log10(Math.max(m.amt20, 1)) - 7) / 2 * 100);
+  sc.vol = clamp(100 - m.sig20 * 25);
+  m.sc = sc;
+  const W = { trend: .2, inst: .2, mom: .15, chip: .2, liq: .1, vol: .15 };
+  let tw = 0, ws = 0; Object.keys(W).forEach(k => { if (sc[k] != null) { tw += W[k]; ws += W[k] * sc[k]; } });
+  m.total = tw ? ws / tw : 50; m.grade = gradeOf(m.total);
+  const v = k => sc[k] == null ? 50 : sc[k];
+  m.vv = { trend: v("trend"), mom: v("mom"), inst: v("inst"), chip: v("chip"), liq: v("liq"), vol: v("vol") };
+
+  // ── 風險六軸(0~100,越高越危險)──
+  const chase = clamp((m.rsi - 50) * 2.5 + Math.max(0, (m.close / m.ma20 - 1) * 100 * 4));
+  m.riskAxes = [
+    { k: "流動性風險", v: 100 - m.vv.liq }, { k: "波動風險", v: 100 - m.vv.vol }, { k: "趨勢風險", v: 100 - m.vv.trend },
+    { k: "籌碼風險", v: 100 - m.vv.chip }, { k: "法人風險", v: 100 - m.vv.inst }, { k: "追價風險", v: chase },
+  ];
+  m.riskIdx = meanA(m.riskAxes.map(a => a.v)); m.riskLbl = riskLabel(m.riskIdx);
+
+  // ── 隔日沖風險(每一項都是可直接驗算的機械指標)──
+  const dj = { };
+  dj.sell = m.inst ? clamp(50 - (m.instVol5 ? m.net5 / m.instVol5 : 0) * 500) : null;   // 法人賣壓
+  dj.vol = clamp(m.vr * 30);                                                             // 量能異常
+  dj.mg = m.mgChg5 != null ? clamp(50 + m.mgChg5 * 3) : null;                            // 融資變動
+  dj.wick = (m.high - m.low) > 0 ? clamp((m.high - m.close) / (m.high - m.low) * 100) : 0; // 上影線壓力
+  dj.rng = clamp((m.high - m.low) / m.prev * 100 * 10);                                  // 日內振幅
+  m.dj = dj;
+  const djv = Object.values(dj).filter(x => x != null); m.djIdx = meanA(djv);
+  m.djLbl = m.djIdx < 34 ? "低" : m.djIdx < 60 ? "中" : "高";
+
+  // ── 價量分佈 / 支撐壓力 ──
+  m.pf60 = volProfile(px, 60, 30); m.pf30 = volProfile(px, 30, 26);
+  const nodes = volNodes(m.pf60);
+  const below = nodes.filter(x => x.price < m.close).sort((a, b) => b.price - a.price);
+  const above = nodes.filter(x => x.price > m.close).sort((a, b) => a.price - b.price);
+  m.support = [below[0] ? below[0].price : m.ma60, m.low60];
+  m.resist = [above[0] ? above[0].price : m.high60, m.high60];
+  if (m.support[0] < m.support[1]) m.support[0] = m.support[1];
+
+  // 熱區佔比
+  const T = sumA(m.pf30.p) || 1;
+  const zoneSum = f => sumA(m.pf30.p.map((v, b) => f(binCenter(m.pf30, b)) ? v : 0)) / T * 100;
+  const sortedP = [...m.pf30.p].sort((a, b) => b - a), avgP = meanA(m.pf30.p);
+  m.zones = [
+    { k: "壓力區", c: "#ff4d57", v: zoneSum(p => p > m.close * 1.05) },
+    { k: "大量成交區", c: "#f5a623", v: sumA(sortedP.slice(0, 3)) / T * 100 },
+    { k: "密集成交區", c: "#f2d13a", v: sumA(m.pf30.p.filter(x => x >= avgP * 1.3)) / T * 100 },
+    { k: "價平區", c: "#3fd28c", v: zoneSum(p => Math.abs(p / m.close - 1) <= 0.05) },
+    { k: "支撐區", c: "#4c8dff", v: zoneSum(p => p < m.close * 0.95) },
+  ];
+
+  // ── 主力語意 / 行為 ──
+  if (m.inst) {
+    m.mainAct = m.net5 > 0 && m.net20 > 0 ? "法人偏多加碼" : m.net5 < 0 && m.net20 > 0 ? "調節減碼" : m.net5 < 0 ? "持續減碼" : "回補承接";
+  } else m.mainAct = m.lsRatio > 1.2 ? "量能偏多" : m.lsRatio < 0.83 ? "量能偏空" : "多空均衡";
+  m.chipStruct = m.chipInfo.chipScore >= 4 ? "集中偏多" : m.chipInfo.chipScore >= 2 ? "中性" : "鬆動偏空";
+  m.shortState = (m.close >= m.high20 && m.vr >= 1.5) ? "突破攻擊" : m.k > 85 ? "短線過熱" : m.k < 15 ? "短線超賣" : Math.abs(m.ret5) < 4 ? "區間震盪" : m.ret5 > 0 ? "短線走強" : "短線轉弱";
+  m.healthChip = m.vv.chip;
+
+  // 12 紅綠燈 / 10 多空能量 / 17 多空強度
+  m.bullN = m.tv.bull + (m.inst ? (m.f5 > 0) + (m.t5 > 0) + (m.net5 > 0) : 0);
+  m.bearN = m.tv.bear + (m.inst ? (m.f5 < 0) + (m.t5 < 0) + (m.net5 < 0) : 0);
+  m.facN = m.tv.total + (m.inst ? 3 : 0);
+  m.bullStr = m.bullN / m.facN * 100; m.bearStr = m.bearN / m.facN * 100;
+  m.volStr = clamp(m.vr / 2 * 100);
+  m.sigLevel = clamp(Math.ceil(m.total / 20), 1, 5);
+
+  // 情緒
+  m.sent = {
+    retail: m.mgChg5 != null ? clamp(50 + m.mgChg5 * 4) : clamp(50 + m.ret10 * 2),
+    inst: m.vv.inst,
+    pv: clamp(0.5 * m.bullPct + 0.5 * m.vv.mom),
+  };
+  m.sentAll = meanA([m.sent.retail, m.sent.inst, m.sent.pv]);
+  m.sentLbl = m.sentAll >= 60 ? "偏多" : m.sentAll >= 40 ? "中性" : "偏空";
+
+  // 買賣力(法人 vs 非法人,近 N 日成交量佔比)
+  if (m.inst) {
+    const t = m.inst.slice(-20); const dayVol = {}; px.date.forEach((d, j) => dayVol[d] = V[j] / 1000);
+    let buyS = 0, sellS = 0, volS = 0; t.forEach(d => { if (dayVol[d.date]) { buyS += d.buy; sellS += d.sell; volS += dayVol[d.date]; } });
+    if (volS > 0) { m.bs = { bigBuy: clamp(buyS / volS * 100), bigSell: clamp(sellS / volS * 100), days: t.length, date: t[t.length - 1].date }; }
+  }
+
+  // 信心維度(全部可驗算)
+  const have = [!!px, !!m.inst, !!m.mg, !!(chip && chip.broker && chip.broker.data), !!(rev && rev.yoy != null), !!(per && per.per != null)];
+  m.confData = have.filter(Boolean).length / have.length * 100;
+  // 訊號穩定度:過去 5 日趨勢分數的一致性
+  const ts5 = []; for (let b = 0; b < 5; b++) { const t = i - b; let s2 = 0; const cc = C[t]; [5, 10, 20, 60].forEach(k => { const a = m.maS[k][t]; if (a != null && cc > a) s2++; }); ts5.push(s2 / 4 * 100); }
+  m.confStab = clamp(100 - stdA(ts5) * 1.6);
+  const vals = Object.values(m.vv); const above50 = vals.filter(x => x >= 50).length;
+  m.confAgree = Math.max(above50, vals.length - above50) / vals.length * 100;
+  m.hist = null;
+  if (m.stratType) { try { m.hist = getHistoricalWinRate({ type: m.stratType, volRatio: m.vr, chipScore: m.chipInfo.chipScore, changePct: m.chgPct }); } catch (e) {} }
+  const cd = [m.confData, m.confStab, m.confAgree]; if (m.hist && m.hist.sufficient) cd.push(m.hist.winRate);
+  m.confidence = meanA(cd);
+
+  // 預測路徑(統計推估)
+  m.fc = buildForecast(m);
+  return m;
+}
+
+// 10 日統計推估:歷史 10 日報酬分佈 + 近 60 日漂移/波動
+function buildForecast(m) {
+  const C = m.px.close, n = C.length, H = 10;
+  const r60 = m.rets.slice(-60), mu = meanA(r60), sd = stdA(r60);
+  const wins = []; for (let j = 0; j + H < n; j++) wins.push(C[j + H] / C[j] - 1);
+  const th = 0.02; let up, dn, mid;
+  if (wins.length >= 30) { up = wins.filter(x => x > th).length / wins.length; dn = wins.filter(x => x < -th).length / wins.length; mid = 1 - up - dn; }
+  else {
+    const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+    const mH = mu * H, sH = sd * Math.sqrt(H) || 0.01; up = 1 - Phi((Math.log(1 + th) - mH) / sH); dn = Phi((Math.log(1 - th) - mH) / sH); mid = 1 - up - dn;
+  }
+  function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+  const path = [];
+  for (let t = 0; t <= H; t++) {
+    const c = m.close * Math.exp(mu * t), s = sd * Math.sqrt(t);
+    path.push({ t, c, hi: m.close * Math.exp(mu * t + s), lo: m.close * Math.exp(mu * t - s), hi2: m.close * Math.exp(mu * t + 0.4 * s), lo2: m.close * Math.exp(mu * t - 0.4 * s) });
+  }
+  return { up, dn, mid, path, dirBull: (up + dn) > 0 ? up / (up + dn) * 100 : 50, drift: mu * 252 * 100, nWin: wins.length };
+}
+
+// ════════════ 技術警示(任務二)════════════
+function buildAlerts(m) {
+  const px = m.px, n = px.close.length, C = px.close, out = [];
+  const push = (j, lv, t, d) => out.push({ date: px.date[j], lv, t, d, j });
+  const from = Math.max(21, n - 25);
+  for (let j = from; j < n; j++) {
+    const m5 = m.maS[5][j], m5p = m.maS[5][j - 1], m20 = m.maS[20][j], m20p = m.maS[20][j - 1], m60 = m.maS[60][j], m60p = m.maS[60][j - 1];
+    if (m5 != null && m20 != null && m5p != null && m20p != null) {
+      if (m5p <= m20p && m5 > m20) push(j, "mid", "5MA 上穿 20MA(黃金交叉)", `5MA ${nf(m5, 2)} 上穿 20MA ${nf(m20, 2)}`);
+      if (m5p >= m20p && m5 < m20) push(j, "hi", "5MA 下穿 20MA(死亡交叉)", `5MA ${nf(m5, 2)} 下穿 20MA ${nf(m20, 2)}`);
+    }
+    if (m20 != null && m20p != null) {
+      if (C[j - 1] <= m20p && C[j] > m20) push(j, "lo", "收盤站上月線(20MA)", `收盤 ${nf(C[j], 2)} > 20MA ${nf(m20, 2)}`);
+      if (C[j - 1] >= m20p && C[j] < m20) push(j, "hi", "收盤跌破月線(20MA)", `收盤 ${nf(C[j], 2)} < 20MA ${nf(m20, 2)}`);
+    }
+    if (m60 != null && m60p != null) {
+      if (C[j - 1] <= m60p && C[j] > m60) push(j, "mid", "收盤站上季線(60MA)", `收盤 ${nf(C[j], 2)} > 60MA ${nf(m60, 2)}`);
+      if (C[j - 1] >= m60p && C[j] < m60) push(j, "hi", "收盤跌破季線(60MA)", `收盤 ${nf(C[j], 2)} < 60MA ${nf(m60, 2)}`);
+    }
+    const kp = m.K[j - 1], dp = m.D[j - 1], kk = m.K[j], dd = m.D[j];
+    if (kp <= dp && kk > dd) push(j, kk < 50 ? "mid" : "lo", "KD 黃金交叉", `K ${nf(kk, 1)} 上穿 D ${nf(dd, 1)}`);
+    if (kp >= dp && kk < dd) push(j, kk > 50 ? "mid" : "lo", "KD 死亡交叉", `K ${nf(kk, 1)} 下穿 D ${nf(dd, 1)}`);
+    if (kk > 80 && kp <= 80) push(j, "mid", "KD 進入超買區(K>80)", `K ${nf(kk, 1)}`);
+    if (kk < 20 && kp >= 20) push(j, "mid", "KD 進入超賣區(K<20)", `K ${nf(kk, 1)}`);
+    if (m.dif[j - 1] <= m.dea[j - 1] && m.dif[j] > m.dea[j]) push(j, "mid", "MACD 黃金交叉", `DIF ${nf(m.dif[j], 2)} 上穿 DEA ${nf(m.dea[j], 2)}`);
+    if (m.dif[j - 1] >= m.dea[j - 1] && m.dif[j] < m.dea[j]) push(j, "mid", "MACD 死亡交叉", `DIF ${nf(m.dif[j], 2)} 下穿 DEA ${nf(m.dea[j], 2)}`);
+    const rs = m.rsiSer[j], rp = m.rsiSer[j - 1];
+    if (rs != null && rp != null) { if (rs > 70 && rp <= 70) push(j, "mid", "RSI 進入超買(>70)", `RSI14 ${nf(rs, 1)}`); if (rs < 30 && rp >= 30) push(j, "mid", "RSI 進入超賣(<30)", `RSI14 ${nf(rs, 1)}`); }
+    const av = meanA(px.vol.slice(Math.max(0, j - 20), j)); if (av > 0 && px.vol[j] > av * 2) push(j, C[j] >= C[j - 1] ? "mid" : "hi", `爆量 ×${nf(px.vol[j] / av, 1)}`, `成交量 ${nf(px.vol[j] / 1000)} 張,為前 20 日均量 ${nf(av / 1000)} 張的 ${nf(px.vol[j] / av, 1)} 倍(${C[j] >= C[j - 1] ? "收紅" : "收黑"})`);
+    const hh = pickMax(C.slice(Math.max(0, j - 20), j)), ll = pickMin(C.slice(Math.max(0, j - 20), j));
+    if (C[j] > hh) push(j, "lo", "創 20 日收盤新高", `收盤 ${nf(C[j], 2)} > 前 20 日高 ${nf(hh, 2)}`);
+    if (C[j] < ll) push(j, "hi", "創 20 日收盤新低", `收盤 ${nf(C[j], 2)} < 前 20 日低 ${nf(ll, 2)}`);
+    if (px.low[j] > px.high[j - 1] * 1.02) push(j, "lo", "向上跳空缺口", `最低 ${nf(px.low[j], 2)} > 前日最高 ${nf(px.high[j - 1], 2)}`);
+    if (px.high[j] < px.low[j - 1] * 0.98) push(j, "hi", "向下跳空缺口", `最高 ${nf(px.high[j], 2)} < 前日最低 ${nf(px.low[j - 1], 2)}`);
+  }
+  if (m.inst) {
+    for (const key of [["f", "外資"], ["t", "投信"]]) {
+      let run = 0, dir = 0; for (let k = m.inst.length - 1; k >= 0; k--) { const s = Math.sign(m.inst[k][key[0]]); if (s === 0) break; if (!dir) dir = s; if (s === dir) run++; else break; }
+      if (run >= 3) out.push({ date: m.inst[m.inst.length - 1].date, lv: dir > 0 ? "lo" : "mid", t: `${key[1]}連續 ${run} 日${dir > 0 ? "買超" : "賣超"}`, d: `近 ${run} 日合計 ${sg(sumA(m.inst.slice(-run).map(d => d[key[0]])))} 張` });
+    }
+  }
+  if (m.mg && m.mg.length >= 2) {
+    const a = m.mg[m.mg.length - 1], b = m.mg[m.mg.length - 2]; const pct = b.bal > 0 ? (a.bal / b.bal - 1) * 100 : 0;
+    if (Math.abs(pct) >= 5) out.push({ date: a.date, lv: "mid", t: `融資單日${pct > 0 ? "暴增" : "大減"} ${sg(pct, 1)}%`, d: `融資餘額 ${nf(b.bal)} → ${nf(a.bal)} 張` });
+  }
+  const rank = { hi: 0, mid: 1, lo: 2 };
+  out.sort((a, b) => b.date.localeCompare(a.date) || rank[a.lv] - rank[b.lv]);
+  return out;
+}
+
+window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel };
+})();
+
+
+// ════════════════════════════════════════════════════════
+// v10 儀表板模組 B:18 格面板(+4 個延伸面板)渲染
+// ════════════════════════════════════════════════════════
+(function () {
+"use strict";
+const A = window.__dashA;
+const { clamp, nf, sg, escH, sumA, meanA, pickMax, pickMin, binCenter } = A;
+
+const cl = () => ({
+  up: cssVar("--up"), down: cssVar("--down"), t2: cssVar("--text2"), tx: cssVar("--text"), bd: cssVar("--border"), bd2: cssVar("--border2"),
+  cy: cssVar("--cyan"), amb: cssVar("--amber"), good: cssVar("--good"), pu: cssVar("--purple"), bg: cssVar("--bg2"),
+});
+const cUp = v => v > 0 ? "up" : v < 0 ? "down" : "";
+const goodCol = v => v >= 70 ? "#26c6a2" : v >= 45 ? "#4c8dff" : "#f5a623";
+const riskCol = v => v >= 60 ? "#ff4d57" : v >= 40 ? "#f5a623" : "#26c6a2";
+const px2 = v => nf(v, v >= 1000 ? 2 : 2);
+const nodata = t => `<div class="t2" style="font-size:12px;padding:18px 4px;line-height:1.7">⚠ 無${t}<br><span style="font-size:10.5px">此面板需要該資料集,取得後才會計算(不以假資料代替)。</span></div>`;
+
+function hexRgb(h) { h = (h || "#000").trim().replace("#", ""); if (h.length === 3) h = h.split("").map(c => c + c).join(""); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function heatColor(t) {
+  const st = ["--heat0", "--heat1", "--heat2", "--heat3", "--heat4", "--heat5"].map(v => hexRgb(cssVar(v)));
+  t = clamp(t, 0, 1) * 5; const i = Math.min(4, Math.floor(t)), f = t - i;
+  const a = st[i], b = st[i + 1]; return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+}
+const dt = d => (d || "").slice(5).replace("-", "/");
+
+// ── 環形 / 雷達 / 進度列 ──
+function ring(pct, color, big) {
+  const C = cl(), r = 38, c = 2 * Math.PI * r, p = clamp(pct, 0, 100);
+  return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="${C.bd2}" stroke-opacity=".55" stroke-width="9"/>
+  <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * p / 100).toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 50 50)"/>
+  <text x="50" y="${big ? 58 : 57}" text-anchor="middle" font-size="${big ? 25 : 22}" font-weight="700" fill="${C.tx}" style="font-family:var(--mono)">${Math.round(p)}%</text></svg>`;
+}
+function radar(labels, vals, opt) {
+  const C = cl(), W = 250, H = 210, cx = W / 2, cy = H / 2 + 2, R = 66, n = labels.length, a0 = -120;
+  const pt = (i, f) => { const a = (a0 + i * 360 / n) * Math.PI / 180; return [cx + Math.cos(a) * R * f, cy + Math.sin(a) * R * f]; };
+  let g = "";
+  [.25, .5, .75, 1].forEach(f => { g += `<polygon points="${labels.map((_, i) => pt(i, f).map(x => x.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="${C.bd2}" stroke-width="1" ${f < 1 ? 'stroke-dasharray="2 3"' : ""} stroke-opacity=".8"/>`; });
+  labels.forEach((_, i) => { const p = pt(i, 1); g += `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="${C.bd2}" stroke-opacity=".7"/>`; });
+  const poly = vals.map((v, i) => pt(i, clamp(v) / 100).map(x => x.toFixed(1)).join(",")).join(" ");
+  g += `<polygon points="${poly}" fill="${opt.fill}" stroke="${opt.stroke}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  vals.forEach((v, i) => { const p = pt(i, clamp(v) / 100); g += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${opt.stroke}"/>`; });
+  labels.forEach((l, i) => { const p = pt(i, 1.2), a = (a0 + i * 360 / n); const cs = Math.cos(a * Math.PI / 180); const anc = cs > 0.3 ? "start" : cs < -0.3 ? "end" : "middle"; g += `<text x="${p[0].toFixed(1)}" y="${(p[1] + 3.5).toFixed(1)}" text-anchor="${anc}" font-size="11" fill="${C.tx}">${l}</text>`; });
+  if (opt.center) g += opt.center(cx, cy);
+  return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
+}
+const prow = (l, v, cls, txt) => `<div class="prow"><span class="pl">${l}</span><span class="pb ${cls}"><i style="width:${clamp(v)}%"></i></span><span class="pv">${txt != null ? txt : Math.round(v) + "%"}</span></div>`;
+const krow = (ic, k, v, c) => `<div class="krow"><span class="ki">${ic}</span><span class="kk">${k}</span><span class="kv" style="color:${c || "var(--text)"}">${v}</span></div>`;
+
+// ════════ 01 主K線圖 ════════
+function p01(m) {
+  const C = cl(), px = m.px, n = px.close.length, N = Math.min(60, n), s = n - N;
+  const W = 660, Hh = 300, pl = 6, pr = 54, pt = 8, pb = 18, volH = 46, gap = 8;
+  const priceB = Hh - pb - volH - gap, ph = priceB - pt;
+  let hi = pickMax(px.high.slice(s)), lo = pickMin(px.low.slice(s));
+  const ls = [m.resist[0], m.support[0], m.vwap]; ls.forEach(v => { if (isFinite(v)) { hi = Math.max(hi, v); lo = Math.min(lo, v); } });
+  const pad = (hi - lo) * 0.06; hi += pad; lo -= pad;
+  const Y = v => pt + (hi - v) / (hi - lo) * ph, step = (W - pl - pr) / N, X = k => pl + (k + .5) * step;
+  const maxV = pickMax(px.vol.slice(s)) || 1, yv = v => Hh - pb - v / maxV * volH;
+  let g = "";
+  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); g += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.bd}" stroke-opacity=".8" stroke-dasharray="2 4"/><text class="sv" x="${W - pr + 5}" y="${(y + 3).toFixed(1)}">${nf(v, 0)}</text>`; }
+  const bw = Math.max(2, step * 0.62);
+  for (let k = 0; k < N; k++) {
+    const j = s + k, up = px.close[j] >= px.open[j], col = up ? C.up : C.down, x = X(k);
+    const yo = Y(px.open[j]), yc = Y(px.close[j]);
+    g += `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y(px.high[j]).toFixed(1)}" y2="${Y(px.low[j]).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
+    g += `<rect x="${(x - bw / 2).toFixed(1)}" y="${Math.min(yo, yc).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(yo - yc)).toFixed(1)}" fill="${col}"/>`;
+    g += `<rect x="${(x - bw / 2).toFixed(1)}" y="${yv(px.vol[j]).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, Hh - pb - yv(px.vol[j])).toFixed(1)}" fill="${col}" fill-opacity=".55"/>`;
+  }
+  const line = (arr, col, dash) => { let d = ""; for (let k = 0; k < N; k++) { const v = arr[s + k]; if (v == null) continue; d += (d ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1); } return d ? `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.2" ${dash ? 'stroke-dasharray="4 3"' : ""}/>` : ""; };
+  g += line(m.maS[60], "#cfd8e8", true) + line(m.maS[20], "#ffb74d") + line(m.maS[10], "#9a8cff") + line(m.maS[5], "#ff8ad8");
+  const lab = (v, txt, col, x) => { const y = Y(v); const w = txt.length * 6.6 + 12; return `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-dasharray="5 4" stroke-opacity=".85"/><rect x="${x}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(0)}" height="16" rx="2" fill="${C.bg}" stroke="${col}"/><text x="${x + 6}" y="${(y + 4).toFixed(1)}" font-size="10.5" fill="${col}" style="font-family:var(--mono)">${txt}</text>`; };
+  g += lab(m.resist[0], `壓力區 ${nf(m.resist[0], 2)}`, C.up, W - pr - 128);
+  g += lab(m.vwap, `主力成本 ${nf(m.vwap, 2)}`, C.cy, 74);
+  g += lab(m.support[0], `支撐區 ${nf(m.support[0], 2)}`, C.cy, W - pr - 128);
+  for (let k = 0; k < N; k += Math.max(1, Math.round(N / 6))) g += `<text class="sv" x="${X(k).toFixed(1)}" y="${Hh - 4}" text-anchor="middle">${dt(px.date[s + k])}</text>`;
+  g += `<text class="sv" x="${W - pr + 5}" y="${yv(maxV) + 9}">${nf(maxV / 1000 / 1000, 1)}M張</text>`;
+  const lg = `<div class="legend" style="margin-bottom:4px"><span><i style="background:${C.up}"></i>K線(紅漲綠跌)</span><span><i class="ln" style="background:#ff8ad8"></i>MA5</span><span><i class="ln" style="background:#9a8cff"></i>MA10</span><span><i class="ln" style="background:#ffb74d"></i>MA20</span><span><i class="ln" style="background:#cfd8e8"></i>MA60</span><span><i style="background:${C.t2};opacity:.6"></i>成交量</span></div>`;
+  return { n: "01", t: "主K線圖", s: "AI 主力行為判讀系統", body: lg + `<svg viewBox="0 0 ${W} ${Hh}">${g}</svg>`, note: `主力成本 = 近 20 日 VWAP(成交金額 ÷ 成交量);壓力/支撐取近 60 日價量分佈最近的高量節點,無節點時退回 60 日高/低` };
+}
+
+// ════════ 02 AI 決策核心 ════════
+function p02(m) {
+  const cls = m.riskIdx >= 60 ? "red" : m.riskIdx >= 40 ? "amb" : "grn";
+  const head = cls === "red" ? "⚠ AI WARNING" : cls === "amb" ? "◆ AI CAUTION" : "✔ AI SIGNAL";
+  const tc = m.trendScore >= 65 ? "var(--up)" : m.trendScore < 40 ? "var(--down)" : "var(--amber)";
+  const rl = m.riskIdx < 25 ? "1 級" : m.riskIdx < 45 ? "2 級" : m.riskIdx < 65 ? "3 級" : "4 級";
+  const body = `<div class="warnbar ${cls}">${head}</div>
+    ${krow("📈", "趨勢判斷", m.trendLabel, tc)}
+    ${krow("🔗", "短線狀態", m.shortState, "var(--amber)")}
+    ${krow("👤", "主力行為", m.mainAct, m.inst ? (m.net5 >= 0 ? "var(--up)" : "var(--down)") : "var(--text2)")}
+    ${krow("▦", "籌碼結構", m.chipStruct)}
+    ${krow("⚠", "隔日沖風險", Math.round(m.djIdx) + "%(" + m.djLbl + ")")}
+    ${krow("♡", "籌碼健康度", Math.round(m.healthChip) + "分(" + A.tierLabel(m.healthChip) + ")")}
+    ${krow("▤", "支撐區間", nf(m.support[0], 2) + " / " + nf(m.support[1], 2))}
+    ${krow("▤", "壓力區間", nf(m.resist[0], 2) + " / " + nf(m.resist[1], 2))}
+    ${krow("⚑", "風險等級", rl + "(指數 " + Math.round(m.riskIdx) + ")", riskCol(m.riskIdx))}`;
+  return { n: "02", t: "AI 決策核心", s: "AI DECISION CORE", body, note: "規則式判斷(均線/KD/法人/量價),非機器學習模型" };
+}
+
+// ════════ 03 多維度判斷 ════════
+function p03(m) {
+  const C = cl(), v = m.vv;
+  const svg = radar(["法人", "動能", "趨勢", "籌碼", "流動性", "波動"], [v.inst, v.mom, v.trend, v.chip, v.liq, v.vol], {
+    fill: "rgba(255,77,87,.30)", stroke: C.up,
+    center: (cx, cy) => `<text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="34" font-weight="800" fill="${goodCol(m.total)}" style="font-family:var(--mono)" opacity=".92">${m.grade}</text><text x="${cx}" y="${cy + 24}" text-anchor="middle" font-size="9" fill="${C.t2}">${Math.round(m.total)}/100</text>`,
+  });
+  const miss = ["inst", "chip"].filter(k => m.sc[k] == null).map(k => ({ inst: "法人", chip: "籌碼" }[k]));
+  return { n: "03", t: "多維度判斷", body: `<div style="text-align:center;color:var(--cyan);font-weight:700;font-size:13px">綜合評分:${Math.round(m.total)} / 100</div>${svg}`, foot: `<span>總評等級:<b class="cy">${m.grade} 級</b></span><span>總評分數:<b class="cy">${Math.round(m.total)} / 100</b></span>`, note: miss.length ? `${miss.join("、")}無資料,以中性 50 計入雷達(不計入總分)` : "" };
+}
+
+// ════════ 04 籌碼熱區圖 ════════
+function p04(m) {
+  const C = cl(), pf = m.pf30, days = pf.rows.length, nb = pf.nb;
+  const W = 210, Hh = 168, pl = 34, pr = 4, pt = 4, pb = 16, cw = (W - pl - pr) / days, ch = (Hh - pt - pb) / nb;
+  let mx = 0; pf.rows.forEach(r => r.forEach(v => { if (v > mx) mx = v; }));
+  let g = "";
+  for (let d = 0; d < days; d++) for (let b = 0; b < nb; b++) {
+    const v = pf.rows[d][b]; if (v <= 0) continue;
+    g += `<rect x="${(pl + d * cw).toFixed(1)}" y="${(pt + (nb - 1 - b) * ch).toFixed(1)}" width="${(cw + .4).toFixed(1)}" height="${(ch + .4).toFixed(1)}" fill="${heatColor(Math.pow(v / mx, .6))}"/>`;
+  }
+  const yOf = v => pt + (nb - (v - pf.lo) / pf.bw) * ch;
+  let d = ""; for (let k = 0; k < days; k++) { const v = m.px.close[pf.s + k]; d += (k ? "L" : "M") + (pl + (k + .5) * cw).toFixed(1) + " " + Math.max(pt, Math.min(Hh - pb, yOf(v))).toFixed(1); }
+  g += `<path d="${d}" fill="none" stroke="#fff" stroke-width="1.3" stroke-opacity=".9"/>`;
+  for (let k = 0; k <= 4; k++) { const v = pf.lo + (pf.hi - pf.lo) * k / 4; g += `<text class="sv" x="${pl - 3}" y="${(pt + (nb - (v - pf.lo) / pf.bw * 1) * ch + 3).toFixed(1)}" text-anchor="end">${nf(v, 0)}</text>`; }
+  g += `<text class="sv" x="${pl}" y="${Hh - 3}">${dt(pf.dates[0])}</text><text class="sv" x="${W - pr}" y="${Hh - 3}" text-anchor="end">${dt(pf.dates[days - 1])}</text>`;
+  const leg = m.zones.map(z => `<div class="prow" style="padding:1.5px 0;font-size:11px"><span style="width:8px;height:8px;border-radius:2px;background:${z.c};flex-shrink:0"></span><span class="pl" style="min-width:0;flex:1">${z.k}</span><span class="pv" style="color:${z.c}">${Math.round(z.v)}%</span></div>`).join("");
+  return { n: "04", t: "AI 籌碼熱區圖", body: `<svg viewBox="0 0 ${W} ${Hh}">${g}</svg><div style="margin-top:4px">${leg}</div>`, note: "近 30 日成交量按每日高~低區間攤入價格區間;白線為收盤價。壓力/支撐區 = 收盤 ±5% 以外的成交量占比" };
+}
+
+// ════════ 05 風險雷達圖 ════════
+function p05(m) {
+  const C = cl();
+  const svg = radar(m.riskAxes.map(a => a.k.replace("風險", "")), m.riskAxes.map(a => a.v), { fill: "rgba(245,166,35,.28)", stroke: C.amb });
+  const box = (k, v, c) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:11.5px;margin-top:4px"><span class="t2">${k}</span><b style="color:${c}">${v}</b></div>`;
+  return { n: "05", t: "風險雷達圖", body: svg + box("主力風險等級", m.riskLbl, riskCol(m.riskIdx)) + box("主力風險指數", Math.round(m.riskIdx) + "%", riskCol(m.riskIdx)), note: "六軸皆為 100 − 對應健康分數(追價風險依 RSI 與偏離月線計算)" };
+}
+
+// ════════ 06 預測路徑 ════════
+function p06(m) {
+  const C = cl(), f = m.fc, W = 380, Hh = 188, pl = 40, pr = 8, pt = 8, pb = 18;
+  let lo = pickMin(f.path.map(p => p.lo)), hi = pickMax(f.path.map(p => p.hi)); const pd = (hi - lo) * .1; lo -= pd; hi += pd;
+  const X = t => pl + t / 10 * (W - pl - pr), Y = v => pt + (hi - v) / (hi - lo) * (Hh - pt - pb);
+  const band = (a, b, col) => `<polygon points="${f.path.map(p => X(p.t).toFixed(1) + "," + Y(p[a]).toFixed(1)).join(" ")} ${[...f.path].reverse().map(p => X(p.t).toFixed(1) + "," + Y(p[b]).toFixed(1)).join(" ")}" fill="${col}" fill-opacity=".38"/>`;
+  let g = "";
+  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="${C.bd}" stroke-dasharray="2 4"/><text class="sv" x="${pl - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">${nf(v, 0)}</text>`; }
+  g += band("hi", "hi2", C.up) + band("hi2", "lo2", C.amb) + band("lo2", "lo", C.down);
+  g += `<path d="${f.path.map((p, i) => (i ? "L" : "M") + X(p.t).toFixed(1) + " " + Y(p.c).toFixed(1)).join("")}" fill="none" stroke="#fff" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  [[0, "今日"], [3, "3日後"], [5, "5日後"], [10, "10日後"]].forEach(([t, l]) => { g += `<text class="sv" x="${X(t).toFixed(1)}" y="${Hh - 3}" text-anchor="middle">${l}</text>`; });
+  const lgd = `<g><rect x="${pl + 6}" y="${pt + 3}" width="122" height="46" rx="3" fill="${C.bg}" stroke="${C.bd2}"/>
+    <rect x="${pl + 11}" y="${pt + 9}" width="8" height="8" fill="${C.up}"/><text x="${pl + 24}" y="${pt + 17}" font-size="10" fill="${C.tx}">上漲機率 ${Math.round(f.up * 100)}%</text>
+    <rect x="${pl + 11}" y="${pt + 22}" width="8" height="8" fill="${C.amb}"/><text x="${pl + 24}" y="${pt + 30}" font-size="10" fill="${C.tx}">震盪機率 ${Math.round(f.mid * 100)}%</text>
+    <rect x="${pl + 11}" y="${pt + 35}" width="8" height="8" fill="${C.down}"/><text x="${pl + 24}" y="${pt + 43}" font-size="10" fill="${C.tx}">下跌機率 ${Math.round(f.dn * 100)}%</text></g>`;
+  return { n: "06", t: "累積型 AI 預測路徑圖", s: "依 60 日報酬統計推估", body: `<svg viewBox="0 0 ${W} ${Hh}">${g}${lgd}</svg>`, foot: `<span>主力方向機率:<b class="${f.dirBull >= 50 ? "up" : "down"}">${f.dirBull >= 50 ? "多頭" : "空頭"} ${Math.round(f.dirBull >= 50 ? f.dirBull : 100 - f.dirBull)}%</b></span><span>強弱指標:<b class="${cUp(f.drift)}">${sg(f.drift, 1)}%(年化漂移)</b></span>`, note: `純統計推估:近 60 日平均報酬/波動外推,機率取自 ${f.nWin} 個歷史 10 日窗口(±2% 為震盪帶)。僅供參考,非預測` };
+}
+
+// ════════ 07 主力成本結構分布圖 ════════
+function p07(m) {
+  const C = cl(), px = m.px, n = px.close.length, N = Math.min(60, n - 5), s = n - N, W = 340, Hh = 178, pl = 34, pr = 6, pt = 6, pb = 16;
+  const zs = [{ k: "衰竭區(<-5%)", c: "#4c8dff" }, { k: "套牢區(-2~-5%)", c: "#26b578" }, { k: "主力成本區(±2%)", c: "#ff4d57" }, { k: "大量成交區(+2~+5%)", c: "#f5a623" }, { k: "過熱區(>+5%)", c: "#9a8cff" }];
+  const st = [];
+  for (let t = s; t < n; t++) {
+    const w0 = Math.max(0, t - 19), vw = m.vwapAt(t, 20), z = [0, 0, 0, 0, 0];
+    for (let j = w0; j <= t; j++) { const dv = (px.close[j] / vw - 1) * 100; z[dv < -5 ? 0 : dv < -2 ? 1 : dv <= 2 ? 2 : dv <= 5 ? 3 : 4] += px.vol[j] / 1000; }
+    st.push(z);
+  }
+  const tot = st.map(z => sumA(z)), mx = pickMax(tot) || 1, X = k => pl + k / (N - 1) * (W - pl - pr), Y = v => pt + (1 - v / mx) * (Hh - pt - pb);
+  let g = ""; for (let k = 0; k <= 3; k++) { const v = mx * k / 3; g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="${C.bd}" stroke-dasharray="2 4"/><text class="sv" x="${pl - 3}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">${v >= 1000 ? nf(v / 1000, 0) + "k" : nf(v, 0)}</text>`; }
+  const cum = st.map(() => 0);
+  zs.forEach((zn, zi) => {
+    const lowArr = cum.slice(); st.forEach((z, k) => cum[k] += z[zi]);
+    g += `<polygon points="${cum.map((v, k) => X(k).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")} ${lowArr.map((v, k) => [X(k), Y(v)]).reverse().map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}" fill="${zn.c}" fill-opacity=".72" stroke="${zn.c}" stroke-width=".6"/>`;
+  });
+  for (let k = 0; k < N; k += Math.max(1, Math.round(N / 5))) g += `<text class="sv" x="${X(k).toFixed(1)}" y="${Hh - 3}" text-anchor="middle">${dt(px.date[s + k])}</text>`;
+  const lg = `<div class="legend" style="margin-top:3px">${zs.map(z => `<span><i style="background:${z.c}"></i>${z.k}</span>`).join("")}</div>`;
+  return { n: "07", t: "主力成本結構分布圖", body: `<svg viewBox="0 0 ${W} ${Hh}">${g}</svg>${lg}`, foot: `<span>主力平均成本:<b class="cy">${nf(m.vwap, 0)}</b>(20日VWAP)</span><span>強弱指標:<b class="${cUp(m.vwapDev)}">${sg(m.vwapDev, 1)}%</b></span>`, note: "各日成交量依「當日收盤相對其 20 日 VWAP 的偏離」分入五個價位區後堆疊" };
+}
+
+// ════════ 08 法人行為計量 ════════
+function p08(m) {
+  if (!m.inst) return { n: "08", t: "法人行為計量", s: "三大法人買賣超(張)", body: nodata("三大法人資料") };
+  const C = cl(), rows = m.inst.slice(-15), N = rows.length, W = 330, Hh = 172, pl = 34, pr = 38, pt = 10, pb = 16;
+  const mxA = Math.max(1, ...rows.map(d => Math.max(Math.abs(d.f), Math.abs(d.t), Math.abs(d.d))));
+  let cum = 0; const cs = rows.map(d => cum += d.tot), cmx = pickMax(cs), cmn = pickMin(cs);
+  const step = (W - pl - pr) / N, zeroY = pt + (Hh - pt - pb) / 2, halfH = (Hh - pt - pb) / 2, bw = Math.max(2, step * .24);
+  const cY = v => cmx === cmn ? zeroY : pt + (1 - (v - cmn) / (cmx - cmn)) * (Hh - pt - pb);
+  let g = `<line x1="${pl}" x2="${W - pr}" y1="${zeroY}" y2="${zeroY}" stroke="${C.bd2}"/>`;
+  [[mxA, pt + 3], [-mxA, Hh - pb - 2]].forEach(([v, y]) => g += `<text class="sv" x="${pl - 3}" y="${y}" text-anchor="end">${sg(Math.round(v))}</text>`);
+  g += `<text class="sv" x="${pl - 3}" y="${zeroY + 3}" text-anchor="end">0</text>`;
+  rows.forEach((d, k) => {
+    const x0 = pl + k * step + step / 2 - bw * 1.5;
+    [[d.f, "#4c8dff"], [d.t, "#ff4d57"], [d.d, "#26b578"]].forEach(([v, c], q) => { const h = Math.abs(v) / mxA * halfH; g += `<rect x="${(x0 + q * bw).toFixed(1)}" y="${(v >= 0 ? zeroY - h : zeroY).toFixed(1)}" width="${(bw - .4).toFixed(1)}" height="${Math.max(.6, h).toFixed(1)}" fill="${c}"/>`; });
+    if (k % Math.max(1, Math.round(N / 5)) === 0) g += `<text class="sv" x="${(pl + k * step + step / 2).toFixed(1)}" y="${Hh - 3}" text-anchor="middle">${dt(d.date)}</text>`;
+  });
+  g += `<path d="${cs.map((v, k) => (k ? "L" : "M") + (pl + k * step + step / 2).toFixed(1) + " " + cY(v).toFixed(1)).join("")}" fill="none" stroke="#f5a623" stroke-width="1.6"/>`;
+  g += `<text class="sv" x="${W - pr + 3}" y="${pt + 3}" fill="#f5a623">${nf(cmx)}</text><text class="sv" x="${W - pr + 3}" y="${Hh - pb}" fill="#f5a623">${nf(cmn)}</text>`;
+  const lg = `<div class="legend" style="margin-bottom:3px"><span><i style="background:#4c8dff"></i>外資</span><span><i style="background:#ff4d57"></i>投信</span><span><i style="background:#26b578"></i>自營商</span><span><i class="ln" style="background:#f5a623"></i>合計累積(右軸)</span></div>`;
+  const last3 = m.inst.slice(-3).reverse();
+  const td = v => `<td class="${cUp(v)}">${sg(Math.round(v))}</td>`;
+  const tab = `<table class="mtab"><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr>${last3.map(d => `<tr><td>${dt(d.date)}</td>${td(d.f)}${td(d.t)}${td(d.d)}${td(d.tot)}</tr>`).join("")}</table>
+    <div class="t2" style="font-size:10px;margin-top:6px">單位:張｜近5日 外資 ${sg(Math.round(m.f5))} / 投信 ${sg(Math.round(m.t5))} / 自營商 ${sg(Math.round(m.d5))}</div>`;
+  return { n: "08", t: "法人行為計量", s: "三大法人買賣超", body: `<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1.35;min-width:220px">${lg}<svg viewBox="0 0 ${W} ${Hh}">${g}</svg></div><div style="flex:1;min-width:180px;padding-top:6px">${tab}</div></div>`,
+    foot: `<span>累積買賣超:<b class="${cUp(m.net20)}">${m.net20 >= 0 ? "多頭" : "空頭"}</b>(${m.inst.length}日 ${sg(Math.round(m.net20))} 張)</span><span>近5日買賣超:<b class="${cUp(m.net5)}">${m.net5 >= 0 ? "偏多" : "偏空"}</b>(${sg(Math.round(m.net5))} 張)</span>` };
+}
+
+// ════════ 09 隔日沖風險 ════════
+function p09(m) {
+  const d = m.dj, rows = [["法人賣壓", d.sell], ["量能異常", d.vol], ["融資變動", d.mg], ["上影線壓力", d.wick], ["日內振幅", d.rng]];
+  const body = rows.map(([k, v]) => v == null ? `<div class="prow"><span class="pl">${k}</span><span class="pb"></span><span class="pv t2">無資料</span></div>` : prow(k, v, "b-red")).join("");
+  return { n: "09", t: "隔日沖風險分析", fill: true, body, foot: `<span>風險等級:<b style="color:${riskCol(m.djIdx)}">${m.djLbl}</b></span><span>風險指數:<b style="color:${riskCol(m.djIdx)}">${Math.round(m.djIdx)}%</b></span>`, note: "各項皆為可驗算的機械指標(非分點隔日沖統計)" };
+}
+
+// ════════ 10 多空能量 ════════
+function p10(m) {
+  const bull = m.bullPct, bear = 100 - bull;
+  return { n: "10", t: "AI 多空能量條", fill: true, body: `<div style="margin-top:4px">${prow("多方能量", bull, "b-red")}${prow("空方能量", bear, "b-grn")}</div><div style="margin-top:12px;font-size:12px" class="t2">多空比:<b class="${m.lsRatio >= 1 ? "up" : "down"} mono" style="font-size:14px">${nf(m.lsRatio, 2)} 倍${m.lsRatio >= 1 ? "多" : "空"}</b></div>`, foot: `<span style="font-size:10px">(20日 收紅成交量 ÷ 收黑成交量)</span>` };
+}
+
+// ════════ 11 健康度綜合評估 ════════
+function p11(m) {
+  const v = m.vv, tech = (m.trendScore + m.pos20) / 2;
+  const items = [["籌碼健康度", v.chip, goodCol(v.chip)], ["技術結構度", tech, goodCol(tech)], ["資金動能度", v.mom, goodCol(v.mom)], ["波動風險度", 100 - v.vol, riskCol(100 - v.vol)], ["法人支撐度", v.inst, goodCol(v.inst)]];
+  const avgS = meanA([v.chip, tech, v.mom, v.vol, v.inst]);
+  return { n: "11", t: "健康度綜合評估表", body: `<div class="rings">${items.map(([l, x, c]) => `<div class="ring">${ring(x, c)}<div class="ring-l">${l}</div></div>`).join("")}</div>`, foot: `<span>總評:<b class="amb">${A.tierLabel(avgS)}</b>(平均 ${Math.round(avgS)} 分)</span>`, note: "波動風險度越高越危險(紅環);其餘越高越好" };
+}
+
+// ════════ 12 主力動態信號 ════════
+function p12(m) {
+  const lvl = m.riskIdx >= 60 ? "r" : m.riskIdx >= 40 ? "y" : "g", lname = { r: "紅燈", y: "黃燈", g: "綠燈" }[lvl];
+  const sevc = x => x >= 60 ? "var(--up)" : x >= 40 ? "var(--amber)" : "var(--good)";
+  const trendTxt = m.trendScore >= 65 ? "偏多強勢" : m.trendScore >= 40 ? "多空拉鋸" : "偏空走弱";
+  const chipTxt = m.vv.chip >= 65 ? "籌碼偏多" : m.vv.chip >= 40 ? "籌碼中性" : "籌碼偏弱";
+  const momTxt = m.vv.mom >= 60 ? "動能偏強" : m.vv.mom >= 40 ? "動能持平" : "動能偏弱";
+  const riskTxt = m.riskIdx >= 60 ? "風險偏高" : m.riskIdx >= 40 ? "風險中等" : "風險偏低";
+  const lamp = `<div class="tl-lamp"><i class="r ${lvl === "r" ? "on" : ""}"></i><i class="y ${lvl === "y" ? "on" : ""}"></i><i class="g ${lvl === "g" ? "on" : ""}"></i></div>`;
+  const rows = `<div class="tl-rows">${krow("", "趨勢:", trendTxt, sevc(100 - m.trendScore))}${krow("", "籌碼:", chipTxt, sevc(100 - m.vv.chip))}${krow("", "動能:", momTxt, sevc(100 - m.vv.mom))}${krow("", "風險:", riskTxt, sevc(m.riskIdx))}${krow("", "結論:", lname + (lvl === "r" ? "(高風險)" : lvl === "y" ? "(留意)" : "(低風險)"), sevc(m.riskIdx))}</div>`;
+  return { n: "12", t: "AI 主力動態信號判斷", body: `<div class="tl">${lamp}${rows}</div>`, foot: `<span>目前燈號:<b style="color:${sevc(m.riskIdx)}">${lname}</b>(風險指數 ${Math.round(m.riskIdx)})</span>`, note: "燈號代表風險:紅=高風險 黃=留意 綠=低風險(與 K 線紅漲綠跌無關)" };
+}
+
+// ════════ 13 情緒儀表 ════════
+function p13(m) {
+  const C = cl(), W = 210, Hh = 118, cx = 105, cy = 100, R = 70, v = m.sentAll;
+  const arc = (a0, a1, col) => { const p = a => [cx + Math.cos(a * Math.PI / 180) * R, cy + Math.sin(a * Math.PI / 180) * R]; const s = p(a0), e = p(a1); return `<path d="M${s[0].toFixed(1)} ${s[1].toFixed(1)} A${R} ${R} 0 0 1 ${e[0].toFixed(1)} ${e[1].toFixed(1)}" fill="none" stroke="${col}" stroke-width="13"/>`; };
+  let g = arc(180, 240, C.down) + arc(240, 300, C.amb) + arc(300, 360, C.up);
+  const ang = (180 + clamp(v) / 100 * 180) * Math.PI / 180, nx = cx + Math.cos(ang) * (R - 16), ny = cy + Math.sin(ang) * (R - 16);
+  g += `<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${C.tx}" stroke-width="2.4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="4.5" fill="${C.tx}"/>`;
+  g += `<text class="sv" x="${cx - R - 2}" y="${cy + 12}" text-anchor="middle">0</text><text class="sv" x="${cx}" y="${cy - R - 8}" text-anchor="middle">50</text><text class="sv" x="${cx + R + 2}" y="${cy + 12}" text-anchor="middle">100</text>`;
+  const cc = m.sentAll >= 60 ? C.up : m.sentAll >= 40 ? C.amb : C.down;
+  const row = (k, x) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span class="t2">${k}</span><b class="mono" style="color:${x >= 60 ? "var(--up)" : x >= 40 ? "var(--amber)" : "var(--down)"}">${Math.round(x)}%</b></div>`;
+  return { n: "13", t: "個股情緒儀表板", body: `<svg viewBox="0 0 ${W} ${Hh}">${g}</svg><div style="text-align:center;font-size:13px;margin-top:-2px" class="t2">情緒:<b style="color:${cc}">${m.sentLbl}</b></div><div style="margin-top:6px">${row("散戶情緒(融資)", m.sent.retail)}${row("法人情緒", m.sent.inst)}${row("價量情緒", m.sent.pv)}</div>`, note: "散戶=融資餘額 5 日變動;法人=近期買賣超;價量=紅黑K量比+動能。0=偏空 100=偏多" };
+}
+
+// ════════ 14 信心維度 ════════
+function p14(m) {
+  const rows = [["資料完整度", m.confData, "b-blu"], ["訊號穩定度", m.confStab, "b-blu"], ["多維一致度", m.confAgree, "b-blu"]];
+  let hist = ""; if (m.hist) hist = m.hist.sufficient ? prow("歷史勝率", m.hist.winRate, "b-blu", Math.round(m.hist.winRate) + "%") : `<div class="prow"><span class="pl">歷史勝率</span><span class="pb"></span><span class="pv t2" style="min-width:60px">樣本不足</span></div>`;
+  return { n: "14", t: "AI 信心維度", fill: true, body: `<div class="prow" style="padding:2px 0 6px"><span class="pl" style="color:var(--cyan);font-weight:700">AI CONFIDENCE</span><span class="pb b-amb"><i style="width:${m.confidence}%"></i></span><span class="pv amb">${Math.round(m.confidence)}%</span></div>${rows.map(([k, v, c]) => prow(k, v, c)).join("")}${hist}`, note: "資料完整度=價/法人/融資/分點/營收/PER 取得比例;穩定度=近 5 日均線位置一致性;一致度=六維同向比例" };
+}
+
+// ════════ 15 籌碼異動摘要 ════════
+function p15(m) {
+  if (!m.inst) return { n: "15", t: "籌碼異動摘要", body: nodata("三大法人資料") };
+  const C = cl(), L = m.instLast, W = 200, Hh = 96, pl = 30, pr = 4, pt = 6, pb = 14;
+  let cum = 0; const cs = m.inst.map(d => cum += d.tot), mx = Math.max(pickMax(cs), 0), mn = Math.min(pickMin(cs), 0), N = cs.length;
+  const X = k => pl + k / Math.max(1, N - 1) * (W - pl - pr), Y = v => mx === mn ? Hh / 2 : pt + (mx - v) / (mx - mn) * (Hh - pt - pb);
+  let g = `<line x1="${pl}" x2="${W - pr}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="${C.bd2}"/><text class="sv" x="${pl - 3}" y="${(Y(0) + 3).toFixed(1)}" text-anchor="end">0</text><text class="sv" x="${pl - 3}" y="${pt + 8}" text-anchor="end">${nf(mx)}</text><text class="sv" x="${pl - 3}" y="${Hh - pb}" text-anchor="end">${nf(mn)}</text>`;
+  g += `<path d="${cs.map((v, k) => (k ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1)).join("")}" fill="none" stroke="${C.cy}" stroke-width="1.6"/>`;
+  g += `<text class="sv" x="${pl}" y="${Hh - 2}">${dt(m.inst[0].date)}</text><text class="sv" x="${W - pr}" y="${Hh - 2}" text-anchor="end">${dt(L.date)}</text>`;
+  const r = (k, v) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:2.5px 0"><span>${k}</span><b class="mono ${cUp(v)}">${sg(Math.round(v))} 張</b></div>`;
+  const concl = m.net5 > 0 ? (m.net20 > 0 ? "法人偏多,可追蹤" : "法人回補,觀察") : (m.net5 < 0 ? (m.f5 < 0 && m.t5 < 0 ? "法人同步偏空,觀望" : "短線偏空,追價風險可控") : "法人中性");
+  return { n: "15", t: "籌碼異動摘要", body: `<div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0">${r("外資", L.f)}${r("投信", L.t)}${r("自營商", L.d)}${r("三大法人", L.tot)}<div class="t2" style="font-size:10px;margin-top:2px">${dt(L.date)}</div></div><div style="flex:1.25"><svg viewBox="0 0 ${W} ${Hh}">${g}</svg><div class="t2" style="font-size:9.5px;text-align:center">三大法人累積買賣超(張)</div></div></div>`, foot: `<span>短線${m.net5 < 0 ? "偏空" : "偏多"}</span><b class="${m.net5 < 0 ? "down" : "up"}">結論:${concl}</b>` };
+}
+
+// ════════ 16 買賣力分布 ════════
+function p16(m) {
+  if (!m.bs) return { n: "16", t: "買賣力分布圖", s: "法人 vs 散戶", body: nodata("三大法人資料") };
+  const b = m.bs;
+  return { n: "16", t: "買賣力分布圖", s: "法人 vs 散戶", body: `<div class="rings big"><div class="ring">${ring(b.bigBuy, "#ff4d57", 1)}<div class="ring-l">大戶買盤</div></div><div class="ring">${ring(100 - b.bigBuy, "#f5a623", 1)}<div class="ring-l">散戶買盤</div></div><div class="ring">${ring(100 - b.bigSell, "#26b578", 1)}<div class="ring-l">散戶賣盤</div></div></div>`, foot: `<span>資料時間:<b class="cy">${b.date}</b></span><span>(近 ${b.days} 日平均:法人買/賣量 ÷ 成交量)</span>`, note: "大戶=三大法人;散戶=其餘(買盤 = 1 − 法人買佔比,賣盤 = 1 − 法人賣佔比)" };
+}
+
+// ════════ 17 多空強度 ════════
+function p17(m) {
+  return { n: "17", t: "多空強度分布", body: `<div class="rings big"><div class="ring">${ring(m.bullStr, "#ff4d57", 1)}<div class="ring-l">多方強度</div></div><div class="ring">${ring(m.bearStr, "#26b578", 1)}<div class="ring-l">空方強度</div></div><div class="ring">${ring(m.volStr, "#4c8dff", 1)}<div class="ring-l">量能強度</div></div></div>`, foot: `<span>信號等級:<b class="cy">${m.sigLevel} 級區</b></span><span>(1級最弱~5級最強,依綜合評分 ${Math.round(m.total)})</span>`, note: `多/空強度 = ${m.facN} 項技術+法人因子中偏多/偏空的比例;量能強度 = 今日量 ÷ 20 日均量 ÷ 2` };
+}
+
+// ════════ 18 主力語意 ════════
+function p18(m) {
+  const map = { "法人偏多加碼": ["主力吸籌", "var(--up)"], "調節減碼": ["調節減碼", "var(--up)"], "持續減碼": ["出貨偏空", "var(--down)"], "回補承接": ["低檔承接", "var(--amber)"], "量能偏多": ["量能偏多", "var(--up)"], "量能偏空": ["量能偏空", "var(--down)"], "多空均衡": ["多空均衡", "var(--amber)"] };
+  let [txt, col] = map[m.mainAct] || ["觀察中", "var(--amber)"];
+  if (m.mainAct === "法人偏多加碼" && m.shortState === "突破攻擊") { txt = "拉升攻堅"; }
+  const oper = m.riskIdx >= 60 ? "短線宜區間操作、不宜追價" : m.riskIdx >= 40 ? "宜分批留意、設好停損" : "風險偏低,可依計畫操作";
+  const instTxt = m.inst ? `法人近5日合計 ${sg(Math.round(m.net5))} 張` : "法人資料缺漏";
+  const concl = `經 ${Math.min(5, m.n)} 日主力行為綜合研判(${instTxt}、收盤相對 20 日 VWAP ${sg(m.vwapDev, 1)}%、RSI ${Math.round(m.rsi)}、KD ${nf(m.k, 0)}/${nf(m.d, 0)}),${m.mainAct === "調節減碼" ? "法人小幅調節" : m.mainAct === "法人偏多加碼" ? "法人偏多加碼" : m.mainAct === "持續減碼" ? "法人持續賣超" : "主力動向:" + m.mainAct},${oper}。`;
+  return { n: "18", t: "主力追蹤總判列", s: "規則式 · MLP-AI 風格", body: `<div class="mlp"><span class="k">主力語意:</span><span class="v" style="color:${col}">${txt}</span><button class="btn2" onclick="dashFocus('08')">法人動作</button></div><div class="concl">AI 結論:${escH(concl)}</div>`, note: "此結論由前述指標套用固定規則組成的文字模板,並非大型語言模型輸出;僅供參考,不構成投資建議" };
+}
+
+// ════════ 19~22 延伸面板(沿用原系統功能)════════
+function p19(m) {
+  const rev = m.rev, per = m.per, row = (k, v, cls) => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val ${cls || ""}" ${v === "--" ? 'style="color:var(--text2)"' : ""}>${v}</span></div>`;
+  return { n: "19", t: "基本面", s: "月營收 / 估值", body: `${row("月營收YoY", rev && rev.yoy != null ? (rev.yoy >= 0 ? "+" : "") + rev.yoy + "%" : "--", rev && rev.yoy != null ? (rev.yoy >= 0 ? "up" : "down") : "")}${rev && rev.yoy3 != null ? row("近3月均YoY", (rev.yoy3 >= 0 ? "+" : "") + rev.yoy3 + "%", rev.yoy3 >= 0 ? "up" : "down") : ""}${row("本益比 PER", per && per.per != null ? per.per : "--")}${row("股價淨值比 PBR", per && per.pbr != null ? per.pbr : "--")}${row("殖利率", per && per.yield != null ? per.yield + "%" : "--")}` };
+}
+function p20(m) {
+  let dtv = null; try { dtv = calcDayTradeVolCheck(m.px.vol); } catch (e) {}
+  const row = (k, v, cls) => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val ${cls || ""}">${v}</span></div>`;
+  const body = dtv ? `${row("五日平均量", dtv.baselineRaw.toLocaleString() + " 張")}${row("排除爆量平均量", dtv.baselineAdj.toLocaleString() + " 張", "cyan")}${row("次日觀察門檻", dtv.dailyWatchVol.toLocaleString() + " 張")}${row("每分鐘基準量", dtv.perMinBaseline.toLocaleString() + " 張/分")}${row("首分鐘進場量(×" + DT_IGNITION_MULT + ")", dtv.ignitionVol.toLocaleString() + " 張", "up")}${row("校正量比", "×" + dtv.volRatioAdj, dtv.volRatioAdj >= 2 ? "up" : "")}` : `<div class="t2" style="font-size:12px">資料不足</div>`;
+  return { n: "20", t: "當沖基準量", s: "校正後", body };
+}
+function p21(m) { return { n: "21", t: "五大熱點券商", s: "分點買賣超", body: `<div class="broker-block" style="border:0;padding:0;background:transparent">${renderBrokerBlock(m.chip && m.chip.broker)}</div>` }; }
+function p22(m) { return { n: "22", t: "相關新聞", body: `<div style="margin-bottom:6px"><button class="dbtn" onclick="loadDetailNews('${m.id}', this)">載入新聞</button></div><div id="newsListWrap" class="news-list"></div>` }; }
+
+const SPANS = { "01": [10, 12, 12], "02": [4, 6, 6], "03": [4, 6, 6], "04": [3, 6, 6], "05": [3, 6, 6], "06": [6, 6, 12], "07": [5, 6, 12], "08": [9, 12, 12], "09": [4, 6, 6], "10": [3, 6, 6], "11": [5, 12, 12], "12": [4, 6, 6], "13": [4, 6, 6], "14": [4, 6, 6], "15": [4, 6, 6], "16": [8, 6, 12], "17": [8, 6, 12], "18": [8, 12, 12], "19": [6, 4, 6], "20": [6, 4, 6], "21": [6, 4, 12], "22": [6, 12, 12] };
+const FNS = [p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22];
+
+function panelHTML(p) {
+  const sp = SPANS[p.n];
+  return `<section class="dp" id="dp-${p.n}" style="--s:${sp[0]};--s2:${sp[1]};--s3:${sp[2]}">
+    <div class="dp-h"><span class="dp-n">${p.n}</span><span class="dp-t">${p.t}</span>${p.s ? `<span class="dp-s">| ${p.s}</span>` : ""}<button class="dp-dl" title="下載此面板 PNG" onclick="dashPanelPng('${p.n}')">⤓</button></div>
+    <div class="dp-b${p.fill ? " fill" : ""}">${p.body}</div>${p.foot ? `<div class="dp-f">${p.foot}</div>` : ""}${p.note ? `<div class="note">${p.note}</div>` : ""}</section>`;
+}
+
+function renderGridHTML(m) {
+  return FNS.map(f => { try { return panelHTML(f(m)); } catch (e) { console.error("panel error", f.name, e); const n = f.name.slice(1); return panelHTML({ n, t: "面板", body: `<div class="t2" style="font-size:12px">此面板計算失敗:${escH(e.message)}</div>` }); } }).join("");
+}
+
+// ── 任務四:MACD ──
+function macdSVG(m) {
+  const C = cl(), n = m.px.close.length, N = Math.min(80, n), s = n - N, W = 900, Hh = 260, pl = 46, pr = 10, pt = 10, pb = 18;
+  const all = [...m.macd.slice(s), ...m.dif.slice(s), ...m.dea.slice(s)], mx = Math.max(...all.map(Math.abs)) || 1;
+  const step = (W - pl - pr) / N, zy = pt + (Hh - pt - pb) / 2, Y = v => zy - v / mx * ((Hh - pt - pb) / 2);
+  let g = `<line x1="${pl}" x2="${W - pr}" y1="${zy}" y2="${zy}" stroke="${C.bd2}"/>`;
+  [mx, mx / 2, -mx / 2, -mx].forEach(v => g += `<text class="sv" x="${pl - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">${nf(v, 1)}</text><line x1="${pl}" x2="${W - pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="${C.bd}" stroke-dasharray="2 4"/>`);
+  for (let k = 0; k < N; k++) { const v = m.macd[s + k], x = pl + k * step + step / 2, y = Y(v); g += `<rect x="${(x - step * .3).toFixed(1)}" y="${Math.min(y, zy).toFixed(1)}" width="${(step * .6).toFixed(1)}" height="${Math.max(.6, Math.abs(y - zy)).toFixed(1)}" fill="${v >= 0 ? C.up : C.down}"/>`; if (k % Math.round(N / 8) === 0) g += `<text class="sv" x="${x.toFixed(1)}" y="${Hh - 4}" text-anchor="middle">${dt(m.px.date[s + k])}</text>`; }
+  const ln = (arr, c) => `<path d="${arr.slice(s).map((v, k) => (k ? "L" : "M") + (pl + k * step + step / 2).toFixed(1) + " " + Y(v).toFixed(1)).join("")}" fill="none" stroke="${c}" stroke-width="1.6"/>`;
+  g += ln(m.dif, "#f5a623") + ln(m.dea, "#4c8dff");
+  return `<div class="legend" style="margin-bottom:6px"><span><i class="ln" style="background:#f5a623"></i>DIF(12-26)</span><span><i class="ln" style="background:#4c8dff"></i>DEA(9)</span><span><i style="background:${C.up}"></i>OSC 柱(紅正綠負)</span></div><svg viewBox="0 0 ${W} ${Hh}">${g}</svg>`;
+}
+
+window.__dashB = { renderGridHTML, macdSVG, panelHTML };
+})();
+
+
+// ════════════════════════════════════════════════════════
+// v10 儀表板模組 C:頁面控制 / 分頁 / 下載 / 啟動
+// ════════════════════════════════════════════════════════
+(function () {
+"use strict";
+const A = window.__dashA, B = window.__dashB;
+const { $, nf, sg, escH } = A;
+const DASH = { m: null, id: null, seq: 0, task: 1, busy: false, long: null };
+const stash = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+const nameOf = id => (typeof stockNameMap !== "undefined" && stockNameMap[id]) || id;
+
+// ── 主導覽 ──
+function setView(v) {
+  document.querySelectorAll(".dnav").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === "view-" + v));
+  stash("dash_view", v);
+  if (v === "radar") { try { if (moneyFlowData && moneyFlowData.length) renderRadar(); } catch (e) {} }
+  if (v === "dash" && !DASH.m && !DASH.busy) dashOpen(stash("dash_last") || "2330");
+  if (v === "dash" && DASH.task === 3) taskShow(3, true);
+}
+window.dashSetView = setView;
+
+// ── 頂部 KPI 條 ──
+function renderKpis(m) {
+  const box = $("dashKpis"); if (!box) return;
+  const cls = v => v > 0 ? "up" : v < 0 ? "down" : "";
+  const cell = (l, v, c, sm) => `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v ${c || ""} ${sm ? "sm" : ""}">${v}</div></div>`;
+  if (!m) { box.innerHTML = ["今日收盤價", "今日漲跌", "今日漲幅", "成交量(張)", "成交筆數", "開盤", "最高", "最低", "最新交易日", "資料筆數"].map(l => cell(l, "--")).join(""); return; }
+  const rel = v => cls(v - m.prev);
+  box.innerHTML = cell("今日收盤價", nf(m.close, 2), cls(m.chg)) + cell("今日漲跌", sg(m.chg, 2), cls(m.chg)) + cell("今日漲幅", sg(m.chgPct, 2) + "%", cls(m.chg)) +
+    cell("成交量(張)", nf(m.volLots), "") + cell("成交筆數", m.cnt ? nf(m.cnt) : "--", "") + cell("開盤", nf(m.open, 2), rel(m.open)) + cell("最高", nf(m.high, 2), rel(m.high)) + cell("最低", nf(m.low, 2), rel(m.low)) +
+    cell("最新交易日", m.date, "", 1) + cell("資料筆數", m.n + " 日", "", 1);
+}
+function updateHeader(m) {
+  $("dashInput").value = m.id; $("dashName").textContent = m.name;
+  renderKpis(m);
+  const px = m.px;
+  $("diRange").textContent = `區間 ${px.date[0]} ~ ${m.date},共 ${m.n} 個交易日,法人資料 ${m.inst ? m.inst.length : 0} 日`;
+  $("diSrc").textContent = "資料來源:日K FinMind｜法人 FinMind｜融資券 FinMind";
+  const cm = $("chipMainS"); if (cm) cm.textContent = m.mainAct;
+  const cv = $("chipVolS"), chv = $("chipVol"); if (cv) cv.textContent = `ATR ${nf(m.atrPct, 1)}%｜日波動 σ ${nf(m.sig20, 1)}%`;
+  if (chv) { const hi = m.riskAxes[1].v >= 60; chv.classList.toggle("danger", hi); chv.classList.toggle("warn", !hi && m.riskAxes[1].v >= 40); chv.classList.toggle("ok", m.riskAxes[1].v < 40); }
+  $("chipMainBox") && $("chipMainBox").classList.add("ok");
+}
+function updateChips() {
+  const on = (typeof scanning !== "undefined" && scanning) || (typeof isRealtimeMode !== "undefined" && isRealtimeMode);
+  const t = $("chipScanT"), s = $("chipScanS"), box = $("chipScanBox");
+  if (t) t.textContent = on ? "AI SCAN ACTIVE" : "AI SCAN STANDBY";
+  if (s) s.textContent = on ? "掃描進行中" : "盤後分析待機";
+  if (box) { box.classList.toggle("ok", !!on); }
+  const mb = $("marketBadge"), ms = $("chipMktS"), mbox = $("chipMktBox");
+  if (mb && ms) { ms.textContent = mb.textContent; mbox && mbox.classList.toggle("ok", mb.classList.contains("open")); }
+}
+setInterval(updateChips, 1500);
+
+// ── 個股分析主流程 ──
+async function dashOpen(id) {
+  id = String(id || "").trim(); if (!id) return;
+  const my = ++DASH.seq; DASH.busy = true; DASH.id = id; DASH.long = null;   // busy 先設,避免 setView 反過來觸發自動載入
+  setView("dash");
+  const root = $("dashRoot");
+  $("dashInput").value = id; $("dashName").textContent = nameOf(id);
+  root.innerHTML = `<div class="dash-loading"><div class="radar-spin"></div>分析 ${escH(id)} ${escH(nameOf(id))} 中,請稍候…</div>`;
+  try {
+    const [pxR, chipR, revR, perR] = await Promise.allSettled([A.fetchPx(id), fetchChipData(id), fetchMonthRevenue(id), fetchPER(id)]);
+    if (my !== DASH.seq) return;
+    const px = pxR.status === "fulfilled" ? pxR.value : null;
+    if (!px) { root.innerHTML = `<div class="dash-empty">無法取得 <b>${escH(id)}</b> 的價量資料<br>請確認代號是否正確,或後端服務是否可用。</div>`; DASH.m = null; return; }
+    const chip = chipR.status === "fulfilled" ? chipR.value : { inst: null, margin: null, broker: null };
+    const m = A.buildModel(id, nameOf(id), px, chip, revR.status === "fulfilled" ? revR.value : null, perR.status === "fulfilled" ? perR.value : null);
+    DASH.m = m; stash("dash_last", id);
+    updateHeader(m); renderDash();
+  } catch (e) {
+    console.error(e); if (my === DASH.seq) { root.innerHTML = `<div class="dash-empty">分析失敗:${escH(e.message)}</div>`; DASH.m = null; }
+  } finally { if (my === DASH.seq) DASH.busy = false; }
+}
+window.dashOpen = dashOpen;
+
+function svgFix(html) {
+  const t2 = cssVar("--text2");
+  return html
+    .replace(/<text class="sv"([^>]*)>/g, (m0, rest) => `<text${rest} ${/fill=/.test(rest) ? "" : `fill="${t2}"`} font-size="10" font-family="Roboto Mono,monospace">`)
+    .replace(/style="font-family:var\(--mono\)"/g, 'font-family="Roboto Mono,monospace"');
+}
+const TASKS = [[1, "▣", "任務一:綜合分析報告"], [2, "▲", "任務二:技術警示報告"], [3, "▤", "任務三:KD + MA 圖表"], [4, "▥", "任務四:MACD 圖表"], [5, "▦", "原始資料表"]];
+
+function renderDash() {
+  const m = DASH.m, root = $("dashRoot"); if (!m) return;
+  const grid = svgFix(B.renderGridHTML(m));
+  root.innerHTML = `<div class="task" id="task-1"><div class="dgrid" id="dashGrid">${grid}</div></div>
+    <div class="task" id="task-2"></div><div class="task" id="task-3"></div><div class="task" id="task-4"></div><div class="task" id="task-5"></div>
+    <div class="dock">${TASKS.map(t => `<button class="dtab" data-t="${t[0]}" onclick="dashTask(${t[0]})"><span class="d-i">${t[1]}</span>${t[2]}</button>`).join("")}</div>`;
+  taskShow(DASH.task || 1, true);
+}
+function regridOnly() { const g = $("dashGrid"); if (g && DASH.m) g.innerHTML = svgFix(B.renderGridHTML(DASH.m)); }
+
+// ── 任務分頁 ──
+function taskShow(t, force) {
+  const m = DASH.m; if (!m) return;
+  DASH.task = t;
+  document.querySelectorAll(".dtab").forEach(b => b.classList.toggle("active", +b.dataset.t === t));
+  document.querySelectorAll(".task").forEach(el => el.classList.toggle("active", el.id === "task-" + t));
+  const box = $("task-" + t); if (!box) return;
+  if (t === 2 && (force || !box.dataset.done)) { box.innerHTML = alertsHTML(m); box.dataset.done = 1; }
+  if (t === 3) task3(m, box);
+  if (t === 4 && (force || !box.dataset.done)) { box.innerHTML = task4HTML(m); box.dataset.done = 1; }
+  if (t === 5 && (force || !box.dataset.done)) { box.innerHTML = rawHTML(m); box.dataset.done = 1; }
+}
+window.dashTask = t => taskShow(t, false);
+
+function alertsHTML(m) {
+  const al = A.buildAlerts(m), lvName = { hi: "警示", mid: "留意", lo: "訊息" };
+  const cnt = k => al.filter(a => a.lv === k).length;
+  const list = al.length ? al.slice(0, 40).map(a => `<div class="alert-item ${a.lv}"><span class="al-date">${a.date}</span><div><div class="al-t">${escH(a.t)}</div><div class="al-d">${escH(a.d)}</div></div><span class="al-tag ${a.lv}">${lvName[a.lv]}</span></div>`).join("") : `<div class="t2" style="padding:24px;text-align:center">近 25 個交易日內沒有觸發任何技術警示條件</div>`;
+  return `<div class="task-box"><h3>技術警示報告 <span class="t2" style="font-size:12px;font-weight:400">— ${escH(m.id)} ${escH(m.name)}｜近 25 個交易日｜警示 ${cnt("hi")} / 留意 ${cnt("mid")} / 訊息 ${cnt("lo")}</span></h3><div class="alert-list">${list}</div>
+    <div class="note t2" style="font-size:10.5px;margin-top:10px">偵測項目:均線/季線穿越、KD/MACD 交叉、RSI 超買超賣、爆量、20 日新高新低、跳空缺口、外資投信連買連賣、融資單日異動。皆為規則式偵測,非投資建議。</div></div>`;
+}
+
+async function task3(m, box) {
+  if (!box.dataset.done) {
+    box.innerHTML = `<div class="task-box"><h3>KD + MA 圖表 <span class="t2" style="font-size:12px;font-weight:400">— 日 / 週 / 月 K,移動游標查看細節</span></h3>
+      <div class="kline-section" style="padding:0"><div class="kline-wrap"><div class="kline-toolbar"><div class="kperiod-group">
+        <button class="kperiod-btn active" onclick="klineSetPeriod('D',this)">日K</button><button class="kperiod-btn" onclick="klineSetPeriod('W',this)">週K</button><button class="kperiod-btn" onclick="klineSetPeriod('M',this)">月K</button></div>
+        <div class="kline-legend"><span class="lg"><i style="background:var(--amber)"></i>MA5</span><span class="lg"><i style="background:var(--cyan)"></i>MA20</span><span class="lg"><i style="background:var(--purple)"></i>季線60</span><span class="lg"><i style="background:var(--gold)"></i>年線200</span><span>紅漲綠跌</span></div></div>
+        <div class="kline-info" id="klineInfo"><span style="color:var(--text2)">載入長期日K…</span></div><canvas id="klineCanvas"></canvas></div>
+        <div class="kline-wrap"><canvas id="volCanvas"></canvas></div><div class="kline-wrap"><canvas id="kdCanvas"></canvas></div></div></div>`;
+    box.dataset.done = 1; DASH.longFor = null;
+  }
+  if (DASH.longFor !== m.id) {
+    DASH.longFor = m.id;
+    let d = null; try { d = await fetchDailyLong(m.id); } catch (e) {}
+    if (!d) d = { date: m.px.date, open: m.px.open, high: m.px.high, low: m.px.low, close: m.px.close, volume: m.px.vol };
+    if (DASH.m !== m) return;
+    requestAnimationFrame(() => { try { initKline(d); } catch (e) { console.error(e); } });
+  } else if (typeof KLINE !== "undefined" && KLINE.bars && KLINE.bars.length) { requestAnimationFrame(() => renderAllCharts()); }
+}
+function task4HTML(m) {
+  const i = m.n - 1, sig = m.dif[i] > m.dea[i] ? ["DIF 在 DEA 之上", "up"] : ["DIF 在 DEA 之下", "down"];
+  return `<div class="task-box"><h3>MACD 圖表 <span class="t2" style="font-size:12px;font-weight:400">— DIF ${nf(m.dif[i], 2)}｜DEA ${nf(m.dea[i], 2)}｜OSC ${nf(m.macd[i], 2)}｜<span class="${sig[1]}">${sig[0]}</span></span></h3>${B.macdSVG(m)}</div>`;
+}
+function rawRows(m) {
+  const px = m.px, im = {}; (m.inst || []).forEach(d => im[d.date] = d);
+  const out = []; for (let j = px.close.length - 1; j >= 0; j--) { const d = im[px.date[j]]; out.push({ date: px.date[j], o: px.open[j], h: px.high[j], l: px.low[j], c: px.close[j], chg: j ? px.close[j] - px.close[j - 1] : 0, v: px.vol[j] / 1000, amt: px.amt[j], cnt: px.cnt[j], f: d ? d.f : null, t: d ? d.t : null, dl: d ? d.d : null }); }
+  return out;
+}
+function rawHTML(m) {
+  const rows = rawRows(m), c = v => v > 0 ? "up" : v < 0 ? "down" : "", ni = v => v == null ? "--" : `<span class="${c(v)}">${sg(Math.round(v))}</span>`;
+  return `<div class="task-box"><h3>原始資料表 <span class="t2" style="font-size:12px;font-weight:400">— ${rows.length} 筆(由新到舊)</span> <button class="dbtn" style="margin-left:10px" onclick="dashCsv()">下載 CSV</button></h3><div class="raw-wrap"><table class="mtab"><thead><tr><th>日期</th><th>開</th><th>高</th><th>低</th><th>收</th><th>漲跌</th><th>成交量(張)</th><th>成交金額(億)</th><th>成交筆數</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.date}</td><td>${nf(r.o, 2)}</td><td>${nf(r.h, 2)}</td><td>${nf(r.l, 2)}</td><td class="${c(r.chg)}">${nf(r.c, 2)}</td><td class="${c(r.chg)}">${sg(r.chg, 2)}</td><td>${nf(r.v)}</td><td>${r.amt ? nf(r.amt / 1e8, 2) : "--"}</td><td>${r.cnt ? nf(r.cnt) : "--"}</td><td>${ni(r.f)}</td><td>${ni(r.t)}</td><td>${ni(r.dl)}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+// ── 搜尋 ──
+function dashSearch() {
+  const v = ($("dashInput").value || "").trim(); if (!v) return;
+  let id = v;
+  if (!/^[0-9A-Za-z]+$/.test(v) || /[一-鿿]/.test(v)) {
+    const f = Object.entries(stockNameMap).find(([i, nm]) => nm.includes(v) || i === v);
+    if (!f) { $("dashName").textContent = "找不到「" + v + "」"; return; }
+    id = f[0];
+  }
+  dashOpen(id);
+}
+window.dashSearch = dashSearch;
+window.searchStock = function () { dashSearch(); };
+window.openStockDetail = function (id) { dashOpen(id); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} };
+window.dashFocus = function (n) { const el = $("dp-" + n); if (!el) return; el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); };
+
+// ── 主題切換後重畫 ──
+const _tt = window.toggleTheme;
+window.toggleTheme = function () { _tt(); if (DASH.m) regridOnly(); };
+let _rz = null; window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (DASH.task === 3 && typeof KLINE !== "undefined" && KLINE.bars && KLINE.bars.length && $("klineCanvas")) renderAllCharts(); }, 200); });
+
+// ── 下載 ──
+function dl(name, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+window.dashCsv = function () {
+  const m = DASH.m; if (!m) return;
+  const head = "日期,開,高,低,收,漲跌,成交量(張),成交金額(元),成交筆數,外資(張),投信(張),自營商(張)";
+  const lines = rawRows(m).reverse().map(r => [r.date, r.o, r.h, r.l, r.c, r.chg.toFixed(2), Math.round(r.v), r.amt, r.cnt, r.f == null ? "" : Math.round(r.f), r.t == null ? "" : Math.round(r.t), r.dl == null ? "" : Math.round(r.dl)].join(","));
+  dl(`${m.id}_${m.name}_data_${m.date}.csv`, new Blob(["﻿" + head + "\r\n" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+};
+function loadH2C() {
+  return window.html2canvas ? Promise.resolve(window.html2canvas) : new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"; s.onload = () => res(window.html2canvas); s.onerror = () => rej(new Error("無法載入 html2canvas(請確認網路)")); document.head.appendChild(s); });
+}
+async function pngOf(el, name) {
+  try { const h = await loadH2C(); const cv = await h(el, { backgroundColor: cssVar("--bg"), scale: 2, useCORS: true }); cv.toBlob(b => dl(name, b), "image/png"); }
+  catch (e) { alert("PNG 匯出失敗:" + e.message + "\n可改用「列印 / PDF」。"); }
+}
+window.dashPanelPng = function (n) { const el = $("dp-" + n); if (el && DASH.m) pngOf(el, `${DASH.m.id}_panel${n}.png`); };
+window.dashPng = async function () {
+  const m = DASH.m; if (!m) return;
+  const wrap = document.createElement("div"); wrap.style.cssText = "position:fixed;left:-20000px;top:0;width:1680px;padding:12px;background:" + cssVar("--bg");
+  wrap.appendChild($("dashHead").cloneNode(true)); const inf = $("dashInfo").cloneNode(true); inf.querySelector(".di-btns") && inf.querySelector(".di-btns").remove(); wrap.appendChild(inf);
+  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl").forEach(x => x.remove()); wrap.appendChild(g);
+  wrap.setAttribute("data-theme", document.documentElement.getAttribute("data-theme") || "dark");
+  document.body.appendChild(wrap);
+  await pngOf(wrap, `${m.id}_${m.name}_dashboard_${m.date}.png`); wrap.remove();
+};
+window.dashHtml = function () {
+  const m = DASH.m; if (!m) return;
+  const css = [...document.querySelectorAll("style")].map(s => s.textContent).join("\n");
+  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl,.btn2,.dbtn").forEach(x => x.remove());
+  const head = $("dashHead").cloneNode(true); head.querySelectorAll("input,button,.dh-end,.dh-chips").forEach(x => x.remove());
+  const theme = document.documentElement.getAttribute("data-theme") || "dark";
+  const html = `<!DOCTYPE html><html lang="zh-TW" data-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escH(m.id + " " + m.name)} 飆股狙擊離線報告 ${m.date}</title><style>${css}</style></head><body><div class="wrap"><div style="margin-bottom:8px;font-size:12px;color:var(--text2)">飆股狙擊系統 離線報告｜${escH(m.id)} ${escH(m.name)}｜資料日期 ${m.date}｜產生時間 ${new Date().toLocaleString("zh-TW")}</div>${head.outerHTML}<div class="dgrid">${g.innerHTML}</div><div style="margin-top:12px;font-size:11px;color:var(--text2)">本報告僅供參考,投資有風險。所有分數與結論皆為規則式計算,非投資建議。</div></div></body></html>`;
+  dl(`${m.id}_${m.name}_offline_${m.date}.html`, new Blob([html], { type: "text/html;charset=utf-8" }));
+};
+window.dashPrint = function () { window.print(); };
+
+// ── 啟動 ──
+function boot() {
+  renderKpis(null);
+  document.querySelectorAll(".dnav").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+  const v = stash("dash_view") || "dash";
+  setView(document.getElementById("view-" + v) ? v : "dash");
+  const inp = $("dashInput"); if (inp && !inp.value) inp.value = stash("dash_last") || "";
+  if ($("dashName") && inp.value) $("dashName").textContent = nameOf(inp.value);
+  setTimeout(() => { if ($("dashName") && DASH.id) $("dashName").textContent = nameOf(DASH.id); }, 6000);
+  updateChips();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+window.__dash = DASH;
+})();
 
 </script>
 </body>
