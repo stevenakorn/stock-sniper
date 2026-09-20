@@ -703,7 +703,7 @@ body{
 .dp-n{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#fff;background:var(--cyan2);padding:1.5px 5px;border-radius:4px;letter-spacing:.5px;flex-shrink:0}
 .dp-t{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap}
 .dp-s{font-size:10.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.dp-dl{margin-left:auto;border:0;background:transparent;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;flex-shrink:0}
+.dp-dl{margin-left:2px;border:0;background:transparent;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;flex-shrink:0}
 .dp-dl:hover{color:var(--cyan)}
 .dp-b{flex:1;min-height:0;display:flex;flex-direction:column}
 .dp-b.fill{justify-content:space-around}
@@ -838,6 +838,18 @@ body{
   .view{display:none!important}.view#view-dash{display:block!important}
   .dp{break-inside:avoid}
 }
+
+.kinfo{display:flex;flex-wrap:wrap;gap:3px 12px;align-items:center;font-family:var(--mono);font-size:11px;padding:4px 8px;margin-bottom:4px;border:1px solid var(--border);border-radius:6px;background:rgba(255,255,255,.03);min-height:24px}
+.kinfo b{font-weight:700}
+#k01{touch-action:pan-y}
+
+.dp-help{margin-left:auto;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--text2);background:transparent;color:var(--text2);font-size:11px;font-weight:700;line-height:1;cursor:help;padding:0;flex-shrink:0;font-family:var(--sans)}
+.dp-help:hover{border-color:var(--cyan);color:var(--cyan)}
+.dhelp{position:fixed;z-index:1000;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.55);font-size:12px;line-height:1.6;color:var(--text)}
+.dhelp .dh-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+.dhelp .dh-s{margin-top:5px}
+.dhelp .dh-s em{display:block;font-style:normal;font-size:10.5px;color:var(--cyan);font-weight:700;letter-spacing:.5px}
+@media print{.dp-help,.dhelp{display:none!important}}
 
 .dp.flash{box-shadow:0 0 0 2px var(--cyan),0 0 18px rgba(76,141,255,.5)}
 .dp{transition:box-shadow .3s}
@@ -6875,6 +6887,19 @@ function radar(labels, vals, opt) {
 const prow = (l, v, cls, txt) => `<div class="prow"><span class="pl">${l}</span><span class="pb ${cls}"><i style="width:${clamp(v)}%"></i></span><span class="pv">${txt != null ? txt : Math.round(v) + "%"}</span></div>`;
 const krow = (ic, k, v, c) => `<div class="krow"><span class="ki">${ic}</span><span class="kk">${k}</span><span class="kv" style="color:${c || "var(--text)"}">${v}</span></div>`;
 
+
+// K 棒資訊列(游標移過/點選 K 棒時顯示)
+function kInfo(m, j) {
+  const px = m.px, o = px.open[j], h = px.high[j], l = px.low[j], c = px.close[j], pc = j > 0 ? px.close[j - 1] : o;
+  const chg = c - pc, pct = pc ? chg / pc * 100 : 0, cc = chg > 0 ? "up" : chg < 0 ? "down" : "";
+  const rel = v => v > pc ? "up" : v < pc ? "down" : "";
+  const ma = (k, col) => m.maS[k][j] == null ? "" : `<span style="color:${col}">MA${k} <b>${nf(m.maS[k][j], 2)}</b></span>`;
+  const im = (m.inst || []).find(d => d.date === px.date[j]);
+  const inst = im ? `<span>外資 <b class="${cUp(im.f)}">${sg(Math.round(im.f))}</b></span><span>投信 <b class="${cUp(im.t)}">${sg(Math.round(im.t))}</b></span><span>自營 <b class="${cUp(im.d)}">${sg(Math.round(im.d))}</b></span>` : "";
+  const amt = px.amt[j] > 0 ? `<span>金額 <b>${nf(px.amt[j] / 1e8, 2)}億</b></span>` : "";
+  return `<span class="t2">${px.date[j]}</span><span>開 <b class="${rel(o)}">${nf(o, 2)}</b></span><span>高 <b class="${rel(h)}">${nf(h, 2)}</b></span><span>低 <b class="${rel(l)}">${nf(l, 2)}</b></span><span>收 <b class="${cc}">${nf(c, 2)}</b></span><span class="${cc}">${sg(chg, 2)}(${sg(pct, 2)}%)</span><span>量 <b>${nf(px.vol[j] / 1000)}張</b></span>${amt}${ma(5, "#ff8ad8")}${ma(10, "#9a8cff")}${ma(20, "#ffb74d")}${ma(60, "#cfd8e8")}${inst}`;
+}
+
 // ════════ 01 主K線圖 ════════
 function p01(m) {
   const C = cl(), px = m.px, n = px.close.length, N = Math.min(60, n), s = n - N;
@@ -6904,7 +6929,7 @@ function p01(m) {
   for (let k = 0; k < N; k += Math.max(1, Math.round(N / 6))) g += `<text class="sv" x="${X(k).toFixed(1)}" y="${Hh - 4}" text-anchor="middle">${dt(px.date[s + k])}</text>`;
   g += `<text class="sv" x="${W - pr + 5}" y="${yv(maxV) + 9}">${nf(maxV / 1000 / 1000, 1)}M張</text>`;
   const lg = `<div class="legend" style="margin-bottom:4px"><span><i style="background:${C.up}"></i>K線(紅漲綠跌)</span><span><i class="ln" style="background:#ff8ad8"></i>MA5</span><span><i class="ln" style="background:#9a8cff"></i>MA10</span><span><i class="ln" style="background:#ffb74d"></i>MA20</span><span><i class="ln" style="background:#cfd8e8"></i>MA60</span><span><i style="background:${C.t2};opacity:.6"></i>成交量</span></div>`;
-  return { n: "01", t: "主K線圖", s: "AI 主力行為判讀系統", body: lg + `<svg viewBox="0 0 ${W} ${Hh}">${g}</svg>`, note: `主力成本 = 近 20 日 VWAP(成交金額 ÷ 成交量);壓力/支撐取近 60 日價量分佈最近的高量節點,無節點時退回 60 日高/低` };
+  return { n: "01", t: "主K線圖", s: "AI 主力行為判讀系統", body: lg + `<div class="kinfo" id="k01info">${kInfo(m, n - 1)}</div><svg id="k01" viewBox="0 0 ${W} ${Hh}" data-s="${s}" data-n="${N}" data-pl="${pl}" data-step="${step}" data-w="${W}" data-h="${Hh}" data-hi="${hi}" data-lo="${lo}" data-pt="${pt}" data-ph="${ph}" data-pb="${pb}" style="cursor:crosshair">${g}<g id="k01x" pointer-events="none"></g></svg>`, note: `主力成本 = 近 20 日 VWAP(成交金額 ÷ 成交量);壓力/支撐取近 60 日價量分佈最近的高量節點,無節點時退回 60 日高/低` };
 }
 
 // ════════ 02 AI 決策核心 ════════
@@ -7136,13 +7161,40 @@ function p20(m) {
 function p21(m) { return { n: "21", t: "五大熱點券商", s: "分點買賣超", body: `<div class="broker-block" style="border:0;padding:0;background:transparent">${renderBrokerBlock(m.chip && m.chip.broker)}</div>` }; }
 function p22(m) { return { n: "22", t: "相關新聞", body: `<div style="margin-bottom:6px"><button class="dbtn" onclick="loadDetailNews('${m.id}', this)">載入新聞</button></div><div id="newsListWrap" class="news-list"></div>` }; }
 
+
+// ── 每格面板右上角「?」說明(用途 / 怎麼看 / 算法)──
+const HELP = {
+  "01": ["看價格走勢、均線與成交量,並標出主力成本與壓力/支撐。", "紅K=收盤≥開盤(台股紅漲綠跌)。MA5/10/20/60 由短到長依序由上往下排列=多頭排列。股價在「主力成本」之上代表近期買進者多數獲利。游標移過 K 棒看細節,點選可鎖定。", "主力成本=近 20 日 VWAP(成交金額÷成交量)。壓力/支撐=近 60 日價量分佈中,離收盤最近的高量價位;找不到時退回 60 日高/低。"],
+  "02": ["把趨勢、短線、主力行為、籌碼與風險濃縮成一張判讀卡,一眼掌握現況。", "頂部橫幅依風險指數變色:≥60 為 WARNING、40~60 為 CAUTION、<40 為 SIGNAL。各列文字為狀態結論,顏色依多空或風險程度而定。", "趨勢=7 項均線條件的得分;短線狀態=KD、近 5 日漲幅與是否突破;主力行為=法人近 5 日與 20 日買賣超;支撐/壓力同面板 01。全部是固定規則,不是機器學習。"],
+  "03": ["把個股拆成六個面向打分數,看強項與弱項。", "六邊形越往外越好,中央字母為綜合評級:A≥80、B≥65、C≥50、D≥35、其餘 E。缺資料的面向不計入總分,雷達上以中性 50 顯示。", "各面向 0~100 分:趨勢(均線位置)、動能(RSI 與 10 日報酬)、法人(近 5 日買賣超與買超天數)、籌碼(籌碼評分與融資)、流動性(20 日均成交金額)、波動(越穩定越高)。權重:趨勢/法人/籌碼各 20%、動能/波動各 15%、流動性 10%。"],
+  "04": ["看近 30 日的成交量堆積在哪些價位,判斷上方壓力與下方支撐。", "顏色藍→綠→黃→紅代表成交量由少到多;白線是每日收盤價。紅色高量區在股價上方=套牢壓力,在下方=支撐。右側百分比是各類價位占近 30 日總量的比例。", "把每天的成交量按當日最高~最低價平均攤到各價格區間。壓力區/支撐區=收盤價 ±5% 以外的上方/下方量占比;價平區=±5% 內;大量成交區=量最大的 3 個價位;密集成交區=量高於平均 1.3 倍的價位。"],
+  "05": ["六個風險面向的雷達圖,看風險集中在哪。", "越往外越危險。「主力風險指數」是六軸平均:<30 低、<50 中、<65 中高、≥65 高。", "各軸=100 減去對應健康分數(流動性、波動、趨勢、籌碼、法人);追價風險由 RSI 與股價偏離月線的程度計算。"],
+  "06": ["用歷史統計推估未來 10 個交易日的價格區間與漲跌機率。", "白色虛線是平均漂移路徑,扇形為 ±1 倍標準差;紅/黃/綠帶分別代表上漲/震盪/下跌區。這是統計外推,不是預測,僅供參考。", "以近 60 日的平均報酬與波動外推。機率取自所有歷史 10 日窗口:漲幅>2% 為上漲、跌幅>2% 為下跌、其餘為震盪。主力方向機率=上漲÷(上漲+下跌);強弱指標=年化漂移。"],
+  "07": ["看近期成交量落在相對「主力成本」的哪一個價位帶,觀察成本是否集中。", "「主力成本區(±2%)」占比越大,代表成本越集中;衰竭區/套牢區在成本之下,大量成交區/過熱區在成本之上。", "每日成交量依「當日收盤相對其 20 日 VWAP 的偏離」分入 5 區並堆疊:<-5% 衰竭、-5~-2% 套牢、±2% 主力成本、+2~+5% 大量成交、>+5% 過熱。"],
+  "08": ["三大法人(外資、投信、自營商)每日買賣超與累積,判斷法人在買還是在賣。", "柱狀:藍=外資、紅=投信、綠=自營商(單位:張,上為買超、下為賣超);橘線=期間累積合計(右軸);表格為最近 3 日。近 5 日或累積為正=偏多。", "資料來自 FinMind 三大法人買賣超,買進減賣出後換算成張。"],
+  "09": ["檢查隔日沖(當日拉高、隔日出脫)風險的機械指標。", "每一列越滿越危險;風險指數是有資料的項目平均:<34 低、<60 中、≥60 高。", "法人賣壓=近 5 日法人淨賣超相對成交量;量能異常=今日量÷20 日均量;融資變動=5 日融資餘額變化;上影線壓力=(最高-收盤)÷(最高-最低);日內振幅=(最高-最低)÷昨收。這不是分點隔日沖統計。"],
+  "10": ["比較近 20 日「上漲日」與「下跌日」的成交量,看多空哪邊力道大。", "多方能量越高代表上漲時量能較大。多空比>1 表示多方占優。", "多方=收盤高於前日的日子的成交量總和;空方=收盤低於前日的日子;多空比=紅 K 量÷黑 K 量。"],
+  "11": ["用五個環形快速看個股體質。", "前 4 個越滿越好,「波動風險度」越滿越危險(紅環)。總評:≥70 良好、50~70 普通、<50 偏弱(取平均)。", "籌碼健康=籌碼評分與融資變化;技術結構=趨勢分數與 20 日相對位置平均;資金動能=RSI 與 10 日報酬;波動風險=100−波動穩定分;法人支撐=近期法人買賣超。"],
+  "12": ["用紅黃綠燈號表示目前的整體風險。", "紅燈=高風險(風險指數≥60)、黃燈=留意(40~60)、綠燈=低風險(<40)。注意:這裡的紅綠代表風險,與 K 線紅漲綠跌無關。右側文字分別為趨勢、籌碼、動能、風險與結論。", "風險指數同面板 05;各項文字由對應分數分段而來。"],
+  "13": ["把散戶、法人、價量三種情緒濃縮成一個儀表。", "0=偏空、100=偏多;指針=三項平均,<40 偏空、40~60 中性、>60 偏多。", "散戶=融資餘額近 5 日變化(融資增加視為散戶偏多);法人=近期買賣超的方向與一致性;價量=紅黑 K 成交量比與動能。無融資資料時,散戶情緒改用價格動能。"],
+  "14": ["顯示這份分析本身有多可靠。分數越低,前面的結論越要保守看待。", "AI CONFIDENCE 是各項平均。歷史勝率只有在該股目前有策略訊號、且回測樣本≥8 筆時才會出現,否則顯示「樣本不足」。", "資料完整度=價量/法人/融資/分點/營收/PER 取得的比例;訊號穩定度=近 5 日均線位置是否一致;多維一致度=六個面向同向的比例。"],
+  "15": ["看最新一個交易日三大法人的買賣超,以及整段期間的累積走勢。", "數字紅=買超、綠=賣超;折線是三大法人累積買賣超(張)。結論依近 5 日與 20 日合計判斷。", "同面板 08 的資料來源,以單日與累積方式呈現。"],
+  "16": ["比較法人與一般散戶在買方、賣方各佔多少成交量。", "大戶買盤越高,代表買方由法人主導;散戶賣盤越高,代表賣方以非法人為主。", "近 20 日平均:大戶買盤=法人買進量÷成交量;散戶買盤=100%−大戶買盤;散戶賣盤=100%−(法人賣出量÷成交量)。大戶=三大法人。"],
+  "17": ["多方、空方與量能三種強度,並換算成 1~5 級的信號等級。", "多方強度+空方強度不一定等於 100%(中性因子不計入任一方)。信號等級 1 級最弱、5 級最強。", "多/空強度=技術面 5 項與法人 3 項因子中偏多/偏空的比例;量能強度=今日量÷20 日均量÷2;信號等級=綜合評分÷20 進位。"],
+  "18": ["彙整前面所有面板,給出一句「主力語意」與結論文字。", "語意如「調節減碼」「主力吸籌」「出貨偏空」「量能偏多」等,由法人與量價規則得出。點「法人動作」可跳到面板 08。", "固定規則組成的文字模板,不是大型語言模型的輸出;僅供參考,不構成投資建議。"],
+  "19": ["基本面速覽:營收成長與估值。", "月營收 YoY 為正=營收較去年同月成長;PER/PBR 越高代表估值越貴;殖利率為現金股利÷股價。", "資料來自 FinMind 月營收與 PER/PBR 資料集。"],
+  "20": ["當沖/爆量策略用的「校正後基準量」。", "把爆量日排除後重算平均量,避免被單日大量墊高。次日觀察門檻=基準×2;首分鐘進場量=每分鐘基準量×8 才算明確進場訊號。", "沿用原系統的當沖基準量校正邏輯(排除爆量日、延續確認)。"],
+  "21": ["看當日買超與賣超最大的券商分點。", "「買超/賣超」分頁切換;⚡標記為常見隔日沖分點,若它們大買,隔日賣壓可能較大。", "資料由後端從分點資料彙整,證交所對分點資料有限制,可能常態空白。"],
+  "22": ["查看這檔個股的相關新聞。", "按「載入新聞」才會抓取,以節省 API 額度。", "資料來自 FinMind 個股新聞資料集。"],
+};
+
 const SPANS = { "01": [10, 12, 12], "02": [4, 6, 6], "03": [4, 6, 6], "04": [3, 6, 6], "05": [3, 6, 6], "06": [6, 6, 12], "07": [5, 6, 12], "08": [9, 12, 12], "09": [4, 6, 6], "10": [3, 6, 6], "11": [5, 12, 12], "12": [4, 6, 6], "13": [4, 6, 6], "14": [4, 6, 6], "15": [4, 6, 6], "16": [8, 6, 12], "17": [8, 6, 12], "18": [8, 12, 12], "19": [6, 4, 6], "20": [6, 4, 6], "21": [6, 4, 12], "22": [6, 12, 12] };
 const FNS = [p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22];
 
 function panelHTML(p) {
   const sp = SPANS[p.n];
   return `<section class="dp" id="dp-${p.n}" style="--s:${sp[0]};--s2:${sp[1]};--s3:${sp[2]}">
-    <div class="dp-h"><span class="dp-n">${p.n}</span><span class="dp-t">${p.t}</span>${p.s ? `<span class="dp-s">| ${p.s}</span>` : ""}<button class="dp-dl" title="下載此面板 PNG" onclick="dashPanelPng('${p.n}')">⤓</button></div>
+    <div class="dp-h"><span class="dp-n">${p.n}</span><span class="dp-t">${p.t}</span>${p.s ? `<span class="dp-s">| ${p.s}</span>` : ""}<button class="dp-help" data-h="${p.n}" title="這格在看什麼?" aria-label="說明">?</button><button class="dp-dl" title="下載此面板 PNG" onclick="dashPanelPng('${p.n}')">⤓</button></div>
     <div class="dp-b${p.fill ? " fill" : ""}">${p.body}</div>${p.foot ? `<div class="dp-f">${p.foot}</div>` : ""}${p.note ? `<div class="note">${p.note}</div>` : ""}</section>`;
 }
 
@@ -7163,7 +7215,7 @@ function macdSVG(m) {
   return `<div class="legend" style="margin-bottom:6px"><span><i class="ln" style="background:#f5a623"></i>DIF(12-26)</span><span><i class="ln" style="background:#4c8dff"></i>DEA(9)</span><span><i style="background:${C.up}"></i>OSC 柱(紅正綠負)</span></div><svg viewBox="0 0 ${W} ${Hh}">${g}</svg>`;
 }
 
-window.__dashB = { renderGridHTML, macdSVG, panelHTML };
+window.__dashB = { renderGridHTML, macdSVG, panelHTML, kInfo, HELP };
 })();
 
 
@@ -7255,13 +7307,14 @@ const TASKS = [[1, "▣", "任務一:綜合分析報告"], [2, "▲", "任務二
 
 function renderDash() {
   const m = DASH.m, root = $("dashRoot"); if (!m) return;
+  kPin = null; kHover = null;
   const grid = svgFix(B.renderGridHTML(m));
   root.innerHTML = `<div class="task" id="task-1"><div class="dgrid" id="dashGrid">${grid}</div></div>
     <div class="task" id="task-2"></div><div class="task" id="task-3"></div><div class="task" id="task-4"></div><div class="task" id="task-5"></div>
     <div class="dock">${TASKS.map(t => `<button class="dtab" data-t="${t[0]}" onclick="dashTask(${t[0]})"><span class="d-i">${t[1]}</span>${t[2]}</button>`).join("")}</div>`;
   taskShow(DASH.task || 1, true);
 }
-function regridOnly() { const g = $("dashGrid"); if (g && DASH.m) g.innerHTML = svgFix(B.renderGridHTML(DASH.m)); }
+function regridOnly() { const g = $("dashGrid"); if (g && DASH.m) { g.innerHTML = svgFix(B.renderGridHTML(DASH.m)); kHover = null; kDraw(); } }
 
 // ── 任務分頁 ──
 function taskShow(t, force) {
@@ -7333,6 +7386,77 @@ window.searchStock = function () { dashSearch(); };
 window.openStockDetail = function (id) { dashOpen(id); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} };
 window.dashFocus = function (n) { const el = $("dp-" + n); if (!el) return; el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); };
 
+
+// ── 01 主K線圖:游標移過顯示十字線+K棒資訊,點選可鎖定/取消 ──
+let kPin = null, kHover = null;
+function kIndex(svg, ev) {
+  const r = svg.getBoundingClientRect(), W = +svg.dataset.w, x = (ev.clientX - r.left) / r.width * W;
+  const N = +svg.dataset.n, pl = +svg.dataset.pl, step = +svg.dataset.step;
+  const k = Math.floor((x - pl) / step); return (k < 0 || k >= N) ? null : k;
+}
+function kDraw() {
+  const svg = $("k01"), m = DASH.m; if (!svg || !m) return;
+  const N = +svg.dataset.n, s = +svg.dataset.s, k = kHover != null ? kHover : kPin, g = $("k01x"), info = $("k01info");
+  const idx = k != null ? k : N - 1;
+  if (info) info.innerHTML = B.kInfo(m, s + idx) + (kPin != null ? `<span class="amb">📌 已鎖定 ${m.px.date[s + kPin].slice(5).replace("-", "/")}(點該 K 棒取消)</span>` : '<span class="t2">移動游標或點選 K 棒查看細節</span>');
+  if (k == null) { g.innerHTML = ""; return; }
+  const pl = +svg.dataset.pl, step = +svg.dataset.step, W = +svg.dataset.w, H = +svg.dataset.h, hi = +svg.dataset.hi, lo = +svg.dataset.lo, pt = +svg.dataset.pt, ph = +svg.dataset.ph, pb = +svg.dataset.pb;
+  const j = s + k, x = pl + (k + .5) * step, c = m.px.close[j], y = pt + (hi - c) / (hi - lo) * ph, up = c >= m.px.open[j];
+  const col = cssVar("--cyan"), tx = cssVar("--text"), bg = cssVar("--bg2");
+  const lab = nf(c, 2), lw = lab.length * 6.6 + 10, lx = W - 54 + 2;
+  g.innerHTML = `<rect x="${(x - step / 2).toFixed(1)}" y="${pt}" width="${step.toFixed(1)}" height="${(H - pb - pt).toFixed(1)}" fill="${tx}" fill-opacity=".09"/>
+    <line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${pt}" y2="${H - pb}" stroke="${col}" stroke-dasharray="3 3"/>
+    <line x1="${pl}" x2="${W - 54}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-dasharray="3 3" stroke-opacity=".8"/>
+    <rect x="${lx}" y="${(y - 8).toFixed(1)}" width="${lw.toFixed(0)}" height="16" rx="2" fill="${up ? cssVar("--up") : cssVar("--down")}"/>
+    <text x="${lx + 5}" y="${(y + 4).toFixed(1)}" font-size="10" fill="#fff" font-family="Roboto Mono,monospace">${lab}</text>
+    <text x="${x.toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="${tx}" font-family="Roboto Mono,monospace" style="paint-order:stroke" stroke="${bg}" stroke-width="3">${m.px.date[j].slice(5).replace("-", "/")}</text>`;
+}
+document.addEventListener("pointermove", ev => {
+  const svg = ev.target.closest && ev.target.closest("#k01");
+  if (!svg) { if (kHover != null) { kHover = null; kDraw(); } return; }
+  const k = kIndex(svg, ev); if (k !== kHover) { kHover = k; kDraw(); }
+});
+document.addEventListener("click", ev => {
+  const svg = ev.target.closest && ev.target.closest("#k01"); if (!svg) return;
+  const k = kIndex(svg, ev); if (k == null) return;
+  kPin = (kPin === k) ? null : k; kHover = null; kDraw();
+});
+
+
+// ── 「?」說明氣泡 ──
+let helpN = null, helpPinned = false;
+function helpEl() { let e = $("dashHelp"); if (!e) { e = document.createElement("div"); e.id = "dashHelp"; e.className = "dhelp"; e.style.display = "none"; document.body.appendChild(e); } return e; }
+function helpShow(btn, pin) {
+  const n = btn.dataset.h, h = B.HELP[n]; if (!h) return;
+  const p = $("dp-" + n), title = p ? (p.querySelector(".dp-t") || {}).textContent : "";
+  const e = helpEl();
+  e.innerHTML = `<div class="dh-h"><span class="dp-n">${n}</span><b>${escH(title)}</b></div><div class="dh-s"><em>這格在做什麼</em>${escH(h[0])}</div><div class="dh-s"><em>怎麼看</em>${escH(h[1])}</div><div class="dh-s"><em>怎麼算</em>${escH(h[2])}</div>`;
+  e.style.display = "block"; helpN = n; helpPinned = !!pin;
+  const r = btn.getBoundingClientRect(), w = Math.min(340, window.innerWidth - 16);
+  e.style.width = w + "px";
+  let left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8), top = r.bottom + 6;
+  const hh = e.offsetHeight; if (top + hh > window.innerHeight - 8) top = Math.max(8, r.top - hh - 6);
+  e.style.left = left + "px"; e.style.top = top + "px";
+}
+function helpHide() { const e = $("dashHelp"); if (e) e.style.display = "none"; helpN = null; helpPinned = false; }
+document.addEventListener("click", ev => {
+  const btn = ev.target.closest && ev.target.closest(".dp-help");
+  if (btn) { if (helpN === btn.dataset.h && helpPinned) helpHide(); else helpShow(btn, true); ev.stopPropagation(); return; }
+  if (!(ev.target.closest && ev.target.closest("#dashHelp"))) helpHide();
+}, true);
+document.addEventListener("pointerover", ev => {
+  if (ev.pointerType !== "mouse") return;
+  const btn = ev.target.closest && ev.target.closest(".dp-help");
+  if (btn && !helpPinned) helpShow(btn, false);
+});
+document.addEventListener("pointerout", ev => {
+  if (ev.pointerType !== "mouse" || helpPinned) return;
+  const btn = ev.target.closest && ev.target.closest(".dp-help");
+  if (btn) helpHide();
+});
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") helpHide(); });
+window.addEventListener("scroll", () => { if (helpN) helpHide(); }, { passive: true });
+
 // ── 主題切換後重畫 ──
 const _tt = window.toggleTheme;
 window.toggleTheme = function () { _tt(); if (DASH.m) regridOnly(); };
@@ -7358,7 +7482,7 @@ window.dashPng = async function () {
   const m = DASH.m; if (!m) return;
   const wrap = document.createElement("div"); wrap.style.cssText = "position:fixed;left:-20000px;top:0;width:1680px;padding:12px;background:" + cssVar("--bg");
   wrap.appendChild($("dashHead").cloneNode(true)); const inf = $("dashInfo").cloneNode(true); inf.querySelector(".di-btns") && inf.querySelector(".di-btns").remove(); wrap.appendChild(inf);
-  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl").forEach(x => x.remove()); wrap.appendChild(g);
+  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl,.dp-help").forEach(x => x.remove()); wrap.appendChild(g);
   wrap.setAttribute("data-theme", document.documentElement.getAttribute("data-theme") || "dark");
   document.body.appendChild(wrap);
   await pngOf(wrap, `${m.id}_${m.name}_dashboard_${m.date}.png`); wrap.remove();
@@ -7366,7 +7490,7 @@ window.dashPng = async function () {
 window.dashHtml = function () {
   const m = DASH.m; if (!m) return;
   const css = [...document.querySelectorAll("style")].map(s => s.textContent).join("\n");
-  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl,.btn2,.dbtn").forEach(x => x.remove());
+  const g = $("dashGrid").cloneNode(true); g.querySelectorAll(".dp-dl,.dp-help,.btn2,.dbtn").forEach(x => x.remove());
   const head = $("dashHead").cloneNode(true); head.querySelectorAll("input,button,.dh-end,.dh-chips").forEach(x => x.remove());
   const theme = document.documentElement.getAttribute("data-theme") || "dark";
   const html = `<!DOCTYPE html><html lang="zh-TW" data-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escH(m.id + " " + m.name)} 飆股狙擊離線報告 ${m.date}</title><style>${css}</style></head><body><div class="wrap"><div style="margin-bottom:8px;font-size:12px;color:var(--text2)">飆股狙擊系統 離線報告｜${escH(m.id)} ${escH(m.name)}｜資料日期 ${m.date}｜產生時間 ${new Date().toLocaleString("zh-TW")}</div>${head.outerHTML}<div class="dgrid">${g.innerHTML}</div><div style="margin-top:12px;font-size:11px;color:var(--text2)">本報告僅供參考,投資有風險。所有分數與結論皆為規則式計算,非投資建議。</div></div></body></html>`;
