@@ -6493,7 +6493,7 @@ const lastNN = a => { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) 
 // ── 資料抓取(價量:含成交金額/成交筆數)──
 async function fetchPx(id) {
   const ck = "pxD_" + id; const c = memGet(ck); if (c) return c;
-  const end = new Date(), st = new Date(); st.setDate(st.getDate() - 165);
+  const end = new Date(), st = new Date(); st.setDate(st.getDate() - 620); // 620 日:讓 UT Bot ATR(300) 有足夠日數暖身
   const f = d => d.toISOString().split("T")[0];
   const url = USE_BACKEND
     ? `${BACKEND_URL}/api/stock_price?token=${token}&stock_id=${id}&start_date=${f(st)}&end_date=${f(end)}`
@@ -6566,6 +6566,41 @@ function volNodes(pf) {
     if (sm[b] >= l && sm[b] >= r && sm[b] > avgv) nodes.push({ price: binCenter(pf, b), v: sm[b] });
   }
   return nodes;
+}
+
+// ── UT Bot Alerts(公開的 TradingView 社群指標,ATR 移動停損翻轉):
+//    key = 靈敏度倍數,atrLen = ATR 週期(Wilder RMA)。na 掉暖身不足的區段,不用假資料補。
+const UT_KEY = 2, UT_ATR_LEN = 300;
+function computeUTBot(px, key, atrLen) {
+  const n = px.close.length, H = px.high, L = px.low, C = px.close;
+  if (n < 2) return { atr: [], stop: [], buy: [], sell: [], len: 0 };
+  const tr = new Array(n);
+  for (let j = 0; j < n; j++) tr[j] = j === 0 ? H[j] - L[j] : Math.max(H[j] - L[j], Math.abs(H[j] - C[j - 1]), Math.abs(L[j] - C[j - 1]));
+  const len = Math.min(atrLen, n);
+  const atr = new Array(n).fill(null);
+  if (n >= len) {
+    let seed = 0; for (let j = 0; j < len; j++) seed += tr[j]; seed /= len;
+    atr[len - 1] = seed;
+    for (let j = len; j < n; j++) atr[j] = (atr[j - 1] * (len - 1) + tr[j]) / len;
+  }
+  const stop = new Array(n).fill(null), buy = new Array(n).fill(false), sell = new Array(n).fill(false);
+  for (let j = 0; j < n; j++) {
+    const a = atr[j]; if (a == null) continue;
+    const nLoss = key * a, src = C[j];
+    const prevStop = j > 0 ? stop[j - 1] : null, prevSrc = j > 0 ? C[j - 1] : null;
+    let cur;
+    if (prevStop == null) cur = src > nLoss ? src - nLoss : src + nLoss;
+    else if (src > prevStop && prevSrc > prevStop) cur = Math.max(prevStop, src - nLoss);
+    else if (src < prevStop && prevSrc < prevStop) cur = Math.min(prevStop, src + nLoss);
+    else if (src > prevStop) cur = src - nLoss;
+    else cur = src + nLoss;
+    stop[j] = cur;
+    if (prevStop != null) {
+      if (prevSrc <= prevStop && src > cur) buy[j] = true;
+      else if (prevSrc >= prevStop && src < cur) sell[j] = true;
+    }
+  }
+  return { atr, stop, buy, sell, len, key, atrLen };
 }
 
 // 分數標籤
@@ -6759,6 +6794,9 @@ function buildModel(id, name, px, chip, rev, per) {
   const cd = [m.confData, m.confStab, m.confAgree]; if (m.hist && m.hist.sufficient) cd.push(m.hist.winRate);
   m.confidence = meanA(cd);
 
+  // UT Bot Alerts(ATR 移動停損翻轉買賣點,沿用公開社群指標的公式)
+  m.ut = computeUTBot(px, UT_KEY, UT_ATR_LEN);
+
   // 預測路徑(統計推估)
   m.fc = buildForecast(m);
   return m;
@@ -6834,7 +6872,7 @@ function buildAlerts(m) {
   return out;
 }
 
-window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel };
+window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
 })();
 
 
@@ -6844,7 +6882,7 @@ window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, 
 (function () {
 "use strict";
 const A = window.__dashA;
-const { clamp, nf, sg, escH, sumA, meanA, pickMax, pickMin, binCenter } = A;
+const { clamp, nf, sg, escH, sumA, meanA, pickMax, pickMin, binCenter, UT_KEY, UT_ATR_LEN } = A;
 
 const cl = () => ({
   up: cssVar("--up"), down: cssVar("--down"), t2: cssVar("--text2"), tx: cssVar("--text"), bd: cssVar("--border"), bd2: cssVar("--border2"),
@@ -6897,7 +6935,8 @@ function kInfo(m, j) {
   const im = (m.inst || []).find(d => d.date === px.date[j]);
   const inst = im ? `<span>外資 <b class="${cUp(im.f)}">${sg(Math.round(im.f))}</b></span><span>投信 <b class="${cUp(im.t)}">${sg(Math.round(im.t))}</b></span><span>自營 <b class="${cUp(im.d)}">${sg(Math.round(im.d))}</b></span>` : "";
   const amt = px.amt[j] > 0 ? `<span>金額 <b>${nf(px.amt[j] / 1e8, 2)}億</b></span>` : "";
-  return `<span class="t2">${px.date[j]}</span><span>開 <b class="${rel(o)}">${nf(o, 2)}</b></span><span>高 <b class="${rel(h)}">${nf(h, 2)}</b></span><span>低 <b class="${rel(l)}">${nf(l, 2)}</b></span><span>收 <b class="${cc}">${nf(c, 2)}</b></span><span class="${cc}">${sg(chg, 2)}(${sg(pct, 2)}%)</span><span>量 <b>${nf(px.vol[j] / 1000)}張</b></span>${amt}${ma(5, "#ff8ad8")}${ma(10, "#9a8cff")}${ma(20, "#ffb74d")}${ma(60, "#cfd8e8")}${inst}`;
+  const ut = m.ut, utTag = ut && ut.buy && ut.buy[j] ? `<span class="up">UT 買訊</span>` : ut && ut.sell && ut.sell[j] ? `<span class="down">UT 賣訊</span>` : "";
+  return `<span class="t2">${px.date[j]}</span><span>開 <b class="${rel(o)}">${nf(o, 2)}</b></span><span>高 <b class="${rel(h)}">${nf(h, 2)}</b></span><span>低 <b class="${rel(l)}">${nf(l, 2)}</b></span><span>收 <b class="${cc}">${nf(c, 2)}</b></span><span class="${cc}">${sg(chg, 2)}(${sg(pct, 2)}%)</span><span>量 <b>${nf(px.vol[j] / 1000)}張</b></span>${amt}${ma(5, "#ff8ad8")}${ma(10, "#9a8cff")}${ma(20, "#ffb74d")}${ma(60, "#cfd8e8")}${inst}${utTag}`;
 }
 
 // ════════ 01 主K線圖 ════════
@@ -6922,14 +6961,33 @@ function p01(m) {
   }
   const line = (arr, col, dash) => { let d = ""; for (let k = 0; k < N; k++) { const v = arr[s + k]; if (v == null) continue; d += (d ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1); } return d ? `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.2" ${dash ? 'stroke-dasharray="4 3"' : ""}/>` : ""; };
   g += line(m.maS[60], "#cfd8e8", true) + line(m.maS[20], "#ffb74d") + line(m.maS[10], "#9a8cff") + line(m.maS[5], "#ff8ad8");
+  // UT Bot Alerts:ATR 移動停損線(依當下多空分段上色)+ 買賣翻轉點
+  const ut = m.ut;
+  if (ut && ut.stop && ut.stop[s] !== undefined) {
+    let seg = "", segUp = null;
+    for (let k = 0; k < N; k++) {
+      const j = s + k, sv = ut.stop[j];
+      if (sv == null) { if (seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`; seg = ""; } continue; }
+      const up = px.close[j] > sv;
+      if (up !== segUp && seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`; seg = ""; }
+      seg += (seg ? "L" : "M") + X(k).toFixed(1) + " " + Y(sv).toFixed(1); segUp = up;
+    }
+    if (seg) g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`;
+    for (let k = 0; k < N; k++) {
+      const j = s + k, x = X(k);
+      if (ut.buy[j]) g += `<path d="M${x.toFixed(1)} ${(Y(px.low[j]) + 10).toFixed(1)} l5 7 l-10 0 Z" fill="${C.up}"/><text x="${x.toFixed(1)}" y="${(Y(px.low[j]) + 20).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C.up}">買</text>`;
+      if (ut.sell[j]) g += `<path d="M${x.toFixed(1)} ${(Y(px.high[j]) - 10).toFixed(1)} l5 -7 l-10 0 Z" fill="${C.down}"/><text x="${x.toFixed(1)}" y="${(Y(px.high[j]) - 14).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C.down}">賣</text>`;
+    }
+  }
   const lab = (v, txt, col, x) => { const y = Y(v); const w = txt.length * 6.6 + 12; return `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-dasharray="5 4" stroke-opacity=".85"/><rect x="${x}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(0)}" height="16" rx="2" fill="${C.bg}" stroke="${col}"/><text x="${x + 6}" y="${(y + 4).toFixed(1)}" font-size="10.5" fill="${col}" style="font-family:var(--mono)">${txt}</text>`; };
   g += lab(m.resist[0], `壓力區 ${nf(m.resist[0], 2)}`, C.up, W - pr - 128);
   g += lab(m.vwap, `主力成本 ${nf(m.vwap, 2)}`, C.cy, 74);
   g += lab(m.support[0], `支撐區 ${nf(m.support[0], 2)}`, C.cy, W - pr - 128);
   for (let k = 0; k < N; k += Math.max(1, Math.round(N / 6))) g += `<text class="sv" x="${X(k).toFixed(1)}" y="${Hh - 4}" text-anchor="middle">${dt(px.date[s + k])}</text>`;
   g += `<text class="sv" x="${W - pr + 5}" y="${yv(maxV) + 9}">${nf(maxV / 1000 / 1000, 1)}M張</text>`;
-  const lg = `<div class="legend" style="margin-bottom:4px"><span><i style="background:${C.up}"></i>K線(紅漲綠跌)</span><span><i class="ln" style="background:#ff8ad8"></i>MA5</span><span><i class="ln" style="background:#9a8cff"></i>MA10</span><span><i class="ln" style="background:#ffb74d"></i>MA20</span><span><i class="ln" style="background:#cfd8e8"></i>MA60</span><span><i style="background:${C.t2};opacity:.6"></i>成交量</span></div>`;
-  return { n: "01", t: "主K線圖", s: "AI 主力行為判讀系統", body: lg + `<div class="kinfo" id="k01info">${kInfo(m, n - 1)}</div><svg id="k01" viewBox="0 0 ${W} ${Hh}" data-s="${s}" data-n="${N}" data-pl="${pl}" data-step="${step}" data-w="${W}" data-h="${Hh}" data-hi="${hi}" data-lo="${lo}" data-pt="${pt}" data-ph="${ph}" data-pb="${pb}" style="cursor:crosshair">${g}<g id="k01x" pointer-events="none"></g></svg>`, note: `主力成本 = 近 20 日 VWAP(成交金額 ÷ 成交量);壓力/支撐取近 60 日價量分佈最近的高量節點,無節點時退回 60 日高/低` };
+  const lg = `<div class="legend" style="margin-bottom:4px"><span><i style="background:${C.up}"></i>K線(紅漲綠跌)</span><span><i class="ln" style="background:#ff8ad8"></i>MA5</span><span><i class="ln" style="background:#9a8cff"></i>MA10</span><span><i class="ln" style="background:#ffb74d"></i>MA20</span><span><i class="ln" style="background:#cfd8e8"></i>MA60</span><span><i style="background:${C.t2};opacity:.6"></i>成交量</span><span><i style="background:${C.up}"></i>買(UT Bot)</span><span><i style="background:${C.down}"></i>賣(UT Bot)</span></div>`;
+  const utNote = ut && ut.len >= UT_ATR_LEN ? `;買賣翻轉點 = UT Bot Alerts(公開社群 ATR 移動停損指標,靈敏度 ${UT_KEY}、ATR ${UT_ATR_LEN} 日),收盤穿越停損線翻轉時標記,非 AI 判斷` : `;UT Bot 買賣點需 ${UT_ATR_LEN} 日以上資料暖身,目前資料不足暫不標記`;
+  return { n: "01", t: "主K線圖", s: "AI 主力行為判讀系統", body: lg + `<div class="kinfo" id="k01info">${kInfo(m, n - 1)}</div><svg id="k01" viewBox="0 0 ${W} ${Hh}" data-s="${s}" data-n="${N}" data-pl="${pl}" data-step="${step}" data-w="${W}" data-h="${Hh}" data-hi="${hi}" data-lo="${lo}" data-pt="${pt}" data-ph="${ph}" data-pb="${pb}" style="cursor:crosshair">${g}<g id="k01x" pointer-events="none"></g></svg>`, note: `主力成本 = 近 20 日 VWAP(成交金額 ÷ 成交量);壓力/支撐取近 60 日價量分佈最近的高量節點,無節點時退回 60 日高/低${utNote}` };
 }
 
 // ════════ 02 AI 決策核心 ════════
@@ -7164,7 +7222,7 @@ function p22(m) { return { n: "22", t: "相關新聞", body: `<div style="margin
 
 // ── 每格面板右上角「?」說明(用途 / 怎麼看 / 算法)──
 const HELP = {
-  "01": ["看價格走勢、均線與成交量,並標出主力成本與壓力/支撐。", "紅K=收盤≥開盤(台股紅漲綠跌)。MA5/10/20/60 由短到長依序由上往下排列=多頭排列。股價在「主力成本」之上代表近期買進者多數獲利。游標移過 K 棒看細節,點選可鎖定。", "主力成本=近 20 日 VWAP(成交金額÷成交量)。壓力/支撐=近 60 日價量分佈中,離收盤最近的高量價位;找不到時退回 60 日高/低。"],
+  "01": ["看價格走勢、均線與成交量,並標出主力成本、壓力/支撐,以及 UT Bot Alerts 買賣翻轉點。", "紅K=收盤≥開盤(台股紅漲綠跌)。MA5/10/20/60 由短到長依序由上往下排列=多頭排列。股價在「主力成本」之上代表近期買進者多數獲利。K 線下方細虛線是 UT Bot 的 ATR 移動停損線,紅=停損在價格上方(空方控制)、綠=停損在價格下方(多方控制);收盤穿越停損線翻轉時標「買/賣」。游標移過 K 棒看細節,點選可鎖定。", "主力成本=近 20 日 VWAP(成交金額÷成交量)。壓力/支撐=近 60 日價量分佈中,離收盤最近的高量價位;找不到時退回 60 日高/低。UT Bot Alerts:每日 ATR=近 300 日真實波幅的 Wilder 平滑值,停損線=價格往有利方向創高/低時,用「前停損 vs. 收盤∓靈敏度(2)×ATR」取更貼近價格者移動;收盤由停損線下方翻上方=買、由上方翻下方=賣。這是複製 TradingView 上公開的「UT Bot Alerts」社群指標公式,不是 Claude 自創或 AI 判斷,也不構成投資建議。"],
   "02": ["把趨勢、短線、主力行為、籌碼與風險濃縮成一張判讀卡,一眼掌握現況。", "頂部橫幅依風險指數變色:≥60 為 WARNING、40~60 為 CAUTION、<40 為 SIGNAL。各列文字為狀態結論,顏色依多空或風險程度而定。", "趨勢=7 項均線條件的得分;短線狀態=KD、近 5 日漲幅與是否突破;主力行為=法人近 5 日與 20 日買賣超;支撐/壓力同面板 01。全部是固定規則,不是機器學習。"],
   "03": ["把個股拆成六個面向打分數,看強項與弱項。", "六邊形越往外越好,中央字母為綜合評級:A≥80、B≥65、C≥50、D≥35、其餘 E。缺資料的面向不計入總分,雷達上以中性 50 顯示。", "各面向 0~100 分:趨勢(均線位置)、動能(RSI 與 10 日報酬)、法人(近 5 日買賣超與買超天數)、籌碼(籌碼評分與融資)、流動性(20 日均成交金額)、波動(越穩定越高)。權重:趨勢/法人/籌碼各 20%、動能/波動各 15%、流動性 10%。"],
   "04": ["看近 30 日的成交量堆積在哪些價位,判斷上方壓力與下方支撐。", "顏色藍→綠→黃→紅代表成交量由少到多;白線是每日收盤價。紅色高量區在股價上方=套牢壓力,在下方=支撐。右側百分比是各類價位占近 30 日總量的比例。", "把每天的成交量按當日最高~最低價平均攤到各價格區間。壓力區/支撐區=收盤價 ±5% 以外的上方/下方量占比;價平區=±5% 內;大量成交區=量最大的 3 個價位;密集成交區=量高於平均 1.3 倍的價位。"],
