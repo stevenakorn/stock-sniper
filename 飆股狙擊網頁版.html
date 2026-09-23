@@ -6961,22 +6961,32 @@ function p01(m) {
   }
   const line = (arr, col, dash) => { let d = ""; for (let k = 0; k < N; k++) { const v = arr[s + k]; if (v == null) continue; d += (d ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1); } return d ? `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.2" ${dash ? 'stroke-dasharray="4 3"' : ""}/>` : ""; };
   g += line(m.maS[60], "#cfd8e8", true) + line(m.maS[20], "#ffb74d") + line(m.maS[10], "#9a8cff") + line(m.maS[5], "#ff8ad8");
-  // UT Bot Alerts:ATR 移動停損線(依當下多空分段上色)+ 買賣翻轉點
+  // UT Bot Alerts:ATR 移動停損線(依當下多空分段上色)+ 買賣翻轉點(比照參考圖的實心標籤樣式)
   const ut = m.ut;
+  const utTag = (cx, baseY, txt, color, dir) => {
+    const w = 25, h = 17, r = 4, tail = 7;
+    const topY = dir === 1 ? baseY + tail : baseY - tail - h;
+    let d = `<rect x="${(cx - w / 2).toFixed(1)}" y="${topY.toFixed(1)}" width="${w}" height="${h}" rx="${r}" fill="${color}" stroke="${C.bg}" stroke-width="1"/>`;
+    d += dir === 1
+      ? `<path d="M${(cx - 5.5).toFixed(1)} ${topY.toFixed(1)} L${cx.toFixed(1)} ${(topY - tail).toFixed(1)} L${(cx + 5.5).toFixed(1)} ${topY.toFixed(1)} Z" fill="${color}"/>`
+      : `<path d="M${(cx - 5.5).toFixed(1)} ${(topY + h).toFixed(1)} L${cx.toFixed(1)} ${(topY + h + tail).toFixed(1)} L${(cx + 5.5).toFixed(1)} ${(topY + h).toFixed(1)} Z" fill="${color}"/>`;
+    d += `<text x="${cx.toFixed(1)}" y="${(topY + h / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="800" fill="#fff" style="paint-order:stroke">${txt}</text>`;
+    return d;
+  };
   if (ut && ut.stop && ut.stop[s] !== undefined) {
     let seg = "", segUp = null;
     for (let k = 0; k < N; k++) {
       const j = s + k, sv = ut.stop[j];
-      if (sv == null) { if (seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`; seg = ""; } continue; }
+      if (sv == null) { if (seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1.6" stroke-opacity=".9" stroke-dasharray="3 3"/>`; seg = ""; } continue; }
       const up = px.close[j] > sv;
-      if (up !== segUp && seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`; seg = ""; }
+      if (up !== segUp && seg) { g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1.6" stroke-opacity=".9" stroke-dasharray="3 3"/>`; seg = ""; }
       seg += (seg ? "L" : "M") + X(k).toFixed(1) + " " + Y(sv).toFixed(1); segUp = up;
     }
-    if (seg) g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1" stroke-opacity=".6" stroke-dasharray="1 2"/>`;
+    if (seg) g += `<path d="${seg}" fill="none" stroke="${segUp ? C.up : C.down}" stroke-width="1.6" stroke-opacity=".9" stroke-dasharray="3 3"/>`;
     for (let k = 0; k < N; k++) {
       const j = s + k, x = X(k);
-      if (ut.buy[j]) g += `<path d="M${x.toFixed(1)} ${(Y(px.low[j]) + 10).toFixed(1)} l5 7 l-10 0 Z" fill="${C.up}"/><text x="${x.toFixed(1)}" y="${(Y(px.low[j]) + 20).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C.up}">買</text>`;
-      if (ut.sell[j]) g += `<path d="M${x.toFixed(1)} ${(Y(px.high[j]) - 10).toFixed(1)} l5 -7 l-10 0 Z" fill="${C.down}"/><text x="${x.toFixed(1)}" y="${(Y(px.high[j]) - 14).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C.down}">賣</text>`;
+      if (ut.buy[j]) g += utTag(x, Y(px.low[j]), "買", C.up, 1);
+      if (ut.sell[j]) g += utTag(x, Y(px.high[j]), "賣", C.down, -1);
     }
   }
   const lab = (v, txt, col, x) => { const y = Y(v); const w = txt.length * 6.6 + 12; return `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-dasharray="5 4" stroke-opacity=".85"/><rect x="${x}" y="${(y - 8).toFixed(1)}" width="${w.toFixed(0)}" height="16" rx="2" fill="${C.bg}" stroke="${col}"/><text x="${x + 6}" y="${(y + 4).toFixed(1)}" font-size="10.5" fill="${col}" style="font-family:var(--mono)">${txt}</text>`; };
