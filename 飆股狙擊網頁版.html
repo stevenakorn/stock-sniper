@@ -1249,7 +1249,10 @@ body{
   <div class="dash-info" style="margin-bottom:10px">
     <span class="di-src">美股查詢(v10.2 新增,v10.5 更新)｜價量資料來源:Twelve Data(免費方案,日K約4小時延遲,非即時)｜新聞來源:Finnhub</span>
   </div>
-  <div class="scan-panel" style="margin-bottom:14px">
+  <div style="margin-bottom:14px">
+    <button class="dbtn" id="apiKeyToggleBtn" onclick="toggleApiKeyBox()">⚙ API Key 設定(進階,預設隱藏)</button>
+  </div>
+  <div class="scan-panel" id="apiKeyBox" style="margin-bottom:14px;display:none">
     <div class="scan-panel-title">API Key 設定</div>
     <div class="mq-bar">
       <input class="token-input" id="tdTokenInput" type="text" placeholder="Twelve Data API key(已內建一組免費 key,不填也能查詢)" autocomplete="off">
@@ -8022,6 +8025,15 @@ function saveFnToken() {
   if (DASH_US.m && DASH_US.symbol) loadUSNews(DASH_US.symbol); // 剛設定好 key,若已有查詢中的個股就順便重新載入新聞
 }
 window.saveFnToken = saveFnToken;
+
+// v10.6:API Key 設定預設收起來(裡面會顯示已存的 key 明碼,平常不需要看到),按鈕點開才顯示
+function toggleApiKeyBox() {
+  const el = $("apiKeyBox"); if (!el) return;
+  const show = el.style.display === "none";
+  el.style.display = show ? "" : "none";
+  const btn = $("apiKeyToggleBtn"); if (btn) btn.textContent = show ? "⚙ API Key 設定(進階,點擊收起)" : "⚙ API Key 設定(進階,預設隱藏)";
+}
+window.toggleApiKeyBox = toggleApiKeyBox;
 
 // ── 美股相關新聞(v10.5,獨立於 18 格面板之外的區塊)──
 function renderUSNewsBox(html) { const el = $("usNewsList"); if (el) el.innerHTML = html; }
