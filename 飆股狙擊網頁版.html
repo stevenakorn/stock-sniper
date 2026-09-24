@@ -862,7 +862,7 @@ body{
 <div id="dashHead" class="dash-head">
   <div class="dh-chips">
     <div class="dh-chip" id="chipScanBox"><span class="dh-ico">◉</span><div class="dh-txt"><span id="chipScanT">AI SCAN STANDBY</span><small id="chipScanS">盤後分析待機</small></div></div>
-    <div class="dh-chip" id="chipMainBox"><span class="dh-ico">◎</span><div class="dh-txt">MAIN FORCE TRACKING<small id="chipMainS">--</small></div></div>
+    <div class="dh-chip" id="chipMainBox"><span class="dh-ico">◎</span><div class="dh-txt">INSTITUTIONAL FLOW<small id="chipMainS">--</small></div></div>
     <div class="dh-chip" id="chipMktBox"><span class="dh-ico">▮</span><div class="dh-txt">MARKET STATUS<small id="chipMktS">--</small></div></div>
     <div class="dh-chip warn" id="chipVol"><span class="dh-ico">!</span><div class="dh-txt">VOLATILITY ALERT<small id="chipVolS">--</small></div></div>
   </div>
@@ -896,8 +896,10 @@ body{
   <button class="dnav" data-view="scan">選股掃描</button>
   <button class="dnav" data-view="radar">資金雷達</button>
   <button class="dnav" data-view="lt">中長期潛力</button>
+  <button class="dnav" data-view="ma">均線糾結</button>
   <button class="dnav" data-view="bt">回測績效</button>
   <button class="dnav" data-view="sent">市場情緒</button>
+  <button class="dnav" data-view="us">美股查詢</button>
 </nav>
 
 <div class="view active" id="view-dash"><div id="dashRoot"><div class="dash-empty">輸入上方股票代號(例如 <b>2330</b>)並按「分析」,<br>即可產生 18 格個股 AI 分析儀表板。</div></div></div>
@@ -1160,10 +1162,48 @@ body{
       <div class="lt-funnel-arrow">→</div>
       <div class="lt-funnel-step" data-step="score"><span class="lt-funnel-dot"></span>入選<b id="lfScore">0</b></div>
     </div>
-    <div class="lt-note">趨勢模板(收盤>50>150>200MA、200MA上揚、距高點25%內、離低點25%上)為必要門檻;嚴格版另需 VCP 收縮 + 年報酬≥30%。掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考。</div>
+    <div class="lt-note">趨勢模板(收盤>50MA>150MA>200MA、200MA 連續 21+42 日上升、距 52 週高點 25% 內、高於 52 週低點 30% 以上)為必要門檻;嚴格版另需多段收縮 VCP + RPS(全市場年報酬百分位)≥80。這是簡化版 Trend Template,不含完整相對強度排名以外的 CANSLIM 條件;掃描全市場約需數分鐘,結果依潛力星等排序。僅供研究參考,不構成投資建議。</div>
     <div id="ltStats"><div class="lt-stat-empty">掃描後結果會自動歸檔,隔日後可計算中長期勝率</div></div>
     <div id="ltKeptSection" class="lt-kept-wrap"></div>
     <div id="ltResults"><div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股</div></div>
+  </div>
+</div>
+
+
+</div>
+
+<div class="view" id="view-ma">
+<!-- 均線糾結掃描 -->
+<div class="panel" style="margin-top:14px">
+  <div class="panel-header">
+    <span class="panel-title">MA CONVERGENCE RADAR · 均線糾結掃描</span>
+    <span class="panel-badge" id="maCount">0 檔</span>
+  </div>
+  <div style="padding:14px 16px">
+    <div class="lt-controls">
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">糾結幅度</span>
+        <button class="lt-mode-btn ma-th-btn active" onclick="setMaThreshold(2,this)">緊(&lt;2%)</button>
+        <button class="lt-mode-btn ma-th-btn" onclick="setMaThreshold(3,this)">一般(&lt;3%)</button>
+        <button class="lt-mode-btn ma-th-btn" onclick="setMaThreshold(5,this)">寬(&lt;5%)</button>
+      </div>
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">均線組合</span>
+        <button class="lt-mode-btn ma-set-btn active" onclick="setMaSet('short',this)">5/10/20/60日</button>
+        <button class="lt-mode-btn ma-set-btn" onclick="setMaSet('long',this)">20/60/120/240日</button>
+      </div>
+      <div class="lt-ctrl-group">
+        <span class="lt-ctrl-label">範圍</span>
+        <button class="lt-scope-btn ma-scope-btn active" onclick="setMaScope('all',this)">全市場</button>
+        <button class="lt-scope-btn ma-scope-btn" onclick="setMaScope('tse',this)">僅上市</button>
+      </div>
+      <button class="lt-scan-btn" id="btnMaScan" onclick="startMaScan()">🎯 開始掃描</button>
+      <button class="lt-stop-btn" onclick="stopMaScan()">■ 中止</button>
+      <button class="radar-btn" onclick="exportMaCSV()">↓ CSV</button>
+    </div>
+    <div class="lt-prog-wrap"><div class="lt-prog" id="maProgress"></div></div>
+    <div class="lt-note">均線糾結 = 選定的幾條均線(如 5/10/20/60 日)彼此距離收斂到現價一定幅度以內,代表短中期均線黏在一起、方向未明,常見於盤整末端、變盤前夕。幅度 = (最高均線−最低均線)÷現價;持續天數是幅度連續低於門檻的交易日數,天數越多代表盤整越久、蓄勢可能越久。v10.4 新增三個輔助判斷,提高精確度:①狀態欄位若標「剛向上突破/剛向下跌破」,會附註當天量是否比前20日均量放大1.5倍以上(量未放大要慎防假突破/假跌破)②長期趨勢欄位比對現價與200日均線,分辨這是多頭中繼整理還是空頭中繼整理③RPS 是全市場年報酬百分位(跟中長期潛力掃描同一套算法),越高代表相對大盤越強勢,可用來過濾量縮到沒人要的弱勢股。這仍然純粹是統計偵測,不代表接下來一定照預期方向走,請自行再搭配籌碼與基本面判斷。與中長期潛力掃描共用同一套股價快取,不會重複耗用 API 額度。僅供研究參考,不構成投資建議。</div>
+    <div id="maResults"><div class="lt-empty">按「開始掃描」尋找均線糾結中的個股</div></div>
   </div>
 </div>
 
@@ -1203,6 +1243,38 @@ body{
 </div>
 
 
+</div>
+
+<div class="view" id="view-us">
+  <div class="dash-info" style="margin-bottom:10px">
+    <span class="di-src">美股查詢(v10.2 新增)｜資料來源:Twelve Data(免費方案,日K約4小時延遲,非即時)</span>
+  </div>
+  <div class="scan-panel" style="margin-bottom:14px">
+    <div class="scan-panel-title">Twelve Data API Key 設定</div>
+    <div class="mq-bar">
+      <input class="token-input" id="tdTokenInput" type="text" placeholder="貼上你的 Twelve Data API key(需自行到 twelvedata.com 免費申請)" autocomplete="off">
+      <button class="mq-btn" onclick="saveTdToken()">儲存</button>
+      <span class="t2" id="tdTokenStatus" style="font-size:12px;margin-left:6px"></span>
+    </div>
+    <div class="note t2" style="font-size:10.5px;margin-top:6px">
+      key 只存在你自己瀏覽器的 localStorage,不會送到別的地方。免費方案每天 800 次額度,單檔查詢用量很小。
+    </div>
+  </div>
+  <div id="dashHeadUS" class="dash-head">
+    <div class="dh-search">
+      <input id="dashInputUS" type="text" maxlength="10" placeholder="美股代號,例如 AAPL" autocomplete="off" onkeydown="if(event.key==='Enter')dashSearchUS()">
+      <div class="dh-name" id="dashNameUS">--</div>
+      <button class="dh-go" onclick="dashSearchUS()">分析</button>
+    </div>
+    <div class="dh-kpis" id="dashKpisUS"></div>
+  </div>
+  <div class="dash-info" id="dashInfoUS">
+    <span class="di-range" id="diRangeUS">輸入美股代號後開始分析</span>
+  </div>
+  <div class="note t2" style="font-size:10.5px;margin:2px 0 14px">
+    美股沒有台股「三大法人買賣超 / 融資融券 / 分點進出 / 月營收」這類每日揭露資料,對應面板(法人行為計量、籌碼異動摘要、買賣力分布圖、五大熱點券商、當沖基準量)已直接不顯示,不是留空裝有資料。估值(PER/PBR/殖利率)免費資料源目前未提供,顯示為 --。其餘以日K價量計算的面板(K線、量價熱區、VWAP成本結構、多空能量、技術指標等)邏輯與台股版相同。僅供研究參考,不構成投資建議。
+  </div>
+  <div id="dashRootUS"><div class="dash-empty">設定 API key 並輸入美股代號(例如 <b>AAPL</b>)後按「分析」。</div></div>
 </div>
 
 <!-- 底部狀態列 -->
@@ -1721,38 +1793,42 @@ function renderBacktest() {
   const csvBtn = document.getElementById("btnBtCsv");
   if (csvBtn) csvBtn.disabled = false;
 
-  const bestR = b => (b.r5 !== null && b.r5 !== undefined) ? b.r5 : (b.r3 ?? b.r1);
+  // v10.1修正:過去「勝率(5日)」其實是 r5→r3→r1 的 fallback 混合值,不是嚴格5日勝率。
+  // 現在每個持有期間各自嚴格計算:該筆訊號必須有該期間的實際資料(bt.rN !== null)才計入該期間統計,不同期間之間不互相取代。
   const avgOf = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
   const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
   const cls = v => v >= 0 ? "up" : "down";
   const stratNames = { breakout: "爆量突破", consolidation: "強勢整理", accumulation: "主力蓄勢" };
+  // 嚴格期間統計:只用「該筆訊號當下已有這個期間資料」的樣本,不同期間樣本數可能不同
+  function periodStat(arr, field) {
+    const valid = arr.filter(x => x.bt[field] !== null && x.bt[field] !== undefined);
+    if (!valid.length) return { n: 0, win: 0, wr: null, avg: null };
+    const win = valid.filter(x => x.bt[field] > 0).length;
+    return { n: valid.length, win, wr: win / valid.length * 100, avg: avgOf(valid.map(x => x.bt[field])) };
+  }
 
   // ── 整體統計:只用 3★↑(或 4★↑)──
   const statRows = btStatRows(allRows);
-  const wins = statRows.filter(x => bestR(x.bt) > 0);
-  const winRate = statRows.length ? (wins.length / statRows.length * 100).toFixed(1) : "0.0";
-  const avgR5 = avgOf(statRows.map(x => bestR(x.bt)).filter(v => v !== null));
-  const avgR1 = avgOf(statRows.map(x => x.bt.r1).filter(v => v !== null && v !== undefined));
-  const r10s = statRows.map(x => x.bt.r10).filter(v => v !== null && v !== undefined);
-  const avgR10 = avgOf(r10s);
+  const p1 = periodStat(statRows, "r1"), p3 = periodStat(statRows, "r3"), p5 = periodStat(statRows, "r5"), p10 = periodStat(statRows, "r10");
+  const winRate = p5.wr != null ? p5.wr.toFixed(1) : "--";
+  const avgR5 = p5.avg || 0, avgR1 = p1.avg || 0, avgR10 = p10.avg || 0;
   const scopeLabel = BT.scope === "s45" ? "4-5★" : "3-5★";
-  // 大盤同期(有 mktR5 的樣本)
-  const withMkt = statRows.filter(x => x.bt.mktR5 !== null && x.bt.mktR5 !== undefined);
+  // 大盤同期(有 mktR5 且個股也有嚴格 r5 的樣本,才能公平比較同一批訊號的同期表現)
+  const withMkt = statRows.filter(x => x.bt.mktR5 !== null && x.bt.mktR5 !== undefined && x.bt.r5 !== null && x.bt.r5 !== undefined);
   const avgMktR5 = avgOf(withMkt.map(x => x.bt.mktR5));
-  const avgStockR5same = avgOf(withMkt.map(x => bestR(x.bt)).filter(v => v !== null));
+  const avgStockR5same = avgOf(withMkt.map(x => x.bt.r5));
   const excessR5 = avgStockR5same - avgMktR5;
   const hasMkt = withMkt.length > 0;
-  // 多空分組
+  // 多空分組(嚴格 r5)
   const bullRows = statRows.filter(x => x.bt.bull === true);
   const bearRows = statRows.filter(x => x.bt.bull === false);
   const grpStat = arr => {
-    if (!arr.length) return { n: 0, wr: "--", a5: 0 };
-    const w = arr.filter(x => bestR(x.bt) > 0).length;
-    return { n: arr.length, wr: (w / arr.length * 100).toFixed(0) + "%", a5: avgOf(arr.map(x => bestR(x.bt)).filter(v => v !== null)) };
+    const s = periodStat(arr, "r5");
+    return { n: s.n, wr: s.wr != null ? s.wr.toFixed(0) + "%" : "--", a5: s.avg || 0 };
   };
   const bullS = grpStat(bullRows), bearS = grpStat(bearRows);
 
-  // 依策略統計(同樣只算 statRows)
+  // 依策略統計(同樣只算 statRows,嚴格 r5)
   const byStrat = {};
   statRows.forEach(x => { (byStrat[x.type] = byStrat[x.type] || []).push(x); });
   // 各星級統計:1-5★ 全顯示(對照用,用 allRows)
@@ -1760,16 +1836,19 @@ function renderBacktest() {
   allRows.forEach(x => { const s = x.stars || 1; (byStar[s] = byStar[s] || []).push(x); });
 
   const statRow = (label, arr, dim) => {
-    const w = arr.filter(x => bestR(x.bt) > 0).length;
-    const wr = arr.length ? (w / arr.length * 100).toFixed(0) : "0";
-    const a5 = avgOf(arr.map(x => bestR(x.bt)).filter(v => v !== null));
-    return `<tr${dim ? ' style="opacity:.5"' : ''}><td>${label}</td><td>${arr.length}</td><td>${wr}%</td><td class="${cls(a5)}">${fmtPct(a5)}</td></tr>`;
+    const s = periodStat(arr, "r5");
+    const wr = s.wr != null ? s.wr.toFixed(0) : "--";
+    const a5 = s.avg || 0;
+    return `<tr${dim ? ' style="opacity:.5"' : ''}><td>${label}</td><td>${s.n}</td><td>${wr}%</td><td class="${cls(a5)}">${s.n ? fmtPct(a5) : "--"}</td></tr>`;
   };
   let stratHtml = Object.keys(byStrat).map(k =>
     statRow(`<span class="bt-tag ${k}">${stratNames[k] || k}</span>`, byStrat[k])).join("");
   // 星級表:1-2★ 標灰(不計入整體),3-5★ 正常
   let starHtml = [5, 4, 3, 2, 1].filter(s => byStar[s]).map(s =>
     statRow("★".repeat(s), byStar[s], s < 3)).join("");
+  // 各持有期間(1/3/5/10日)嚴格勝率明細表,每個期間都只用「有到期」的樣本,不互相 fallback
+  const periodRow = (label, s) => `<tr><td>${label}</td><td>${s.n}</td><td>${s.wr != null ? s.wr.toFixed(0) + "%" : "--"}</td><td class="${s.avg != null ? cls(s.avg) : ""}">${s.avg != null ? fmtPct(s.avg) : "--"}</td></tr>`;
+  const periodHtml = periodRow("+1日", p1) + periodRow("+3日", p3) + periodRow("+5日", p5) + periodRow("+10日", p10);
 
   sumEl.innerHTML = `
     <div class="bt-scope-bar">
@@ -1780,8 +1859,8 @@ function renderBacktest() {
     </div>
     <div class="bt-summary-grid">
       <div class="bt-card"><div class="bt-card-label">已回測訊號</div><div class="bt-card-value">${statRows.length}</div><div class="bt-card-sub">${scopeLabel}·近 ${HIST_MAX_DAYS} 天</div></div>
-      <div class="bt-card"><div class="bt-card-label">勝率(5日)</div><div class="bt-card-value ${winRate >= 50 ? "up" : "down"}">${winRate}%</div><div class="bt-card-sub">${wins.length} 勝 / ${statRows.length - wins.length} 敗</div></div>
-      <div class="bt-card"><div class="bt-card-label">平均報酬(5日)</div><div class="bt-card-value ${cls(avgR5)}">${fmtPct(avgR5)}</div><div class="bt-card-sub">隔日均:${fmtPct(avgR1)}</div></div>
+      <div class="bt-card"><div class="bt-card-label">勝率(嚴格5日)</div><div class="bt-card-value ${p5.wr != null && p5.wr >= 50 ? "up" : "down"}">${winRate}%</div><div class="bt-card-sub">${p5.win} 勝 / ${p5.n - p5.win} 敗(僅已滿5日樣本)</div></div>
+      <div class="bt-card"><div class="bt-card-label">平均報酬(嚴格5日)</div><div class="bt-card-value ${cls(avgR5)}">${fmtPct(avgR5)}</div><div class="bt-card-sub">隔日均(嚴格1日):${fmtPct(avgR1)}</div></div>
       <div class="bt-card"><div class="bt-card-label">超額報酬(5日)</div><div class="bt-card-value ${hasMkt ? cls(excessR5) : ""}">${hasMkt ? fmtPct(excessR5) : "--"}</div><div class="bt-card-sub">${hasMkt ? "大盤同期:" + fmtPct(avgMktR5) : "需更新回測"}</div></div>
     </div>
     <div class="bt-group-bar">
@@ -1796,13 +1875,17 @@ function renderBacktest() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="bt-stat-tables">
       <div class="bt-card" style="padding:10px 12px">
-        <div class="bt-card-label" style="margin-bottom:8px">各策略表現（${scopeLabel}）</div>
+        <div class="bt-card-label" style="margin-bottom:8px">各策略表現（${scopeLabel}・嚴格5日）</div>
         <table class="bt-strategy-table"><thead><tr><th>策略</th><th>筆數</th><th>勝率</th><th>均酬5日</th></tr></thead><tbody>${stratHtml}</tbody></table>
       </div>
       <div class="bt-card" style="padding:10px 12px">
-        <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體）</div>
+        <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體・嚴格5日）</div>
         <table class="bt-strategy-table"><thead><tr><th>星級</th><th>筆數</th><th>勝率</th><th>均酬5日</th></tr></thead><tbody>${starHtml}</tbody></table>
       </div>
+    </div>
+    <div class="bt-card" style="padding:10px 12px;margin-top:10px">
+      <div class="bt-card-label" style="margin-bottom:8px">各持有期間表現（${scopeLabel}・每個期間各自嚴格計算,不互相取代,筆數可能不同）</div>
+      <table class="bt-strategy-table"><thead><tr><th>持有期間</th><th>筆數</th><th>勝率</th><th>均報酬</th></tr></thead><tbody>${periodHtml}</tbody></table>
     </div>`;
 
   renderBtTable(allRows);
@@ -2393,8 +2476,78 @@ function ltATR(high, low, close, n, endIdx) {
   return sum / n;
 }
 
-// 分析單檔,回傳評估結果(不符最低門檻回 null)
-function ltAnalyze(id, d, chip) {
+// ════════════════════════════════════════
+// v10.1 修正:①RPS(全市場252日報酬百分位,取代把「年報酬」直接當RPS)
+// ════════════════════════════════════════
+// 由呼叫端(startLtScan)在完整掃過一輪股價資料後建立;sorted 是全市場(已成功取得200日以上資料者)的年報酬由小到大排序
+function buildRpsLookup(marketReturns) {
+  const sorted = marketReturns.map(x => x.yrRet).filter(v => isFinite(v)).sort((a, b) => a - b);
+  return function rpsOf(yrRet) {
+    if (!sorted.length || !isFinite(yrRet)) return null;
+    // 百分位 = 報酬 <= 此股票報酬的比例(0~100),越高代表相對全市場漲幅前段班
+    let lo = 0, hi = sorted.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] <= yrRet) lo = mid + 1; else hi = mid; }
+    return sorted.length ? lo / sorted.length * 100 : null;
+  };
+}
+
+// ════════════════════════════════════════
+// v10.1 修正:②VCP 改為偵測多段收縮(而不是單一快照的波動率收縮)
+// 做法:用 k 根 K 棒的 fractal 找出近 N 日內的高低點,組成交替的高→低段(每段是一次修正),
+// 取最後 2~4 段修正幅度與各段平均量,檢查「幅度依序收斂」且「量能依序萎縮」,
+// 且目前股價落在最後一段收縮區間的上緣(準備突破)。仍是簡化版,不是嚴格逐筆 O'Neil 判讀,但比單一快照更接近「多段收縮」的定義。
+// ════════════════════════════════════════
+function detectVCP(d, i, opt) {
+  opt = opt || {};
+  const N = Math.min(opt.lookback || 90, i + 1), k = 3;
+  const s = i - N + 1, H = d.high, L = d.low, V = d.volume;
+  const highs = [], lows = [];
+  for (let j = s + k; j <= i - k; j++) {
+    let isH = true, isL = true;
+    for (let t = 1; t <= k; t++) {
+      if (H[j] < H[j - t] || H[j] < H[j + t]) isH = false;
+      if (L[j] > L[j - t] || L[j] > L[j + t]) isL = false;
+    }
+    if (isH) highs.push({ idx: j, price: H[j] });
+    if (isL) lows.push({ idx: j, price: L[j] });
+  }
+  // 合併成交替的高/低擺動序列(同型別只留較極端者)
+  const pts = [...highs.map(p => ({ ...p, type: "H" })), ...lows.map(p => ({ ...p, type: "L" }))].sort((a, b) => a.idx - b.idx);
+  const seq = [];
+  for (const p of pts) {
+    const last = seq[seq.length - 1];
+    if (!last) { seq.push(p); continue; }
+    if (last.type === p.type) { if (p.type === "H" ? p.price > last.price : p.price < last.price) seq[seq.length - 1] = p; }
+    else seq.push(p);
+  }
+  // 取「高→低」的修正段(每段=一次拉回),各段幅度%與段內均量
+  const legs = [];
+  for (let q = 0; q < seq.length - 1; q++) {
+    if (seq[q].type === "H" && seq[q + 1].type === "L") {
+      const depth = (seq[q].price - seq[q + 1].price) / seq[q].price * 100;
+      const vAvg = avg(V.slice(seq[q].idx, seq[q + 1].idx + 1).filter(x => x > 0)) || 0;
+      legs.push({ hIdx: seq[q].idx, lIdx: seq[q + 1].idx, hPrice: seq[q].price, lPrice: seq[q + 1].price, depth, vAvg });
+    }
+  }
+  const stages = legs.slice(-4); // 最近至多4段
+  if (stages.length < 2) return { tight: false, stages: stages.length, depths: stages.map(s => +s.depth.toFixed(1)) };
+  // 幅度依序收斂(容許15%誤差緩衝,避免過度嚴格)
+  let depthOk = true;
+  for (let q = 1; q < stages.length; q++) if (stages[q].depth > stages[q - 1].depth * 1.15) depthOk = false;
+  // 量能依序萎縮
+  let volOk = true;
+  for (let q = 1; q < stages.length; q++) if (stages[q].vAvg > stages[q - 1].vAvg * 1.15) volOk = false;
+  const lastStage = stages[stages.length - 1];
+  const finalTight = lastStage.depth < 15; // 最後一段收縮幅度需夠窄
+  // 現價需落在最後一段區間的上緣(接近突破),且離最後一次高點不遠(避免已經破底又反彈很多才算數)
+  const price = d.close[i];
+  const nearBreakout = price >= lastStage.lPrice && price >= lastStage.hPrice * 0.92;
+  const tight = depthOk && volOk && finalTight && nearBreakout && stages.length >= 2;
+  return { tight, stages: stages.length, depths: stages.map(s => +s.depth.toFixed(1)), depthOk, volOk, finalTight, nearBreakout };
+}
+
+// 分析單檔,回傳評估結果(不符最低門檻回 null)。rpsOf:由 buildRpsLookup() 產生的百分位函式,null 代表市場分布尚未建立(退回年報酬≥30%作為權宜)
+function ltAnalyze(id, d, chip, rpsOf) {
   const n = d.close.length;
   if (n < 200) return null; // 資料不足以算 200MA
   const i = n - 1;
@@ -2409,38 +2562,32 @@ function ltAnalyze(id, d, chip) {
   const s50 = ltSMA(d.close, 50, i), s150 = ltSMA(d.close, 150, i), s200 = ltSMA(d.close, 200, i);
   if (s50 == null || s150 == null || s200 == null) return null;
   const s200_21 = ltSMA(d.close, 200, i - 21);
+  const s200_42 = ltSMA(d.close, 200, i - 42);
   const win = Math.min(252, n);
   const hi52 = Math.max(...d.high.slice(-win));
   const lo52 = Math.min(...d.low.slice(-win));
 
-  // ── 趨勢模板(硬條件)──
+  // ── 趨勢模板(硬條件,v10.1:200MA 改為要求「連續」上升,離低點門檻 25%→30%)──
   const t1 = price > s150 && price > s200;
   const t2 = s150 > s200;
-  // ②200MA方向:容許0.5%緩衝(走平也算過,不要求嚴格向上)
-  const t3 = s200_21 != null && s200 > s200_21 * 0.995;
+  // 200MA方向:今日 > 21日前 > 42日前,兩段都要向上,才算「持續上升」而非單日雜訊
+  const t3 = s200_21 != null && s200_42 != null && s200 > s200_21 && s200_21 > s200_42;
   const t4 = s50 > s150 && s50 > s200;
   const t5 = price > s50;
-  const t6 = price >= 1.25 * lo52;
+  const t6 = price >= 1.30 * lo52;
   const t7 = price >= 0.75 * hi52;
   const trendPass = t1 && t2 && t3 && t4 && t5 && t6 && t7;
   if (!trendPass) return null; // 趨勢模板是必要門檻(嚴格/彈性都要)
 
-  // ── 年報酬強度(代 RPS)──
+  // ── 年報酬(僅供顯示參考)與 RPS(相對全市場的百分位排名,才是真正的相對強度)──
   const yrAgo = (n >= 252) ? d.close[n - 252] : d.close[0];
   const yrRet = (price / yrAgo - 1) * 100;
-  const strongRet = yrRet >= 30;
+  const rps = rpsOf ? rpsOf(yrRet) : null;
+  const strongRet = rps != null ? rps >= 80 : yrRet >= 30; // 市場分布未建立時退回舊門檻,並標記 rpsFallback
 
-  // ── VCP(③參數放寬:ATR比例5%→6%、區間寬度10%→12%)──
-  const a14 = ltATR(d.high, d.low, d.close, 14, i);
-  const a50 = ltATR(d.high, d.low, d.close, 50, i);
-  const volRatio = (a14 != null) ? a14 / price : 1;
-  const volContract = (a14 != null && a50 != null) ? a14 < a50 : false;
-  const last21 = d.close.slice(-21);
-  const rangePct = (Math.max(...last21) - Math.min(...last21)) / price;
-  const vol20 = avg(d.volume.slice(-20));
-  const vol50 = avg(d.volume.slice(-50));
-  const volDrying = vol20 < vol50;
-  const vcpTight = volRatio < 0.06 && volContract && rangePct < 0.12 && volDrying;
+  // ── VCP:多段收縮偵測(取代單一快照的波動率收縮)──
+  const vcp = detectVCP(d, i);
+  const vcpTight = vcp.tight;
 
   // ── 距52週新高3%以內(加分用)──
   const nearHigh = price >= 0.97 * hi52;
@@ -2470,7 +2617,7 @@ function ltAnalyze(id, d, chip) {
     const pb = parseFloat(prev.MarginPurchaseTodayBalance ?? prev.margin ?? 0);
     marginDown = lb < pb; // 融資減少 = 散戶下車
   }
-  // ⑥法人鎖碼:買超天數≥7天 且 累積淨額為正(排除零星買超但金額為負的假訊號)
+  // 外資／投信買超:買超天數≥7天 且 累積淨額為正(排除零星買超但金額為負的假訊號)。注意:這只涵蓋外資+投信,不含自營商,且「三大法人」≠市場口語的「主力」
   const chipGood = (foreignBuyDays >= 7 && foreignNetSum > 0) || (trustBuyDays >= 7 && trustNetSum > 0);
 
   // ── 評分(潛力星等 1-5)──
@@ -2482,19 +2629,19 @@ function ltAnalyze(id, d, chip) {
   if (nearHigh) score += 0.5; // ⑤距52週新高3%以內加分
   const stars = Math.min(5, Math.max(1, Math.round(score)));
 
-  // 嚴格版:VCP + 強勢報酬 必須成立
+  // 嚴格版:VCP + RPS(或退回年報酬)強勢 必須成立
   if (LTSCAN.mode === "strict") {
     if (!vcpTight || !strongRet) return null;
   }
 
   return {
     id, price: +price.toFixed(2), stars,
-    yrRet: +yrRet.toFixed(1), strongRet,
+    yrRet: +yrRet.toFixed(1), rps: rps != null ? +rps.toFixed(1) : null, rpsFallback: rps == null, strongRet,
     s50: +s50.toFixed(1), s150: +s150.toFixed(1), s200: +s200.toFixed(1),
     distHigh: +((price / hi52 - 1) * 100).toFixed(1),  // 距52週高 %
     distLow: +((price / lo52 - 1) * 100).toFixed(1),   // 離52週低 %
-    vcpTight, volRatio: +(volRatio * 100).toFixed(2), rangePct: +(rangePct * 100).toFixed(1),
-    volDrying, foreignBuyDays, trustBuyDays, marginDown, chipGood, nearHigh,
+    vcpTight, vcpStages: vcp.stages, vcpDepths: vcp.depths,
+    foreignBuyDays, trustBuyDays, marginDown, chipGood, nearHigh,
     foreignNetSum: +foreignNetSum.toFixed(0), trustNetSum: +trustNetSum.toFixed(0),
   };
 }
@@ -2525,17 +2672,43 @@ async function startLtScan() {
   addLog(`▶ 中長期潛力掃描開始（${LTSCAN.mode === "strict" ? "嚴格" : "彈性"}/${LTSCAN.scope === "tse" ? "上市" : "全市場"}）：共 ${list.length} 檔`);
 
   const BATCH = 20;
+
+  // ── v10.1:第一輪先抓全部股價、建立「年報酬分布」給 RPS 用(不額外多打API,
+  // 第二輪主掃描會直接命中這輪存好的快取)。RPS 才是真正的相對強度排名,不能只看單一股票自己的年報酬。──
+  const marketReturns = [];
+  if (btn) btn.textContent = "建立市場分布中...";
+  for (let bi = 0; bi < list.length; bi += BATCH) {
+    if (!LTSCAN.running) break;
+    const batch = list.slice(bi, bi + BATCH);
+    await Promise.allSettled(batch.map(async id => {
+      try {
+        const d = await fetchDailyLong(id);
+        if (!d || d.close.length < 200) return;
+        const nn = d.close.length, pr = d.close[nn - 1];
+        const ya = nn >= 252 ? d.close[nn - 252] : d.close[0];
+        if (ya > 0) marketReturns.push({ id, yrRet: (pr / ya - 1) * 100 });
+      } catch (e) {}
+    }));
+    const donePct = Math.round(Math.min(bi + BATCH, list.length) / list.length * 50);
+    if (prog) prog.style.width = donePct + "%";
+    if (btn) btn.textContent = `建立市場分布 ${Math.min(bi + BATCH, list.length)}/${list.length}`;
+    await new Promise(r => setTimeout(r, 30));
+  }
+  LTSCAN.marketReturns = marketReturns;
+  const rpsOf = buildRpsLookup(marketReturns);
+  addLog(`✅ 市場報酬分布建立完成:樣本 ${marketReturns.length} 檔（RPS 以此為基準)`);
+
   let done = 0, found = 0;
   for (let bi = 0; bi < list.length; bi += BATCH) {
     if (!LTSCAN.running) break; // 可中止
     const batch = list.slice(bi, bi + BATCH);
     await Promise.allSettled(batch.map(async id => {
       try {
-        const d = await fetchDailyLong(id); // 400天,有快取
+        const d = await fetchDailyLong(id); // 400天,有快取(第一輪已抓過)
         if (!d || d.close.length < 200) return;
         funnel.fetch++;
         // 先過趨勢模板再決定要不要抓籌碼(省 API)
-        const quick = ltAnalyze(id, d, null);
+        const quick = ltAnalyze(id, d, null, rpsOf);
         if (!quick) return;
         funnel.trend++;
         // 過了才抓籌碼、月營收、PER(省 API)
@@ -2547,7 +2720,7 @@ async function startLtScan() {
         if (LTSCAN.revThreshold != null && rev && rev.yoy != null && rev.yoy <= LTSCAN.revThreshold) return;
         funnel.rev++;
         try { per = await fetchPER(id); } catch (e) {}
-        const full = ltAnalyze(id, d, chip);
+        const full = ltAnalyze(id, d, chip, rpsOf);
         if (full) {
           full.name = (stockNameMap && stockNameMap[id]) || id;
           full.revYoy = rev ? rev.yoy : null;
@@ -2563,7 +2736,7 @@ async function startLtScan() {
       } catch (e) {}
     }));
     done = Math.min(bi + BATCH, list.length);
-    const pct = Math.round(done / list.length * 100);
+    const pct = 50 + Math.round(done / list.length * 50);
     if (prog) prog.style.width = pct + "%";
     if (btn) btn.textContent = `掃描中 ${done}/${list.length}（找到 ${found}）`;
     renderFunnel();
@@ -2608,7 +2781,7 @@ function renderLtResults() {
   const rows = LTSCAN.results;
   if (cnt) cnt.textContent = `${rows.length} 檔`;
   if (!rows.length) {
-    wrap.innerHTML = `<div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股<br>（收盤 > 50 > 150 > 200MA、200MA 上揚、距高點 25% 內、VCP 收縮、法人買超）</div>`;
+    wrap.innerHTML = `<div class="lt-empty">按「開始掃描」尋找符合趨勢模板的中長期潛力股<br>（收盤 > 50 > 150 > 200MA、200MA 連續上升、距高點 25% 內、高於低點 30% 以上、多段收縮 VCP、外資/投信買超）</div>`;
     return;
   }
   if (LTSCAN.page == null) LTSCAN.page = 1;
@@ -2624,7 +2797,7 @@ function renderLtResults() {
     if (r.foreignBuyDays >= 7 && r.foreignNetSum > 0) chipTags.push(`<span class="lt-tag good">外資買${r.foreignBuyDays}/10日(+${Math.round(r.foreignNetSum)}張)</span>`);
     if (r.trustBuyDays >= 7 && r.trustNetSum > 0) chipTags.push(`<span class="lt-tag good">投信買${r.trustBuyDays}/10日(+${Math.round(r.trustNetSum)}張)</span>`);
     if (r.marginDown) chipTags.push(`<span class="lt-tag mid">融資減</span>`);
-    if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮</span>`);
+    if (r.vcpTight) chipTags.push(`<span class="lt-tag hot">VCP收縮${r.vcpStages}段(${(r.vcpDepths || []).join("→")}%)</span>`);
     if (r.nearHigh) chipTags.push(`<span class="lt-tag hot">距新高3%內</span>`);
     const rid = "ltx_" + r.id;
     const isKept = !!(todayH[r.id] && todayH[r.id].kept);
@@ -2636,14 +2809,15 @@ function renderLtResults() {
       <td class="lt-t-price">$${r.price}</td>
       <td style="color:var(--amber)">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</td>
       <td class="${r.yrRet >= 0 ? "up" : "down"}">${r.yrRet >= 0 ? "+" : ""}${r.yrRet}%</td>
+      <td class="${r.rps != null && r.rps >= 50 ? "up" : r.rps != null ? "down" : ""}" title="${r.rpsFallback ? "市場分布未建立,退回年報酬門檻" : "全市場年報酬百分位"}">${r.rps != null ? r.rps.toFixed(0) : "--"}${r.rpsFallback ? "*" : ""}</td>
       <td class="${r.revYoy != null ? (r.revYoy >= 0 ? "up" : "down") : ""}">${r.revYoy != null ? (r.revYoy >= 0 ? "+" : "") + r.revYoy + "%" : "--"}</td>
       <td>${r.per != null ? r.per : "--"}</td>
       <td>${r.distHigh}%</td>
     </tr>
     <tr class="lt-expand" id="${rid}" style="display:none">
-      <td colspan="9">
+      <td colspan="10">
         <div class="lt-expand-body">
-          <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200} ｜ 離低點 <b class="up">+${r.distLow}%</b> ｜ 月幅 <b>${r.rangePct}%</b>${r.pbr != null ? ` ｜ PBR <b>${r.pbr}</b>` : ""}${r.revYoy3 != null ? ` ｜ 近3月營收均YoY <b class="${r.revYoy3 >= 0 ? "up" : "down"}">${r.revYoy3 >= 0 ? "+" : ""}${r.revYoy3}%</b>` : ""}</div>
+          <div class="lt-ma">MA <b>50</b>:${r.s50} <b>150</b>:${r.s150} <b>200</b>:${r.s200} ｜ 離低點 <b class="up">+${r.distLow}%</b> ｜ VCP <b>${r.vcpStages}段收縮</b>${r.pbr != null ? ` ｜ PBR <b>${r.pbr}</b>` : ""}${r.revYoy3 != null ? ` ｜ 近3月營收均YoY <b class="${r.revYoy3 >= 0 ? "up" : "down"}">${r.revYoy3 >= 0 ? "+" : ""}${r.revYoy3}%</b>` : ""}</div>
           ${chipTags.length ? `<div class="lt-tags">${chipTags.join("")}</div>` : ""}
           <div class="lt-news-row">
             <button class="radar-btn" onclick="event.stopPropagation();openStockDetail('${r.id}')">查看個股詳情 →</button>
@@ -2672,7 +2846,7 @@ function renderLtResults() {
       <button class="radar-btn" id="btnLtDelete" onclick="ltDeleteChecked()" disabled style="border-color:var(--down);color:var(--down)">移除勾選</button>
     </div>
     <div class="bt-table-wrap"><table class="bt-table lt-table">
-      <thead><tr><th></th><th></th><th>股票</th><th>現價</th><th>星級</th><th>年報酬</th><th>營收YoY</th><th>本益比</th><th>距高點</th></tr></thead>
+      <thead><tr><th></th><th></th><th>股票</th><th>現價</th><th>星級</th><th>年報酬</th><th title="全市場年報酬百分位,*=樣本未建立時退回年報酬門檻">RPS</th><th>營收YoY</th><th>本益比</th><th>距高點</th></tr></thead>
       <tbody>${trs}</tbody>
     </table></div>
     ${pager}
@@ -2687,10 +2861,10 @@ function ltGoResultPage(p) { LTSCAN.page = p; renderLtResults(); }
 function exportLtCSV() {
   const rows = LTSCAN.results;
   if (!rows.length) { alert("尚無掃描結果"); return; }
-  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "距52高%", "離52低%", "50MA", "150MA", "200MA", "月區間%", "VCP收縮", "距新高3%內", "外資買超天", "外資累積淨額(張)", "投信買超天", "投信累積淨額(張)", "融資減少", "營收YoY%", "近3月YoY%", "本益比", "股價淨值比", "殖利率%"];
+  const head = ["代號", "名稱", "潛力星", "現價", "年報酬%", "RPS百分位", "RPS是否為退回值", "距52高%", "離52低%", "50MA", "150MA", "200MA", "VCP收縮段數", "VCP各段幅度%", "距新高3%內", "外資買超天", "外資累積淨額(張)", "投信買超天", "投信累積淨額(張)", "融資減少", "營收YoY%", "近3月YoY%", "本益比", "股價淨值比", "殖利率%"];
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const lines = [head.map(q).join(",")];
-  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.rangePct, r.vcpTight ? "是" : "", r.nearHigh ? "是" : "", r.foreignBuyDays, r.foreignNetSum, r.trustBuyDays, r.trustNetSum, r.marginDown ? "是" : "", r.revYoy ?? "", r.revYoy3 ?? "", r.per ?? "", r.pbr ?? "", r.divYield ?? ""].map(q).join(",")));
+  rows.forEach(r => lines.push([r.id, r.name, r.stars, r.price, r.yrRet, r.rps ?? "", r.rpsFallback ? "是" : "否", r.distHigh, r.distLow, r.s50, r.s150, r.s200, r.vcpStages, (r.vcpDepths || []).join("→"), r.nearHigh ? "是" : "", r.foreignBuyDays, r.foreignNetSum, r.trustBuyDays, r.trustNetSum, r.marginDown ? "是" : "", r.revYoy ?? "", r.revYoy3 ?? "", r.per ?? "", r.pbr ?? "", r.divYield ?? ""].map(q).join(",")));
   downloadText(`中長期潛力股_${todayISO()}.csv`, "\uFEFF" + lines.join("\r\n"), "text/csv");
   addLog("✅ 中長期潛力股 CSV 已匯出");
 }
@@ -2891,27 +3065,31 @@ function ltRenderStats() {
       <div style="text-align:center;margin-top:10px"><button class="radar-btn" id="btnLtBt" onclick="runLtBacktest()">↻ 更新勝率</button></div>`;
     return;
   }
-  const bestR = b => (b.r10 !== null && b.r10 !== undefined) ? b.r10 : (b.r5);
+  // v10.1修正:「勝率(10日)」過去是 r10→r5 的 fallback 混合值,不是嚴格10日勝率。改成每個期間各自嚴格計算(只用該期間 !== null 的樣本)。
   const avgOf = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
   const fmtPct = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
   const cls = v => v >= 0 ? "up" : "down";
-  const wins = stat.filter(x => bestR(x.bt) > 0);
-  const wr = (wins.length / stat.length * 100).toFixed(1);
-  const avg10 = avgOf(stat.map(x => bestR(x.bt)));
-  const avg5 = avgOf(stat.map(x => x.bt.r5).filter(v => v != null));
-  const r20s = stat.map(x => x.bt.r20).filter(v => v != null);
-  const avg20 = avgOf(r20s);
+  function ltPeriodStat(arr, field) {
+    const valid = arr.filter(x => x.bt[field] !== null && x.bt[field] !== undefined);
+    if (!valid.length) return { n: 0, win: 0, wr: null, avg: null };
+    const win = valid.filter(x => x.bt[field] > 0).length;
+    return { n: valid.length, win, wr: win / valid.length * 100, avg: avgOf(valid.map(x => x.bt[field])) };
+  }
+  const s5 = ltPeriodStat(stat, "r5"), s10 = ltPeriodStat(stat, "r10"), s20 = ltPeriodStat(stat, "r20");
+  const wr = s10.wr != null ? s10.wr.toFixed(1) : "--";
+  const avg10 = s10.avg || 0, avg5 = s5.avg || 0, avg20 = s20.avg || 0;
   const scopeLabel = LTBT.scope === "s45" ? "4-5★" : "3-5★";
 
-  // 各星級(1-5全顯示對照)
+  // 各星級(1-5全顯示對照,嚴格10日)
   const byStar = {};
   rows.forEach(x => { const s = x.stars || 1; (byStar[s] = byStar[s] || []).push(x); });
   const starRow = s => {
-    const arr = byStar[s]; const w = arr.filter(x => bestR(x.bt) > 0).length;
-    const a = avgOf(arr.map(x => bestR(x.bt)));
-    return `<tr${s < 3 ? ' style="opacity:.5"' : ''}><td>${"★".repeat(s)}</td><td>${arr.length}</td><td>${(w / arr.length * 100).toFixed(0)}%</td><td class="${cls(a)}">${fmtPct(a)}</td></tr>`;
+    const arr = byStar[s]; const st = ltPeriodStat(arr, "r10");
+    return `<tr${s < 3 ? ' style="opacity:.5"' : ''}><td>${"★".repeat(s)}</td><td>${st.n}</td><td>${st.wr != null ? st.wr.toFixed(0) : "--"}%</td><td class="${st.avg != null ? cls(st.avg) : ""}">${st.avg != null ? fmtPct(st.avg) : "--"}</td></tr>`;
   };
   const starHtml = [5, 4, 3, 2, 1].filter(s => byStar[s]).map(starRow).join("");
+  const periodHtml = [["+5日", s5], ["+10日", s10], ["+20日", s20]].map(([label, s]) =>
+    `<tr><td>${label}</td><td>${s.n}</td><td>${s.wr != null ? s.wr.toFixed(0) + "%" : "--"}</td><td class="${s.avg != null ? cls(s.avg) : ""}">${s.avg != null ? fmtPct(s.avg) : "--"}</td></tr>`).join("");
 
   // ── 明細條列(分頁 50/頁,只列 3-5★ 或依 scope)──
   const cell = v => (v === null || v === undefined) ? `<td style="color:var(--text2)">--</td>` : `<td class="${cls(v)}">${fmtPct(v)}</td>`;
@@ -2950,13 +3128,17 @@ function ltRenderStats() {
     </div>
     <div class="bt-summary-grid" style="margin-bottom:10px">
       <div class="bt-card"><div class="bt-card-label">樣本數</div><div class="bt-card-value">${stat.length}</div><div class="bt-card-sub">${scopeLabel}</div></div>
-      <div class="bt-card"><div class="bt-card-label">勝率(10日)</div><div class="bt-card-value ${wr >= 50 ? "up" : "down"}">${wr}%</div><div class="bt-card-sub">${wins.length}勝/${stat.length - wins.length}敗</div></div>
-      <div class="bt-card"><div class="bt-card-label">均酬(10日)</div><div class="bt-card-value ${cls(avg10)}">${fmtPct(avg10)}</div><div class="bt-card-sub">5日:${fmtPct(avg5)}</div></div>
-      <div class="bt-card"><div class="bt-card-label">均酬(20日)</div><div class="bt-card-value ${cls(avg20)}">${r20s.length ? fmtPct(avg20) : "--"}</div><div class="bt-card-sub">樣本 ${r20s.length}</div></div>
+      <div class="bt-card"><div class="bt-card-label">勝率(嚴格10日)</div><div class="bt-card-value ${s10.wr != null && s10.wr >= 50 ? "up" : "down"}">${wr}%</div><div class="bt-card-sub">${s10.win}勝/${s10.n - s10.win}敗(僅已滿10日樣本)</div></div>
+      <div class="bt-card"><div class="bt-card-label">均酬(嚴格10日)</div><div class="bt-card-value ${cls(avg10)}">${fmtPct(avg10)}</div><div class="bt-card-sub">嚴格5日:${fmtPct(avg5)}</div></div>
+      <div class="bt-card"><div class="bt-card-label">均酬(嚴格20日)</div><div class="bt-card-value ${cls(avg20)}">${s20.n ? fmtPct(avg20) : "--"}</div><div class="bt-card-sub">樣本 ${s20.n}</div></div>
     </div>
     <div class="bt-card" style="padding:10px 12px;margin-bottom:10px">
-      <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體）</div>
+      <div class="bt-card-label" style="margin-bottom:8px">各星級表現（1-2★不計整體・嚴格10日）</div>
       <table class="bt-strategy-table"><thead><tr><th>星級</th><th>筆數</th><th>勝率</th><th>均酬10日</th></tr></thead><tbody>${starHtml}</tbody></table>
+    </div>
+    <div class="bt-card" style="padding:10px 12px;margin-bottom:10px">
+      <div class="bt-card-label" style="margin-bottom:8px">各持有期間表現（${scopeLabel}・每個期間各自嚴格計算,筆數可能不同）</div>
+      <table class="bt-strategy-table"><thead><tr><th>持有期間</th><th>筆數</th><th>勝率</th><th>均報酬</th></tr></thead><tbody>${periodHtml}</tbody></table>
     </div>
     <div class="bt-table-wrap"><table class="bt-table">
       <thead><tr><th>掃描日</th><th>股票</th><th>星級</th><th>進場價<br><span style="font-weight:400;font-size:9px;color:var(--text2)">隔日開盤</span></th><th>+5日</th><th>+10日</th><th>+20日</th></tr></thead>
@@ -2992,6 +3174,210 @@ function ltDeleteChecked() {
   renderLtResults();
 }
 
+
+// ════════════════════════════════════════
+// v10.2 均線糾結掃描(獨立分頁):偵測選定的幾條均線彼此收斂到現價一定幅度以內的個股
+// 沿用中長期潛力掃描同一套 fetchDailyLong 快取,同一次 session 內不會重複打 API
+// ════════════════════════════════════════
+var MASCAN = { running: false, results: [], threshold: 2, maSet: "short", scope: "all" };
+var MA_SETS = { short: [5, 10, 20, 60], long: [20, 60, 120, 240] };
+
+function setMaThreshold(v, el) {
+  MASCAN.threshold = v;
+  document.querySelectorAll(".ma-th-btn").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+function setMaSet(k, el) {
+  MASCAN.maSet = k;
+  document.querySelectorAll(".ma-set-btn").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+function setMaScope(s, el) {
+  MASCAN.scope = s;
+  document.querySelectorAll(".ma-scope-btn").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+
+// 分析單檔:回傳目前是否糾結、幅度%、連續天數、狀態(盤整中/剛突破/剛跌破)、量比、
+// v10.4 新增:量增確認(突破/跌破當天量是否明顯放大)、200日長期趨勢方向、RPS(全市場年報酬百分位)。
+// 不符糾結門檻回 null(不列入結果)。rpsOf:由 buildRpsLookup() 產生,null 代表市場分布尚未建立。
+function analyzeMaTangle(id, d, periods, thresholdPct, rpsOf) {
+  const n = d.close.length, i = n - 1;
+  const maxP = Math.max(...periods);
+  if (n < maxP + 10) return null; // 資料不夠長,均線都還沒暖身完成就不判斷
+
+  // 流動性濾網,跟其他掃描一致:近5日平均成交金額 > 1億元
+  if (d.amount && d.amount.length >= 5) {
+    const avgAmount5 = avg(d.amount.slice(-5));
+    if (avgAmount5 < 1e8) return null;
+  }
+
+  function spreadAt(t) {
+    const vals = periods.map(p => ltSMA(d.close, p, t));
+    if (vals.some(v => v == null)) return null;
+    const price = d.close[t];
+    if (!(price > 0)) return null;
+    const mx = Math.max(...vals), mn = Math.min(...vals);
+    return { spreadPct: (mx - mn) / price * 100, vals, mx, mn, price };
+  }
+
+  const cur = spreadAt(i);
+  if (!cur || cur.spreadPct > thresholdPct) return null; // 今天沒有糾結,不列入(避免顯示早就發散的舊資料)
+
+  // 連續糾結天數:從今天往前數,幅度都 <= 門檻的連續交易日數(回溯上限120日)
+  let persistDays = 0;
+  for (let t = i; t >= Math.max(0, i - 120); t--) {
+    const s = spreadAt(t);
+    if (!s || s.spreadPct > thresholdPct) break;
+    persistDays++;
+  }
+
+  // 狀態:現價相對「糾結均線帶」上緣/下緣的位置,粗略標記剛突破/剛跌破/仍在區間內
+  const price = cur.price;
+  let state = "盤整中";
+  if (price > cur.mx * 1.01) state = "剛向上突破";
+  else if (price < cur.mn * 0.99) state = "剛向下跌破";
+
+  // 量比:近5日均量 ÷ 近20日均量。糾結末端理想上量能偏乾(<1),幫助判斷是否「蓄勢」而非「盤整已久但沒人要」
+  const vol5 = avg(d.volume.slice(-5)), vol20 = avg(d.volume.slice(-20));
+  const volRatio = vol20 ? vol5 / vol20 : null;
+
+  // v10.4 ①量增確認:突破/跌破當天量 ÷ 前20日均量(不含當天),>=1.5倍才算「有量」,避免假突破/假跌破
+  const prevVol20 = i >= 21 ? avg(d.volume.slice(Math.max(0, i - 20), i)) : null;
+  const volSpike = prevVol20 ? d.volume[i] / prevVol20 : null;
+  const volConfirm = state === "盤整中" ? null : (volSpike != null ? volSpike >= 1.5 : null);
+
+  // v10.4 ②200日長期趨勢方向:現價在年線之上/之下,分辨這是多頭中繼整理還是空頭中繼整理
+  const s200 = ltSMA(d.close, 200, i);
+  const trend200 = s200 == null ? null : (price >= s200 ? "多頭" : "空頭");
+
+  // v10.4 ③RPS:全市場年報酬百分位(跟中長期潛力掃描同一套算法),rpsOf 未提供時整體以 null 呈現(不做假退回值)
+  const yrAgo = n >= 252 ? d.close[n - 252] : d.close[0];
+  const yrRet = yrAgo > 0 ? (price / yrAgo - 1) * 100 : null;
+  const rps = (rpsOf && yrRet != null) ? rpsOf(yrRet) : null;
+
+  return {
+    id, price: +price.toFixed(2), spreadPct: +cur.spreadPct.toFixed(2), persistDays, state,
+    maVals: periods.map((p, k) => ({ period: p, value: +cur.vals[k].toFixed(2) })),
+    volRatio: volRatio != null ? +volRatio.toFixed(2) : null,
+    volSpike: volSpike != null ? +volSpike.toFixed(2) : null, volConfirm,
+    trend200, rps: rps != null ? +rps.toFixed(1) : null,
+  };
+}
+
+async function startMaScan() {
+  if (MASCAN.running) return;
+  if (!token) { addLog("請先設定 Token", "warn"); return; }
+  if (!STOCK_LIST || !STOCK_LIST.length) { addLog("股票清單未載入", "warn"); return; }
+  MASCAN.running = true; MASCAN.results = [];
+  const btn = document.getElementById("btnMaScan");
+  const prog = document.getElementById("maProgress");
+  if (btn) { btn.disabled = true; btn.textContent = "掃描中..."; }
+
+  let list = STOCK_LIST.slice();
+  if (MASCAN.scope === "tse") list = list.filter(id => isListed(id));
+  const periods = MA_SETS[MASCAN.maSet];
+  addLog(`▶ 均線糾結掃描開始(門檻 ${MASCAN.threshold}%／${periods.join("-")}日／${MASCAN.scope === "tse" ? "上市" : "全市場"}）：共 ${list.length} 檔`);
+
+  const BATCH = 20;
+
+  // v10.4:第一輪先抓全部股價、建立「年報酬分布」給 RPS 用(跟中長期潛力掃描同一套快取,不會多打API)
+  const marketReturns = [];
+  if (btn) btn.textContent = "建立市場分布中...";
+  for (let bi = 0; bi < list.length; bi += BATCH) {
+    if (!MASCAN.running) break;
+    const batch = list.slice(bi, bi + BATCH);
+    await Promise.allSettled(batch.map(async id => {
+      try {
+        const d = await fetchDailyLong(id);
+        if (!d || d.close.length < 200) return;
+        const nn = d.close.length, pr = d.close[nn - 1];
+        const ya = nn >= 252 ? d.close[nn - 252] : d.close[0];
+        if (ya > 0) marketReturns.push({ id, yrRet: (pr / ya - 1) * 100 });
+      } catch (e) {}
+    }));
+    const donePct = Math.round(Math.min(bi + BATCH, list.length) / list.length * 40);
+    if (prog) prog.style.width = donePct + "%";
+    if (btn) btn.textContent = `建立市場分布 ${Math.min(bi + BATCH, list.length)}/${list.length}`;
+    await new Promise(r => setTimeout(r, 30));
+  }
+  const rpsOf = buildRpsLookup(marketReturns);
+  addLog(`✅ 市場報酬分布建立完成:樣本 ${marketReturns.length} 檔（RPS 以此為基準)`);
+
+  let done = 0, found = 0;
+  for (let bi = 0; bi < list.length; bi += BATCH) {
+    if (!MASCAN.running) break;
+    const batch = list.slice(bi, bi + BATCH);
+    await Promise.allSettled(batch.map(async id => {
+      try {
+        const d = await fetchDailyLong(id); // 與中長期潛力掃描共用快取,同一 session 不重複打 API
+        if (!d) return;
+        const r = analyzeMaTangle(id, d, periods, MASCAN.threshold, rpsOf);
+        if (r) { r.name = (stockNameMap && stockNameMap[id]) || id; MASCAN.results.push(r); found++; }
+      } catch (e) {}
+    }));
+    done = Math.min(bi + BATCH, list.length);
+    const pct = 40 + Math.round(done / list.length * 60);
+    if (prog) prog.style.width = pct + "%";
+    if (btn) btn.textContent = `掃描中 ${done}/${list.length}（找到 ${found}）`;
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  MASCAN.running = false;
+  if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
+  MASCAN.results.sort((a, b) => a.spreadPct - b.spreadPct || b.persistDays - a.persistDays);
+  addLog(`✅ 均線糾結掃描完成：${MASCAN.results.length} 檔符合`);
+  renderMaResults();
+}
+window.startMaScan = startMaScan;
+function stopMaScan() {
+  MASCAN.running = false;
+  const btn = document.getElementById("btnMaScan");
+  if (btn) { btn.disabled = false; btn.textContent = "🎯 開始掃描"; }
+  addLog("已中止均線糾結掃描");
+}
+window.stopMaScan = stopMaScan;
+
+function renderMaResults() {
+  const wrap = document.getElementById("maResults");
+  const cnt = document.getElementById("maCount");
+  if (!wrap) return;
+  const rows = MASCAN.results;
+  if (cnt) cnt.textContent = rows.length + " 檔";
+  if (!rows.length) { wrap.innerHTML = `<div class="lt-empty">沒有符合目前門檻的均線糾結股,可以放寬幅度門檻或換均線組合再試</div>`; return; }
+  const stateCls = s => s === "剛向上突破" ? "up" : s === "剛向下跌破" ? "down" : "";
+  const volConfirmHtml = r => {
+    if (r.volConfirm == null) return "";
+    return r.volConfirm ? `<div style="font-size:10px" class="up">量增確認 ×${r.volSpike}</div>` : `<div style="font-size:10px" class="t2">量未放大(慎防假訊號)</div>`;
+  };
+  wrap.innerHTML = `<div class="raw-wrap"><table class="mtab"><thead><tr><th>股票</th><th>現價</th><th title="(最高均線-最低均線)÷現價">糾結幅度%</th><th title="幅度連續低於門檻的交易日數">持續天數</th><th title="突破/跌破當天量÷前20日均量是否放大1.5倍以上">狀態</th><th title="現價在200日均線之上或之下,分辨多頭或空頭中繼整理">長期趨勢</th><th title="全市場年報酬百分位,越高代表相對大盤越強勢">RPS</th><th>均線值</th><th title="近5日均量÷近20日均量,小於1代表量縮">量比</th></tr></thead><tbody>${
+    rows.map(r => `<tr onclick="openStockDetail('${esc(r.id)}')" style="cursor:pointer">
+      <td>${esc(r.name)} ${esc(r.id)}</td>
+      <td>${r.price}</td>
+      <td>${r.spreadPct}%</td>
+      <td>${r.persistDays} 日</td>
+      <td class="${stateCls(r.state)}">${r.state}${volConfirmHtml(r)}</td>
+      <td class="${r.trend200 === "多頭" ? "up" : r.trend200 === "空頭" ? "down" : ""}">${r.trend200 || "--"}</td>
+      <td class="${r.rps != null && r.rps >= 50 ? "up" : r.rps != null ? "down" : ""}">${r.rps != null ? r.rps.toFixed(0) : "--"}</td>
+      <td style="font-size:11px;color:var(--text2)">${r.maVals.map(m => m.period + "MA " + m.value).join(" / ")}</td>
+      <td class="${r.volRatio != null && r.volRatio < 1 ? "down" : ""}">${r.volRatio != null ? "×" + r.volRatio : "--"}</td>
+    </tr>`).join("")
+  }</tbody></table></div>`;
+}
+function exportMaCSV() {
+  const rows = MASCAN.results;
+  if (!rows.length) { addLog("沒有均線糾結結果可匯出", "warn"); return; }
+  const periods = MA_SETS[MASCAN.maSet];
+  const header = ["代號", "名稱", "現價", "糾結幅度%", "持續天數", "狀態", "量增確認倍數", "長期趨勢(200MA)", "RPS", ...periods.map(p => p + "MA"), "量比"];
+  const lines = [header.join(",")];
+  rows.forEach(r => {
+    const maMap = {}; r.maVals.forEach(m => maMap[m.period] = m.value);
+    lines.push([r.id, r.name, r.price, r.spreadPct, r.persistDays, r.state, r.volSpike != null ? r.volSpike : "", r.trend200 || "", r.rps != null ? r.rps : "", ...periods.map(p => maMap[p] ?? ""), r.volRatio != null ? r.volRatio : ""].join(","));
+  });
+  const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `均線糾結掃描_${todayISO()}.csv`; a.click();
+}
+window.exportMaCSV = exportMaCSV;
 
 
 // ════════════════════════════════════════
@@ -3329,7 +3715,9 @@ async function fetchLargeTraderPosition() {
   }
 }
 
-// ── 市場寬度:用已快取的中長期長期資料(pxL_*)算站上200MA比例(best-effort,樣本數視當日已掃檔數而定)──
+// ── 市場寬度(v10.1修正:誠實標示為「樣本」而非全市場):用已快取的中長期資料(pxL_*)算站上200MA比例。
+// 這不是台股全市場的真實寬度,而是目前已載入快取的股票樣本(開站背景採樣150檔+使用者掃描過的股票)之中的比例,
+// 樣本來自 pickEvenSample() 從完整股票清單等距抽樣,不是隨機挑選使用者剛好掃過的股票,但仍只是抽樣、不是普查。──
 function calcMarketBreadth() {
   let above200 = 0, total = 0;
   memCache.forEach((entry, key) => {
@@ -3341,8 +3729,9 @@ function calcMarketBreadth() {
     total++;
     if (price > ma200) above200++;
   });
-  if (total < 20) return { ok: false, msg: "樣本不足(需先執行過中長期掃描累積資料)", sample: total };
-  return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total };
+  const universe = (typeof STOCK_LIST !== "undefined" && STOCK_LIST) ? STOCK_LIST.length : null;
+  if (total < 30) return { ok: false, msg: "樣本不足(等待背景採樣完成,或先執行一次中長期掃描)", sample: total, universe, sampleOnly: true };
+  return { ok: true, pct: +(above200 / total * 100).toFixed(1), sample: total, universe, sampleOnly: true };
 }
 
 // ── 法人動向(v9.31升級):FinMind官方 TaiwanStockTotalInstitutionalInvestors 全市場三大法人合計買賣金額,
@@ -3466,7 +3855,7 @@ function calcBullBearScore(breadth, instTrend, marginSent) {
 }
 
 // ── 大盤操作建議(機械式規則輸出,非投資建議,依牛熊分數+VIX+市場寬度三項綜合判斷)──
-function calcMarketAdvice(bullBearScore, vixValue, breadthPct) {
+function calcMarketAdvice(bullBearScore, vixValue, breadthPct, breadthSample) {
   const scoreSignal = bullBearScore >= 60 ? "green" : bullBearScore >= 40 ? "yellow" : "red";
   const vixSignal = (vixValue == null) ? null : vixValue < 20 ? "green" : vixValue < 28 ? "yellow" : "red";
   const breadthSignal = (breadthPct == null) ? null : breadthPct >= 50 ? "green" : breadthPct >= 30 ? "yellow" : "red";
@@ -3485,7 +3874,7 @@ function calcMarketAdvice(bullBearScore, vixValue, breadthPct) {
     factors: [
       { name: "牛熊強度", signal: scoreSignal, detail: `${bullBearScore.toFixed(0)}分` },
       { name: "恐慌指數", signal: vixSignal, detail: vixValue != null ? `VIX ${vixValue.toFixed(1)}` : "無資料" },
-      { name: "市場寬度", signal: breadthSignal, detail: breadthPct != null ? `${breadthPct}%站上季線` : "無資料" },
+      { name: "市場寬度", signal: breadthSignal, detail: breadthPct != null ? `${breadthPct}%站上季線(樣本${breadthSample || 0}檔,非全市場普查)` : "無資料" },
     ],
   };
 }
@@ -3549,7 +3938,7 @@ async function loadSentimentDashboard() {
   ]);
   const breadth = calcMarketBreadth();
   const bullBear = calcBullBearScore(breadth, instTrend, marginSent);
-  const advice = calcMarketAdvice(bullBear.score, vix && vix.ok ? vix.value : null, breadth.ok ? breadth.pct : null);
+  const advice = calcMarketAdvice(bullBear.score, vix && vix.ok ? vix.value : null, breadth.ok ? breadth.pct : null, breadth.sample);
   SENTIMENT.vix = vix; SENTIMENT.smartMoney = smartMoney; SENTIMENT.largeTrader = largeTrader; SENTIMENT.bullBear = bullBear; SENTIMENT.advice = advice;
   SENTIMENT.raw = { breadth, instTrend, marginSent }; // 保留原始子項,供市場狀態環獨立投票(不透過複合分數)
   SENTIMENT.loading = false;
@@ -3840,7 +4229,7 @@ async function autoSampleMarketData() {
       const cachedInstTrend = lsCacheGet("instTrend") || { ok: false };
       const cachedMarginSent = lsCacheGet("marginTotal") || { ok: false };
       SENTIMENT.bullBear = calcBullBearScore(breadth, cachedInstTrend, cachedMarginSent);
-      SENTIMENT.advice = calcMarketAdvice(SENTIMENT.bullBear.score, SENTIMENT.vix && SENTIMENT.vix.ok ? SENTIMENT.vix.value : null, breadth.ok ? breadth.pct : null);
+      SENTIMENT.advice = calcMarketAdvice(SENTIMENT.bullBear.score, SENTIMENT.vix && SENTIMENT.vix.ok ? SENTIMENT.vix.value : null, breadth.ok ? breadth.pct : null, breadth.sample);
       SENTIMENT.raw = { breadth, instTrend: cachedInstTrend, marginSent: cachedMarginSent };
       renderSentimentDashboard();
     }
@@ -4329,8 +4718,9 @@ async function fetchChipData(stockId) {
   return _out;
 }
 
-// 分析籌碼指標
-function analyzeChip(chip) {
+// 分析籌碼指標。ctx(v10.1新增,選填):{ changePct, volRatio } 當日漲跌%與量比(5日均量/20日均量),
+// 用來確認「融資暴增」是否真的伴隨價漲量增,否則融資暴增也可能只是股價下跌時散戶攤平,不能直接當「主力訊號」
+function analyzeChip(chip, ctx) {
   const result = {
     // 三大法人
     foreignNet5: 0,   // 外資近5日淨買超（張）
@@ -4430,13 +4820,21 @@ const prevM  = parseInt(prev.MarginPurchaseTodayBalance||prev.MarginPurchaseYest
     details.push("外資長線正");
   }
 
-  // 5. 融資判斷（大型股：融資縮代表散戶退場；中小型股：融資暴增代表主力）
+  // 5. 融資判斷（大型股：融資縮代表散戶退場；中小型股：融資暴增+價漲量增/法人買超 才視為主力訊號）
+  // v10.1修正:融資暴增本身只代表散戶追價或攤平,方向不明;過去單看融資暴增就加分容易誤判下跌時的攤平為「主力進場」。
   if (result.marginChgPct < -5) {
     score++;
     details.push(`融資減${result.marginChgPct.toFixed(0)}%（籌碼洗淨）`);
   } else if (result.marginChgPct > 20) {
-    score++;
-    details.push(`融資暴增+${result.marginChgPct.toFixed(0)}%（主力訊號）`);
+    const priceUp = ctx && ctx.changePct != null && ctx.changePct > 0;
+    const volUp = ctx && ctx.volRatio != null && ctx.volRatio > 1.2;
+    const instBuy = result.totalNet5 > 0;
+    if (priceUp && (volUp || instBuy)) {
+      score++;
+      details.push(`融資增+${result.marginChgPct.toFixed(0)}%＋價漲${volUp ? "量增" : "法人買"}（主力訊號）`);
+    } else {
+      details.push(`融資增+${result.marginChgPct.toFixed(0)}%（未同步價漲量增或法人買超,暫不採計為主力訊號）`);
+    }
   }
 
   result.chipScore  = score;
@@ -4707,7 +5105,9 @@ async function startScan() {
       candidates.map(async result => {
         try {
           const chip    = await fetchChipData(result.id);
-          const chipInfo = analyzeChip(chip);
+          const dd = result.d, dn = dd.close.length;
+          const ctx = dn >= 21 ? { changePct: (dd.close[dn - 1] / dd.close[dn - 2] - 1) * 100, volRatio: avg(dd.volume.slice(-5)) / avg(dd.volume.slice(-20)) } : null;
+          const chipInfo = analyzeChip(chip, ctx);
           result.chipScore  = chipInfo.chipScore;
           result.chipDetail = chipInfo.chipDetail;
           result.foreignNet5 = chipInfo.foreignNet5;
@@ -5864,7 +6264,7 @@ async function searchStock() {
     else if (accumOk) { strategy = "🔮 主力蓄勢"; strategyColor = "var(--purple)"; }
 
     // 籌碼分析
-    const chipInfo = analyzeChip(chip);
+    const chipInfo = analyzeChip(chip, { changePct: parseFloat(changePct), volRatio: parseFloat(volRatio) });
     const stars    = "★".repeat(chipInfo.chipScore) + "☆".repeat(5-chipInfo.chipScore);
 
     // 均線多頭排列判斷
@@ -6513,6 +6913,36 @@ async function fetchPx(id) {
   } catch (e) { return null; }
 }
 
+// ── 美股資料抓取(v10.2,Twelve Data time_series,免費方案)──
+// 回傳格式與 fetchPx 完全相同,讓既有的 buildModel/面板渲染邏輯原封不動重用。
+function tdToken() { try { return (localStorage.getItem("twelvedata_token") || "").trim(); } catch (e) { return ""; } }
+async function fetchUSPx(symbol) {
+  const sym = String(symbol || "").trim().toUpperCase();
+  if (!sym) return null;
+  const key = tdToken();
+  if (!key) return { __needKey: true };
+  const ck = "usPxD_" + sym; const c = memGet(ck); if (c) return c;
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=460&order=ASC&apikey=${encodeURIComponent(key)}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const j = await res.json();
+    if (!j || j.status === "error" || !j.values || !j.values.length) return { __apiError: (j && (j.message || j.code)) || "無資料" };
+    // 防禦:不論 API 實際回傳順序,一律依日期由舊到新排序,確保後續均線/報酬率等計算方向正確
+    const rows = j.values.slice().sort((a, b) => String(a.datetime).localeCompare(String(b.datetime)));
+    const o = { date: [], open: [], high: [], low: [], close: [], vol: [], amt: [], cnt: [], name: (j.meta && j.meta.name) || null, exchange: (j.meta && j.meta.exchange) || null, currency: (j.meta && j.meta.currency) || "USD" };
+    rows.forEach(r => {
+      const close = parseFloat(r.close), vol = parseFloat(r.volume) || 0;
+      if (!(close > 0)) return;
+      o.date.push(r.datetime); o.open.push(parseFloat(r.open)); o.high.push(parseFloat(r.high)); o.low.push(parseFloat(r.low));
+      o.close.push(close); o.vol.push(vol);
+      o.amt.push(close * vol); // Twelve Data 免費方案無「成交金額」欄位,以收盤價×成交量估算,非交易所原始揭露數字
+      o.cnt.push(null); // 美股無對應「成交筆數」資料
+    });
+    if (o.close.length < 30) return { __apiError: "資料筆數不足" };
+    memSet(ck, o); return o;
+  } catch (e) { return { __apiError: e.message || "連線失敗/逾時" }; }
+}
+
 // ── 三大法人每日彙總(單位:張)──
 function buildInst(chip) {
   if (!chip || !chip.inst || !chip.inst.length) return null;
@@ -6609,9 +7039,9 @@ function gradeOf(s) { return s >= 80 ? "A" : s >= 65 ? "B" : s >= 50 ? "C" : s >
 function riskLabel(r) { return r < 30 ? "低" : r < 50 ? "中" : r < 65 ? "中高" : "高"; }
 
 // ════════════ 主模型 ════════════
-function buildModel(id, name, px, chip, rev, per) {
+function buildModel(id, name, px, chip, rev, per, market) {
   const n = px.close.length, i = n - 1, C = px.close, H = px.high, L = px.low, O = px.open, V = px.vol;
-  const m = { id, name, n, px, chip, rev, per };
+  const m = { id, name, n, px, chip, rev, per, market: market || "TW" };
   m.close = C[i]; m.prev = C[i - 1]; m.chg = m.close - m.prev; m.chgPct = m.chg / m.prev * 100;
   m.open = O[i]; m.high = H[i]; m.low = L[i];
   m.volLots = V[i] / 1000; m.cnt = px.cnt[i]; m.date = px.date[i];
@@ -6872,7 +7302,7 @@ function buildAlerts(m) {
   return out;
 }
 
-window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
+window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, fetchUSPx, tdToken, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
 })();
 
 
@@ -7218,7 +7648,10 @@ function p18(m) {
 // ════════ 19~22 延伸面板(沿用原系統功能)════════
 function p19(m) {
   const rev = m.rev, per = m.per, row = (k, v, cls) => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val ${cls || ""}" ${v === "--" ? 'style="color:var(--text2)"' : ""}>${v}</span></div>`;
-  return { n: "19", t: "基本面", s: "月營收 / 估值", body: `${row("月營收YoY", rev && rev.yoy != null ? (rev.yoy >= 0 ? "+" : "") + rev.yoy + "%" : "--", rev && rev.yoy != null ? (rev.yoy >= 0 ? "up" : "down") : "")}${rev && rev.yoy3 != null ? row("近3月均YoY", (rev.yoy3 >= 0 ? "+" : "") + rev.yoy3 + "%", rev.yoy3 >= 0 ? "up" : "down") : ""}${row("本益比 PER", per && per.per != null ? per.per : "--")}${row("股價淨值比 PBR", per && per.pbr != null ? per.pbr : "--")}${row("殖利率", per && per.yield != null ? per.yield + "%" : "--")}` };
+  // 美股公司是季報,沒有台股這種「月營收」揭露,月營收列直接不顯示(不是留空,是這市場結構上沒有這項資料)
+  const revRows = m.market === "US" ? "" : `${row("月營收YoY", rev && rev.yoy != null ? (rev.yoy >= 0 ? "+" : "") + rev.yoy + "%" : "--", rev && rev.yoy != null ? (rev.yoy >= 0 ? "up" : "down") : "")}${rev && rev.yoy3 != null ? row("近3月均YoY", (rev.yoy3 >= 0 ? "+" : "") + rev.yoy3 + "%", rev.yoy3 >= 0 ? "up" : "down") : ""}`;
+  const valNote = m.market === "US" && per == null ? `<div class="t2" style="font-size:10.5px;margin-top:2px">美股估值資料(PER/PBR/殖利率)目前免費資料源未提供,顯示為 --</div>` : "";
+  return { n: "19", t: "基本面", s: m.market === "US" ? "估值" : "月營收 / 估值", body: `${revRows}${row("本益比 PER", per && per.per != null ? per.per : "--")}${row("股價淨值比 PBR", per && per.pbr != null ? per.pbr : "--")}${row("殖利率", per && per.yield != null ? per.yield + "%" : "--")}${valNote}` };
 }
 function p20(m) {
   let dtv = null; try { dtv = calcDayTradeVolCheck(m.px.vol); } catch (e) {}
@@ -7266,8 +7699,12 @@ function panelHTML(p) {
     <div class="dp-b${p.fill ? " fill" : ""}">${p.body}</div>${p.foot ? `<div class="dp-f">${p.foot}</div>` : ""}${p.note ? `<div class="note">${p.note}</div>` : ""}</section>`;
 }
 
+// v10.2:美股模式下,以下面板依賴台股專屬的每日揭露資料(三大法人/分點/當沖規則/台股新聞源),
+// 沒有對應美股資料可用,直接排除,不是「降級顯示」——避免用空欄位假裝有這項分析。
+const US_EXCLUDE = new Set(["08", "15", "16", "20", "21", "22"]);
 function renderGridHTML(m) {
-  return FNS.map(f => { try { return panelHTML(f(m)); } catch (e) { console.error("panel error", f.name, e); const n = f.name.slice(1); return panelHTML({ n, t: "面板", body: `<div class="t2" style="font-size:12px">此面板計算失敗:${escH(e.message)}</div>` }); } }).join("");
+  const fns = (m.market === "US") ? FNS.filter(f => !US_EXCLUDE.has(f.name.slice(1))) : FNS;
+  return fns.map(f => { try { return panelHTML(f(m)); } catch (e) { console.error("panel error", f.name, e); const n = f.name.slice(1); return panelHTML({ n, t: "面板", body: `<div class="t2" style="font-size:12px">此面板計算失敗:${escH(e.message)}</div>` }); } }).join("");
 }
 
 // ── 任務四:MACD ──
@@ -7306,6 +7743,14 @@ function setView(v) {
   if (v === "radar") { try { if (moneyFlowData && moneyFlowData.length) renderRadar(); } catch (e) {} }
   if (v === "dash" && !DASH.m && !DASH.busy) dashOpen(stash("dash_last") || "2330");
   if (v === "dash" && DASH.task === 3) taskShow(3, true);
+  if (v === "us") {
+    const ti = $("tdTokenInput"); if (ti && !ti.value) ti.value = A.tdToken();
+    if (!DASH_US.m && !DASH_US.busy) {
+      const last = stash("dash_last_us");
+      if (last && A.tdToken()) dashOpenUS(last);
+      else { $("dashInputUS") && ($("dashInputUS").value = last || ""); }
+    }
+  }
 }
 window.dashSetView = setView;
 
@@ -7453,6 +7898,70 @@ window.dashSearch = dashSearch;
 window.searchStock = function () { dashSearch(); };
 window.openStockDetail = function (id) { dashOpen(id); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} };
 window.dashFocus = function (n) { const el = $("dp-" + n); if (!el) return; el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); };
+
+// ════════════════════════════════════════
+// v10.2:美股查詢區塊(獨立狀態 DASH_US,不與台股 DASH 互相覆蓋)
+// 資料源:Twelve Data(需自行申請免費 API key)。無三大法人/融資/分點/月營收等台股專屬資料,
+// 相關面板已在 dash_b.js 依 market==="US" 排除,不是缺資料還硬顯示。
+// ════════════════════════════════════════
+const DASH_US = { m: null, symbol: null, seq: 0, busy: false };
+
+function renderKpisUS(m) {
+  const box = $("dashKpisUS"); if (!box) return;
+  const cls = v => v > 0 ? "up" : v < 0 ? "down" : "";
+  const cell = (l, v, c) => `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v ${c || ""}">${v}</div></div>`;
+  if (!m) { box.innerHTML = ["收盤價", "漲跌", "漲幅", "成交量(股)", "開盤", "最高", "最低", "最新交易日"].map(l => cell(l, "--")).join(""); return; }
+  const rel = v => cls(v - m.prev);
+  box.innerHTML = cell("收盤價 (" + (m.px.currency || "USD") + ")", nf(m.close, 2), cls(m.chg)) + cell("漲跌", sg(m.chg, 2), cls(m.chg)) + cell("漲幅", sg(m.chgPct, 2) + "%", cls(m.chg)) +
+    cell("成交量(股)", nf(m.px.vol[m.n - 1]), "") + cell("開盤", nf(m.open, 2), rel(m.open)) + cell("最高", nf(m.high, 2), rel(m.high)) + cell("最低", nf(m.low, 2), rel(m.low)) +
+    cell("最新交易日", m.date, "");
+}
+function updateHeaderUS(m) {
+  $("dashInputUS").value = m.id; $("dashNameUS").textContent = m.name || m.id;
+  renderKpisUS(m);
+  const el = $("diRangeUS");
+  if (el) el.textContent = `區間 ${m.px.date[0]} ~ ${m.date},共 ${m.n} 個交易日｜交易所:${m.px.exchange || "--"}｜資料來源:Twelve Data(日K,可能有延遲,非即時報價)`;
+}
+function renderDashUS() {
+  const m = DASH_US.m, root = $("dashRootUS"); if (!root || !m) return;
+  root.innerHTML = `<div class="dgrid" id="dashGridUS">${svgFix(B.renderGridHTML(m))}</div>`;
+}
+async function dashOpenUS(sym) {
+  sym = String(sym || "").trim().toUpperCase(); if (!sym) return;
+  const my = ++DASH_US.seq; DASH_US.busy = true; DASH_US.symbol = sym;
+  const root = $("dashRootUS"); if (!root) return;
+  $("dashInputUS").value = sym; $("dashNameUS").textContent = sym;
+  root.innerHTML = `<div class="dash-loading"><div class="radar-spin"></div>分析 ${escH(sym)} 中,請稍候…</div>`;
+  try {
+    const px = await A.fetchUSPx(sym);
+    if (my !== DASH_US.seq) return;
+    if (!px || px.__needKey) {
+      root.innerHTML = `<div class="dash-empty">尚未設定 Twelve Data API key<br>請先在上方輸入你申請的免費 API key 並按「儲存」,才能查詢美股。</div>`;
+      DASH_US.m = null; return;
+    }
+    if (px.__apiError) {
+      root.innerHTML = `<div class="dash-empty">無法取得 <b>${escH(sym)}</b> 的價量資料<br>${escH(String(px.__apiError))}<br>請確認代號是否正確(美股代號,例如 AAPL、MSFT),或稍後再試。</div>`;
+      DASH_US.m = null; return;
+    }
+    const m = A.buildModel(sym, px.name || sym, px, { inst: null, margin: null, broker: null }, null, null, "US");
+    DASH_US.m = m; stash("dash_last_us", sym);
+    updateHeaderUS(m); renderDashUS();
+  } catch (e) {
+    console.error(e); if (my === DASH_US.seq) { root.innerHTML = `<div class="dash-empty">分析失敗:${escH(e.message)}</div>`; DASH_US.m = null; }
+  } finally { if (my === DASH_US.seq) DASH_US.busy = false; }
+}
+window.dashOpenUS = dashOpenUS;
+function dashSearchUS() {
+  const v = ($("dashInputUS").value || "").trim(); if (!v) return;
+  dashOpenUS(v);
+}
+window.dashSearchUS = dashSearchUS;
+function saveTdToken() {
+  const v = ($("tdTokenInput").value || "").trim();
+  try { localStorage.setItem("twelvedata_token", v); } catch (e) {}
+  const s = $("tdTokenStatus"); if (s) s.textContent = v ? "已儲存 ✓" : "已清除";
+}
+window.saveTdToken = saveTdToken;
 
 
 // ── 01 主K線圖:游標移過顯示十字線+K棒資訊,點選可鎖定/取消 ──
