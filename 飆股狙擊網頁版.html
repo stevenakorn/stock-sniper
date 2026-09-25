@@ -1249,28 +1249,6 @@ body{
   <div class="dash-info" style="margin-bottom:10px">
     <span class="di-src">美股查詢(v10.2 新增,v10.5 更新)｜價量資料來源:Twelve Data(免費方案,日K約4小時延遲,非即時)｜新聞來源:Finnhub</span>
   </div>
-  <div style="margin-bottom:14px">
-    <button class="dbtn" id="apiKeyToggleBtn" onclick="toggleApiKeyBox()">⚙ API Key 設定(進階,預設隱藏)</button>
-  </div>
-  <div class="scan-panel" id="apiKeyBox" style="margin-bottom:14px;display:none">
-    <div class="scan-panel-title">API Key 設定</div>
-    <div class="mq-bar">
-      <input class="token-input" id="tdTokenInput" type="text" placeholder="Twelve Data API key(已內建一組免費 key,不填也能查詢)" autocomplete="off">
-      <button class="mq-btn" onclick="saveTdToken()">儲存</button>
-      <span class="t2" id="tdTokenStatus" style="font-size:12px;margin-left:6px"></span>
-    </div>
-    <div class="note t2" style="font-size:10.5px;margin:6px 0 10px">
-      價量 / K線 / 技術指標等面板已內建一組免費 Twelve Data key,不需設定就能直接查詢。若想改用自己的 key(例如內建額度剛好用完),貼上後按「儲存」即可覆蓋;留空按「儲存」則清除覆蓋、改回使用內建 key。key 只存在你自己瀏覽器的 localStorage,不會送到別的地方;免費方案每天 800 次額度,單檔查詢用量很小。
-    </div>
-    <div class="mq-bar">
-      <input class="token-input" id="fnTokenInput" type="text" placeholder="Finnhub API key(選填,只用來顯示相關新聞,需自行免費申請)" autocomplete="off">
-      <button class="mq-btn" onclick="saveFnToken()">儲存</button>
-      <span class="t2" id="fnTokenStatus" style="font-size:12px;margin-left:6px"></span>
-    </div>
-    <div class="note t2" style="font-size:10.5px;margin-top:6px">
-      新聞這把 key 是你個人帳號的額度,不像 Twelve Data 那組是可公開使用的固定 key,所以沒有內建預設值。到 <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io/register</a> 免費申請(不需信用卡)貼上即可;沒設定就只是不顯示新聞,不影響其他面板。免費方案的新聞僅涵蓋北美掛牌公司。
-    </div>
-  </div>
   <div id="dashHeadUS" class="dash-head">
     <div class="dh-search">
       <input id="dashInputUS" type="text" maxlength="10" placeholder="美股代號,例如 AAPL" autocomplete="off" onkeydown="if(event.key==='Enter')dashSearchUS()">
@@ -7797,8 +7775,6 @@ function setView(v) {
   if (v === "dash" && !DASH.m && !DASH.busy) dashOpen(stash("dash_last") || "2330");
   if (v === "dash" && DASH.task === 3) taskShow(3, true);
   if (v === "us") {
-    const ti = $("tdTokenInput"); if (ti && !ti.value) ti.value = A.tdSavedToken();
-    const fi = $("fnTokenInput"); if (fi && !fi.value) fi.value = A.fnToken();
     if (!DASH_US.m && !DASH_US.busy) {
       const last = stash("dash_last_us");
       if (last) dashOpenUS(last); // v10.5:Twelve Data key 已內建預設值,不需再檢查是否設定過
@@ -8026,15 +8002,6 @@ function saveFnToken() {
 }
 window.saveFnToken = saveFnToken;
 
-// v10.6:API Key 設定預設收起來(裡面會顯示已存的 key 明碼,平常不需要看到),按鈕點開才顯示
-function toggleApiKeyBox() {
-  const el = $("apiKeyBox"); if (!el) return;
-  const show = el.style.display === "none";
-  el.style.display = show ? "" : "none";
-  const btn = $("apiKeyToggleBtn"); if (btn) btn.textContent = show ? "⚙ API Key 設定(進階,點擊收起)" : "⚙ API Key 設定(進階,預設隱藏)";
-}
-window.toggleApiKeyBox = toggleApiKeyBox;
-
 // ── 美股相關新聞(v10.5,獨立於 18 格面板之外的區塊)──
 function renderUSNewsBox(html) { const el = $("usNewsList"); if (el) el.innerHTML = html; }
 function newsTimeStr(ts) {
@@ -8042,7 +8009,7 @@ function newsTimeStr(ts) {
   try { return new Date(ts * 1000).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; }
 }
 async function loadUSNews(sym) {
-  if (!A.fnToken()) { renderUSNewsBox(`<span class="t2">尚未設定 Finnhub API key,暫不顯示新聞(上方「API Key 設定」可免費申請,不影響其他面板)。</span>`); return; }
+  if (!A.fnToken()) { renderUSNewsBox(`<span class="t2">尚未設定 Finnhub API key,暫不顯示新聞(不影響其他面板)。</span>`); return; }
   renderUSNewsBox(`<span class="t2">新聞載入中…</span>`);
   const r = await A.fetchUSNews(sym);
   if (DASH_US.symbol !== sym) return; // 使用者已切換到別檔,這批結果作廢
