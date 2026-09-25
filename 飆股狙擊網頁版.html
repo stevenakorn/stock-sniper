@@ -1247,12 +1247,17 @@ body{
 
 <div class="view" id="view-us">
   <div class="dash-info" style="margin-bottom:10px">
-    <span class="di-src">美股查詢(v10.2 新增,v10.5 更新)｜價量資料來源:Twelve Data(免費方案,日K約4小時延遲,非即時)｜新聞來源:Finnhub</span>
+    <span class="di-src">美股查詢(v10.2 新增,v10.9 更新)｜價量資料來源:Twelve Data(免費方案,日K約4小時延遲,非即時)｜新聞來源:Finnhub</span>
   </div>
   <div id="dashHeadUS" class="dash-head">
     <div class="dh-search">
-      <input id="dashInputUS" type="text" maxlength="10" placeholder="美股代號,例如 AAPL" autocomplete="off" onkeydown="if(event.key==='Enter')dashSearchUS()">
+      <div style="position:relative;flex:1;display:flex;align-items:center;min-width:0">
+        <input id="dashInputUS" type="text" maxlength="40" placeholder="美股代號或公司名稱,例如 AAPL 或 apple" autocomplete="off" oninput="usSearchInput(this.value)" onkeydown="if(event.key==='Enter')dashSearchUS(); if(event.key==='Escape')usHideSuggest();">
+        <div id="usSuggest" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:50;max-height:260px;overflow:auto"></div>
+      </div>
+      <img id="usLogo" style="display:none;width:22px;height:22px;border-radius:4px;object-fit:contain;margin-left:8px" onerror="this.style.display='none'">
       <div class="dh-name" id="dashNameUS">--</div>
+      <span id="usMktBadge" class="market-badge closed" style="display:none;margin-left:6px;font-size:10.5px;padding:3px 9px;white-space:nowrap">--</span>
       <button class="dh-go" onclick="dashSearchUS()">分析</button>
     </div>
     <div class="dh-kpis" id="dashKpisUS"></div>
@@ -1261,7 +1266,7 @@ body{
     <span class="di-range" id="diRangeUS">輸入美股代號後開始分析</span>
   </div>
   <div class="note t2" style="font-size:10.5px;margin:2px 0 14px">
-    美股沒有台股「三大法人買賣超 / 融資融券 / 分點進出 / 月營收 / 估值(PER/PBR/殖利率)」這類每日揭露資料,對應面板(法人行為計量、隔日沖風險、AI信心維度、籌碼異動摘要、買賣力分布圖、五大熱點券商、當沖基準量、基本面)已直接不顯示,不是留空裝有資料;隔日沖風險與AI信心維度是因為裡面大半項目靠的就是這些台股專屬資料,硬算出來的分數會失真、不是真的反映風險或信心。基本面那格改由下方「相關新聞」區塊取代,其餘拿掉的面板不額外補。其餘以日K價量計算的面板(K線、量價熱區、VWAP成本結構、多空能量、技術指標等)邏輯與台股版相同。僅供研究參考,不構成投資建議。
+    美股沒有台股「三大法人買賣超 / 融資融券 / 分點進出 / 月營收 / 估值(PER/PBR/殖利率)」這類每日揭露資料,對應面板(法人行為計量、隔日沖風險、AI信心維度、籌碼異動摘要、買賣力分布圖、五大熱點券商、當沖基準量、基本面)已直接不顯示,不是留空裝有資料;隔日沖風險與AI信心維度是因為裡面大半項目靠的就是這些台股專屬資料,硬算出來的分數會失真、不是真的反映風險或信心。基本面那格改由下方「相關新聞」區塊取代,其餘拿掉的面板不額外補。其餘以日K價量計算的面板(K線、量價熱區、VWAP成本結構、多空能量、技術指標等)邏輯與台股版相同。KPI 列的 52 週高低是用已抓到的日K自己算的,資料不滿 52 週時會如實標示實際天數;非交易時間若拿得到盤前/盤後即時價會多顯示一格,拿不到就不顯示。僅供研究參考,不構成投資建議。
   </div>
   <div id="dashRootUS"><div class="dash-empty">輸入美股代號(例如 <b>AAPL</b>)後按「分析」,價量資料已內建 key,不需另外設定。</div></div>
   <div class="scan-panel" id="usNewsPanel" style="margin-top:14px">
@@ -6943,6 +6948,71 @@ async function fetchUSPx(symbol) {
   } catch (e) { return { __apiError: e.message || "連線失敗/逾時" }; }
 }
 
+// ── 美股即時開盤狀態 + 盤前/盤後價格(v10.9,Twelve Data /quote,免費方案)──
+// time_series 只到「日」的顆粒度,不管現在盤中/盤後都一樣;這支才是真正的即時端點。
+// 52 週高低已經用 time_series 抓到的日K自己算(見 buildModel),這裡不重複取 quote 的 fifty_two_week,
+// 避免同一個數字有兩個不同算法的版本、互相打架造成混淆。
+const _usQuoteCache = new Map(); // 即時資料,獨立一個 30 秒短 TTL 快取,不沿用 memGet/memSet(那組是台股盤中/盤後兩檔 TTL,不適用美股即時狀態)
+async function fetchUSQuote(symbol) {
+  const sym = String(symbol || "").trim().toUpperCase();
+  if (!sym) return null;
+  const key = tdToken();
+  if (!key) return { __needKey: true };
+  const ck = sym, cached = _usQuoteCache.get(ck);
+  if (cached && Date.now() - cached.t < 30000) return cached.v;
+  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(sym)}&prepost=true&apikey=${encodeURIComponent(key)}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const j = await res.json();
+    if (!j || j.status === "error") return { __apiError: (j && (j.message || j.code)) || "無資料" };
+    const o = {
+      isOpen: j.is_market_open === true || j.is_market_open === "true",
+      extPrice: j.extended_price != null ? parseFloat(j.extended_price) : null,
+      extChg: j.extended_change != null ? parseFloat(j.extended_change) : null,
+      extPct: j.extended_percent_change != null ? parseFloat(j.extended_percent_change) : null,
+      extAt: j.extended_timestamp ? new Date(parseFloat(j.extended_timestamp) * 1000) : null,
+    };
+    _usQuoteCache.set(ck, { t: Date.now(), v: o }); return o;
+  } catch (e) { return { __apiError: e.message || "連線失敗/逾時" }; }
+}
+
+// ── 美股代號/公司名稱搜尋(v10.9,Twelve Data /symbol_search,免費方案)──
+async function fetchUSSymbolSearch(query) {
+  const q = String(query || "").trim();
+  if (q.length < 2) return [];
+  const key = tdToken();
+  if (!key) return { __needKey: true };
+  const url = `https://api.twelvedata.com/symbol_search?symbol=${encodeURIComponent(q)}&outputsize=8&apikey=${encodeURIComponent(key)}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const j = await res.json();
+    if (!j || j.status === "error" || !Array.isArray(j.data)) return [];
+    return j.data
+      .filter(r => r && r.symbol)
+      .filter(r => !r.instrument_type || /stock|etf/i.test(r.instrument_type))
+      .slice(0, 8)
+      .map(r => ({ symbol: r.symbol, name: r.instrument_name || "", exchange: r.exchange || "", country: r.country || "", currency: r.currency || "" }));
+  } catch (e) { return []; }
+}
+
+// ── 美股公司 Logo(v10.9,Twelve Data /logo,免費方案,純美觀,失敗就不顯示)──
+// /logo 端點本身回傳的是 JSON(裡面一個 url 欄位才是真正的圖檔連結),不是圖檔本身,
+// 所以要先呼叫拿到 JSON、取出 url,不能直接把 /logo 端點網址塞進 <img src>。
+async function fetchUSLogo(symbol) {
+  const sym = String(symbol || "").trim().toUpperCase();
+  if (!sym) return null;
+  const key = tdToken();
+  if (!key) return null;
+  const ck = "usLogo_" + sym; const c = memGet(ck); if (c !== null) return c;
+  const url = `https://api.twelvedata.com/logo?symbol=${encodeURIComponent(sym)}&apikey=${encodeURIComponent(key)}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const j = await res.json();
+    const logoUrl = (j && j.url) || null;
+    memSet(ck, logoUrl); return logoUrl;
+  } catch (e) { return null; }
+}
+
 // ── 美股相關新聞(v10.5,Finnhub company-news,免費方案)──
 // 這把 key 是使用者個人帳號額度,不像 Twelve Data 那組是使用者自己提供、可以內嵌,
 // 所以沒有內建預設值;沒設定就明確顯示「尚未設定」,不會用假新聞或別的資料充數。
@@ -7103,6 +7173,10 @@ function buildModel(id, name, px, chip, rev, per, market) {
   m.ret10 = (C[i] / C[Math.max(0, i - 10)] - 1) * 100;
   const w60 = Math.min(60, n);
   m.high60 = pickMax(H.slice(-w60)); m.low60 = pickMin(L.slice(-w60));
+  // v10.9:52 週(約252個交易日)高低點,直接用已經抓到的日K算,不用另外呼叫 API;
+  // 資料不到 252 日時如實揭露實際算了幾天,不假裝是完整 52 週的數字
+  m.w52n = Math.min(252, n);
+  m.hi52w = pickMax(H.slice(-m.w52n)); m.lo52w = pickMin(L.slice(-m.w52n));
   m.high20 = pickMax(C.slice(-21, -1)); m.low20 = pickMin(C.slice(-21, -1));
   m.pos20 = (m.high20 - m.low20) > 0 ? clamp((m.close - m.low20) / (m.high20 - m.low20) * 100) : 50;
 
@@ -7332,7 +7406,7 @@ function buildAlerts(m) {
   return out;
 }
 
-window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, fetchUSPx, tdToken, tdSavedToken, fnToken, fetchUSNews, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
+window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, fetchUSPx, tdToken, tdSavedToken, fnToken, fetchUSNews, fetchUSQuote, fetchUSSymbolSearch, fetchUSLogo, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
 })();
 
 
@@ -7939,15 +8013,22 @@ window.dashFocus = function (n) { const el = $("dp-" + n); if (!el) return; el.s
 // ════════════════════════════════════════
 const DASH_US = { m: null, symbol: null, seq: 0, busy: false };
 
-function renderKpisUS(m) {
+function renderKpisUS(m, q) {
   const box = $("dashKpisUS"); if (!box) return;
   const cls = v => v > 0 ? "up" : v < 0 ? "down" : "";
   const cell = (l, v, c) => `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v ${c || ""}">${v}</div></div>`;
-  if (!m) { box.innerHTML = ["收盤價", "漲跌", "漲幅", "成交量(股)", "開盤", "最高", "最低", "最新交易日"].map(l => cell(l, "--")).join(""); return; }
+  if (!m) { box.innerHTML = ["收盤價", "漲跌", "漲幅", "成交量(股)", "開盤", "最高", "最低", "最新交易日", "52週高", "52週低"].map(l => cell(l, "--")).join(""); return; }
   const rel = v => cls(v - m.prev);
-  box.innerHTML = cell("收盤價 (" + (m.px.currency || "USD") + ")", nf(m.close, 2), cls(m.chg)) + cell("漲跌", sg(m.chg, 2), cls(m.chg)) + cell("漲幅", sg(m.chgPct, 2) + "%", cls(m.chg)) +
+  let html = cell("收盤價 (" + (m.px.currency || "USD") + ")", nf(m.close, 2), cls(m.chg)) + cell("漲跌", sg(m.chg, 2), cls(m.chg)) + cell("漲幅", sg(m.chgPct, 2) + "%", cls(m.chg)) +
     cell("成交量(股)", nf(m.px.vol[m.n - 1]), "") + cell("開盤", nf(m.open, 2), rel(m.open)) + cell("最高", nf(m.high, 2), rel(m.high)) + cell("最低", nf(m.low, 2), rel(m.low)) +
-    cell("最新交易日", m.date, "");
+    cell("最新交易日", m.date, "") +
+    cell(m.w52n >= 252 ? "52週高" : m.w52n + "日高(未滿52週)", nf(m.hi52w, 2), "") +
+    cell(m.w52n >= 252 ? "52週低" : m.w52n + "日低(未滿52週)", nf(m.lo52w, 2), "");
+  // v10.9:市場非交易時間、且拿得到盤前/盤後即時價時多顯示一格;拿不到就不硬湊
+  if (q && !q.__needKey && !q.__apiError && q.isOpen === false && q.extPrice != null) {
+    html += cell("盤前/盤後最新價", nf(q.extPrice, 2), cls(q.extChg));
+  }
+  box.innerHTML = html;
 }
 function updateHeaderUS(m) {
   $("dashInputUS").value = m.id; $("dashNameUS").textContent = m.name || m.id;
@@ -7959,6 +8040,27 @@ function renderDashUS() {
   const m = DASH_US.m, root = $("dashRootUS"); if (!root || !m) return;
   root.innerHTML = `<div class="dgrid" id="dashGridUS">${svgFix(B.renderGridHTML(m))}</div>`;
 }
+// v10.9:即時開盤狀態 + 盤前/盤後價(獨立於主要面板之外,拿不到就整個不顯示,不瞎猜)
+async function loadUSMarketState(sym) {
+  const badge = $("usMktBadge"); if (badge) badge.style.display = "none";
+  const q = await A.fetchUSQuote(sym);
+  if (DASH_US.symbol !== sym) return; // 使用者已切換到別檔,這批結果作廢
+  if (!q || q.__needKey || q.__apiError) return;
+  if (badge) {
+    badge.style.display = "";
+    badge.className = "market-badge " + (q.isOpen ? "open" : "closed");
+    badge.textContent = q.isOpen ? "盤中" : "非交易時間";
+  }
+  if (DASH_US.m) renderKpisUS(DASH_US.m, q); // 補畫一次 KPI,補上盤前/盤後價那格
+}
+// v10.9:公司 Logo(純美觀,拿不到就不顯示)
+async function loadUSLogo(sym) {
+  const img = $("usLogo"); if (!img) return;
+  img.style.display = "none"; img.removeAttribute("src");
+  const url = await A.fetchUSLogo(sym);
+  if (DASH_US.symbol !== sym || !url) return;
+  img.src = url; img.style.display = "";
+}
 async function dashOpenUS(sym) {
   sym = String(sym || "").trim().toUpperCase(); if (!sym) return;
   const my = ++DASH_US.seq; DASH_US.busy = true; DASH_US.symbol = sym;
@@ -7966,11 +8068,13 @@ async function dashOpenUS(sym) {
   $("dashInputUS").value = sym; $("dashNameUS").textContent = sym;
   root.innerHTML = `<div class="dash-loading"><div class="radar-spin"></div>分析 ${escH(sym)} 中,請稍候…</div>`;
   renderUSNewsBox(`<span class="t2">載入中…</span>`);
+  const badge0 = $("usMktBadge"); if (badge0) badge0.style.display = "none";
+  const img0 = $("usLogo"); if (img0) { img0.style.display = "none"; img0.removeAttribute("src"); }
   try {
     const px = await A.fetchUSPx(sym);
     if (my !== DASH_US.seq) return;
     if (!px || px.__needKey) {
-      root.innerHTML = `<div class="dash-empty">尚未設定 Twelve Data API key<br>請先在上方輸入你申請的免費 API key 並按「儲存」,才能查詢美股。</div>`;
+      root.innerHTML = `<div class="dash-empty">無法取得 Twelve Data API key(內建的那組似乎失效了)<br>可在瀏覽器主控台(F12)執行 localStorage.setItem('twelvedata_token','你自己申請的key') 後重新整理頁面。</div>`;
       DASH_US.m = null; renderUSNewsBox(`<span class="t2">尚未查詢個股</span>`); return;
     }
     if (px.__apiError) {
@@ -7980,17 +8084,48 @@ async function dashOpenUS(sym) {
     const m = A.buildModel(sym, px.name || sym, px, { inst: null, margin: null, broker: null }, null, null, "US");
     DASH_US.m = m; stash("dash_last_us", sym);
     updateHeaderUS(m); renderDashUS();
-    loadUSNews(sym); // 獨立區塊,非同步載入,不阻塞主要 18 格面板
+    loadUSNews(sym);        // 獨立區塊,非同步載入,不阻塞主要面板
+    loadUSMarketState(sym); // 同上
+    loadUSLogo(sym);        // 同上
   } catch (e) {
     console.error(e); if (my === DASH_US.seq) { root.innerHTML = `<div class="dash-empty">分析失敗:${escH(e.message)}</div>`; DASH_US.m = null; renderUSNewsBox(`<span class="t2">尚未查詢個股</span>`); }
   } finally { if (my === DASH_US.seq) DASH_US.busy = false; }
 }
 window.dashOpenUS = dashOpenUS;
 function dashSearchUS() {
+  usHideSuggest();
   const v = ($("dashInputUS").value || "").trim(); if (!v) return;
   dashOpenUS(v);
 }
 window.dashSearchUS = dashSearchUS;
+
+// ── 美股代號/公司名稱搜尋建議(v10.9,symbol_search)──
+let usSuggestTimer = null, usSuggestSeq = 0;
+function usHideSuggest() { const el = $("usSuggest"); if (el) { el.style.display = "none"; el.innerHTML = ""; } }
+window.usHideSuggest = usHideSuggest;
+function usSearchInput(v) {
+  clearTimeout(usSuggestTimer);
+  v = (v || "").trim();
+  if (v.length < 2) { usHideSuggest(); return; }
+  usSuggestTimer = setTimeout(() => usRunSuggest(v), 350);
+}
+window.usSearchInput = usSearchInput;
+async function usRunSuggest(q) {
+  const my = ++usSuggestSeq;
+  const r = await A.fetchUSSymbolSearch(q);
+  if (my !== usSuggestSeq) return; // 使用者已經打了別的字,這批結果作廢
+  const el = $("usSuggest"); if (!el) return;
+  if (!r || r.__needKey || !r.length) { usHideSuggest(); return; }
+  el.innerHTML = r.map(it => `<div class="us-sug-row" data-sym="${escH(it.symbol)}" style="padding:7px 10px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)">
+      <b>${escH(it.symbol)}</b> <span class="t2">${escH(it.name)}</span><br><span class="t2" style="font-size:10.5px">${escH(it.exchange)}${it.country ? " ｜ " + escH(it.country) : ""}</span>
+    </div>`).join("");
+  el.style.display = "block";
+}
+document.addEventListener("mousedown", ev => {
+  const row = ev.target.closest && ev.target.closest(".us-sug-row");
+  if (row) { usHideSuggest(); $("dashInputUS").value = row.dataset.sym; dashSearchUS(); return; }
+  if (!(ev.target.closest && (ev.target.closest("#usSuggest") || ev.target.closest("#dashInputUS")))) usHideSuggest();
+});
 function saveTdToken() {
   const v = ($("tdTokenInput").value || "").trim();
   try { localStorage.setItem("twelvedata_token", v); } catch (e) {}
