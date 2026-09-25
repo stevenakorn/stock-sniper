@@ -5891,31 +5891,63 @@ async function loadMoneyFlowBubble() {
     const fmtLocal = d => { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; };
     const today = new Date();
     const start = new Date(); start.setDate(today.getDate() - 30);
-    const url = `${BACKEND_URL}/api/institutional?token=${token}&start_date=${fmtLocal(start)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(45000) });
-    const json = await res.json();
-    if (!json.data || !json.data.length) throw new Error("無資料");
 
     const byDateStock = {};
-    json.data.forEach(d => {
-      const id = d.Code || d.stock_id || "";
-      if (!id || !/^\d{4}$/.test(id) || id.startsWith("0")) return;
-      const date = d.date;
-      if (!date) return;
-      let net = 0;
-      if (d.Foreignbuy !== undefined) {
-        net = (parseInt(String(d.Foreignbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Foreignsell||"0").replace(/,/g,""))||0)
-            + (parseInt(String(d.Investmentbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Investmentsell||"0").replace(/,/g,""))||0)
-            + (parseInt(String(d.Dealerbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Dealersell||"0").replace(/,/g,""))||0);
-      } else if (d.name !== undefined) {
-        net = (parseInt(d.buy||0)) - (parseInt(d.sell||0));
+    let rawRowCount = 0;
+    const ingestRows = (data) => {
+      (data || []).forEach(d => {
+        const id = d.Code || d.stock_id || "";
+        if (!id || !/^\d{4}$/.test(id) || id.startsWith("0")) return;
+        const date = d.date;
+        if (!date) return;
+        let net = 0;
+        if (d.Foreignbuy !== undefined) {
+          net = (parseInt(String(d.Foreignbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Foreignsell||"0").replace(/,/g,""))||0)
+              + (parseInt(String(d.Investmentbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Investmentsell||"0").replace(/,/g,""))||0)
+              + (parseInt(String(d.Dealerbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Dealersell||"0").replace(/,/g,""))||0);
+        } else if (d.name !== undefined) {
+          net = (parseInt(d.buy||0)) - (parseInt(d.sell||0));
+        }
+        rawRowCount++;
+        if (!byDateStock[date]) byDateStock[date] = {};
+        byDateStock[date][id] = (byDateStock[date][id] || 0) + net;
+      });
+    };
+
+    // 先嘗試一次寬日期範圍查詢(較省請求數)
+    try {
+      const url = `${BACKEND_URL}/api/institutional?token=${token}&start_date=${fmtLocal(start)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(45000) });
+      const json = await res.json();
+      ingestRows(json.data);
+    } catch (e) { console.warn("泡泡圖:寬範圍查詢失敗，改逐日查詢:", e); }
+    console.log(`[泡泡圖] 寬範圍查詢取得 ${Object.keys(byDateStock).length} 個交易日、${rawRowCount} 筆資料`);
+
+    // v10.14 修正：後端 /api/institutional 在不帶 stock_id 時，實際上似乎只回最新一日資料，
+    // 忽略 start_date/end_date 範圍(先前只用於2日視窗的區塊圖從未發現，因為只取用最新一日)。
+    // 若寬範圍查詢取得的交易日數不足，改為逐日查詢(沿用已驗證可行的單日全市場查詢模式)，分批平行請求。
+    if (Object.keys(byDateStock).length < 10) {
+      const candidateDays = [];
+      for (let i = 0; i < 34; i++) {
+        const d = new Date(); d.setDate(today.getDate() - i);
+        if (d.getDay() !== 0 && d.getDay() !== 6) candidateDays.push(fmtLocal(d));
       }
-      if (!byDateStock[date]) byDateStock[date] = {};
-      byDateStock[date][id] = (byDateStock[date][id] || 0) + net;
-    });
+      candidateDays.reverse();
+      const useDays = candidateDays.slice(-22).filter(day => !byDateStock[day]);
+      const BATCH = 6;
+      for (let i = 0; i < useDays.length; i += BATCH) {
+        const batch = useDays.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map(day =>
+          fetch(`${BACKEND_URL}/api/institutional?token=${token}&start_date=${day}&end_date=${day}&_t=${Date.now()}`, { signal: AbortSignal.timeout(20000) })
+            .then(r => r.json()).then(j => j.data).catch(() => [])
+        ));
+        results.forEach(data => ingestRows(data));
+      }
+      console.log(`[泡泡圖] 逐日查詢後共取得 ${Object.keys(byDateStock).length} 個交易日、${rawRowCount} 筆資料`);
+    }
 
     const dates = Object.keys(byDateStock).sort();
-    if (dates.length < 2) throw new Error("交易日數不足");
+    if (dates.length < 2) throw new Error(`交易日數不足(僅取得 ${dates.length} 日、${rawRowCount} 筆資料，請稍後再試或改用區塊圖)`);
     const n5 = Math.min(5, dates.length);
     const n20 = Math.min(20, dates.length);
     const last5Dates = dates.slice(-n5);
