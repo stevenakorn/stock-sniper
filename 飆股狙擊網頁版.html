@@ -6996,17 +6996,34 @@ async function fetchFinancials(id) {
 }
 
 // ── 台股股權結構:股權分散表(大戶籌碼)+ 外資持股/投資限額(v10.10,FinMind TaiwanStockHoldingSharesPer / TaiwanStockShareholding,既有 Sponsor 方案內含)──
-// 大戶門檻採持股 400 張(40 萬股)以上之市場慣例定義;股權分散表約每週(集保庫存)更新一次
+// 大戶門檻採持股 400 張(40 萬股)以上之市場慣例定義。
+// v10.11:兩個資料源更新頻率不同,增減幅度的算法要分開處理——
+//   TaiwanStockHoldingSharesPer(股權分散表/集保庫存)只有「週」資料(集保結算所每週五公布上週資料),只算得出週增減/月增減,做不出日增減;
+//   TaiwanStockShareholding(外資持股)每個交易日更新,日/週/月增減都算得出來。
 const _BIGHOLDER_MIN_SHARES = 400000;
 function _holdLevelFloor(level) {
   const nums = String(level || "").match(/[\d,]+/g);
   if (!nums || !nums.length) return null;
   return parseInt(nums[0].replace(/,/g, ""), 10);
 }
+// v10.11:找出「離 latest 往前 N 天最近」的一筆歷史資料,用來算週增減/月增減。
+// 找不到落在容許誤差(tolDays)內的資料點時回傳 null(顯示為「--」),不用距離過遠的資料硬湊成週/月增減。
+function nearestByDaysAgo(trend, days, tolDays) {
+  if (!trend || trend.length < 2) return null;
+  const latestDate = new Date(trend[trend.length - 1].date);
+  const target = new Date(latestDate); target.setDate(target.getDate() - days);
+  let best = null, bestDiff = Infinity;
+  for (let k = 0; k < trend.length - 1; k++) {
+    const diff = Math.abs(new Date(trend[k].date) - target);
+    if (diff < bestDiff) { bestDiff = diff; best = trend[k]; }
+  }
+  if (!best || bestDiff / 86400000 > tolDays) return null;
+  return best;
+}
 async function fetchHolding(id) {
   const ck = "holdAll_" + id; const c = memGet(ck); if (c) return c;
   const fmt = d => d.toISOString().split("T")[0];
-  const start = new Date(); start.setDate(start.getDate() - 120);
+  const start = new Date(); start.setDate(start.getDate() - 150); // 150 日:留出約 1 個月增減比較所需的緩衝
   const uH = `${FINMIND_API}?dataset=TaiwanStockHoldingSharesPer&data_id=${id}&start_date=${fmt(start)}&token=${token}`;
   const uF = `${FINMIND_API}?dataset=TaiwanStockShareholding&data_id=${id}&start_date=${fmt(start)}&token=${token}`;
   try {
@@ -7556,7 +7573,7 @@ function buildAlerts(m) {
   return out;
 }
 
-window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, fetchDividend, fetchFinancials, fetchHolding, fetchUSPx, tdToken, tdSavedToken, fnToken, fetchUSNews, fetchUSQuote, fetchUSSymbolSearch, fetchUSLogo, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
+window.__dashA = { $, clamp, nf, sg, escH, sumA, meanA, stdA, pickMax, pickMin, smaS, emaS, fetchPx, fetchDividend, fetchFinancials, fetchHolding, nearestByDaysAgo, fetchUSPx, tdToken, tdSavedToken, fnToken, fetchUSNews, fetchUSQuote, fetchUSSymbolSearch, fetchUSLogo, buildInst, buildMargin, volProfile, binCenter, buildModel, buildAlerts, tierLabel, gradeOf, riskLabel, computeUTBot, UT_KEY, UT_ATR_LEN };
 })();
 
 
@@ -7957,18 +7974,24 @@ function p25(m) {
   const h = m.hold;
   const row = (k, v) => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`;
   if (!h || (!h.holdTrend.length && !h.foreignTrend.length)) return { n: "25", t: "股權結構(大戶籌碼/外資)", body: nodata("股權分散表/外資持股資料") };
-  const ht = h.holdTrend, latestH = ht.length ? ht[ht.length - 1] : null, prevH = ht.length > 4 ? ht[ht.length - 5] : null;
-  const ft = h.foreignTrend, latestF = ft.length ? ft[ft.length - 1] : null, prevF = ft.length > 4 ? ft[ft.length - 5] : null;
-  const dh = latestH && prevH ? latestH.big - prevH.big : null;
-  const df = latestF && prevF ? latestF.ratio - prevF.ratio : null;
+  // 股權分散表(大戶)本身只有週資料:上一筆就是上一週,做不出日增減
+  const ht = h.holdTrend, latestH = ht.length ? ht[ht.length - 1] : null;
+  const wH = ht.length > 1 ? ht[ht.length - 2] : null;
+  const mH = A.nearestByDaysAgo(ht, 30, 10);
+  // 外資持股每個交易日更新:上一筆就是上一交易日,日/週/月都算得出來
+  const ft = h.foreignTrend, latestF = ft.length ? ft[ft.length - 1] : null;
+  const dF = ft.length > 1 ? ft[ft.length - 2] : null;
+  const wF = A.nearestByDaysAgo(ft, 7, 3);
+  const mF = A.nearestByDaysAgo(ft, 30, 6);
+  const dTag = (cur, base, field) => (base && base[field] != null) ? `<span class="${(cur - base[field]) >= 0 ? "up" : "down"}">${sg(cur - base[field], 1)}pp</span>` : "--";
   return {
     n: "25", t: "股權結構(大戶籌碼/外資)", s: latestH ? `資料日 ${latestH.date}` : (latestF ? `資料日 ${latestF.date}` : ""),
-    body: `${latestH ? row("大戶持股(≥400張)", nf(latestH.big, 1) + "%" + (dh != null ? ` <span class="${dh >= 0 ? "up" : "down"}">(${sg(dh, 1)}pp/月)</span>` : "")) : ""}
+    body: `${latestH ? row("大戶持股(≥400張)", `${nf(latestH.big, 1)}%<br><span class="t2" style="font-size:10px">週增減 ${dTag(latestH.big, wH, "big")}　月增減 ${dTag(latestH.big, mH, "big")}</span>`) : ""}
       ${latestH ? row("小散戶持股(＜1張)", nf(latestH.small, 1) + "%") : ""}
-      ${latestF ? row("外資持股比例", nf(latestF.ratio, 1) + "%" + (df != null ? ` <span class="${df >= 0 ? "up" : "down"}">(${sg(df, 1)}pp/月)</span>` : "")) : ""}
+      ${latestF ? row("外資持股比例", `${nf(latestF.ratio, 1)}%<br><span class="t2" style="font-size:10px">日增減 ${dTag(latestF.ratio, dF, "ratio")}　週增減 ${dTag(latestF.ratio, wF, "ratio")}　月增減 ${dTag(latestF.ratio, mF, "ratio")}</span>`) : ""}
       ${latestF && latestF.limit != null ? row("外資持股上限", nf(latestF.limit, 0) + "%") : ""}
       ${latestF && latestF.remain != null ? row("外資尚可增持空間", nf(latestF.remain, 1) + "%") : ""}
-      <div class="t2" style="font-size:10px;margin-top:6px">股權分散表(集保庫存,約每週更新)大戶門檻採持股 400 張(40萬股)以上之市場慣例定義;外資持股取自公開資訊觀測站最新一筆揭露資料。</div>`
+      <div class="t2" style="font-size:10px;margin-top:6px">外資持股每個交易日更新,日/週/月增減都是真實數字;股權分散表(集保庫存)資料源本身只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日揭露,所以大戶持股只有週增減/月增減,做不出日增減(不是沒做,是資料源本身就沒有逐日數字)。月增減=與最接近30天前的一筆資料比較,找不到落在合理範圍內的比較基準時顯示「--」。大戶門檻採持股 400 張(40萬股)以上之市場慣例定義。</div>`
   };
 }
 
@@ -7999,7 +8022,7 @@ const HELP = {
   "22": ["查看這檔個股的相關新聞。", "按「載入新聞」才會抓取,以節省 API 額度。", "資料來自 FinMind 個股新聞資料集。"],
   "23": ["看歷年股利政策,以及除息後多久填權息(股價回到除息前水準)。", "「近N次除息中已知X次填權息」比例越高,代表這檔股票過去除息後越容易漲回來;未填權息不代表以後不會填,只是以目前資料為準的結果。", "股利資料來自 FinMind 股利政策表;填權息天數用已抓到的日K實際比對「除息日後收盤價首度≥除息參考價」所需交易日數計算,只涵蓋日K資料範圍內(約2年)的除息事件。"],
   "24": ["用申報財報的營收、獲利、負債、現金流看體質好壞,尤其適合比對借款戶同業財務狀況。", "負債比率越低越穩健;營業現金流/稅後淨利若長期明顯低於100%,代表淨利可能有應收帳款或存貨堆積、還沒真正變成現金,要留意獲利品質。", "資料來自 FinMind 綜合損益表/資產負債表/現金流量表,依科目代碼比對常見項目;找不到對應科目時顯示「--」,不用其他科目湊數。各期可能為單季或累計數,正式文件請另比對公開資訊觀測站原始財報。"],
-  "25": ["看大股東與外資的持股比例是在增加還是減少,判斷主力籌碼動向。", "大戶持股比例上升,通常代表主力/大股東在買進、籌碼趨於集中;外資持股比例上升且距離上限還有空間,代表外資買盤可能延續。", "股權分散表資料來自 FinMind(集保庫存,約每週更新一次),大戶=持股400張以上;外資持股資料來自公開資訊觀測站揭露的最新一筆。"],
+  "25": ["看大股東與外資的持股比例是在增加還是減少,判斷主力籌碼動向。", "大戶持股比例上升,通常代表主力/大股東在買進、籌碼趨於集中;外資持股比例上升且距離上限還有空間,代表外資買盤可能延續。外資持股每個交易日更新,所以有日/週/月三種增減;大戶持股(股權分散表)只有週資料,只有週/月增減。", "外資持股(TaiwanStockShareholding)每交易日更新,日增減=與上一交易日比、週增減=與最接近7天前比、月增減=與最接近30天前比;股權分散表(TaiwanStockHoldingSharesPer,集保庫存)只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日數字,週增減=與上一週比、月增減=與最接近30天前比,做不出日增減。找不到落在合理誤差內的比較基準時顯示「--」。大戶=持股400張以上。"],
 };
 
 const SPANS = { "01": [10, 12, 12], "02": [4, 6, 6], "03": [4, 6, 6], "04": [3, 6, 6], "05": [3, 6, 6], "06": [6, 6, 12], "07": [5, 6, 12], "08": [9, 12, 12], "09": [4, 6, 6], "10": [3, 6, 6], "11": [5, 12, 12], "12": [4, 6, 6], "13": [4, 6, 6], "14": [4, 6, 6], "15": [4, 6, 6], "16": [8, 6, 12], "17": [8, 6, 12], "18": [8, 12, 12], "19": [6, 4, 6], "20": [6, 4, 6], "21": [6, 4, 12], "22": [6, 12, 12], "23": [6, 6, 6], "24": [6, 6, 6], "25": [6, 6, 6] };
