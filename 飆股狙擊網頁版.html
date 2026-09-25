@@ -238,6 +238,17 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .tm-block.tm-selected{outline:2px solid var(--cyan);outline-offset:-2px;z-index:11}
 .tm-name{font-size:11px;font-weight:500;text-align:center;padding:0 4px;line-height:1.3;pointer-events:none;color:#fff}
 .tm-val{font-size:10px;margin-top:2px;pointer-events:none;opacity:.9;color:#fff;font-family:var(--mono)}
+/* v10.13:板塊資金流向泡泡圖(仿 tide-tw.app 畫法:X=近5日法人淨買超、Y=近5日步調是否比近20日均快、大小=近20日流向規模、顏色=近5日漲跌) */
+.bubble-wrap{position:relative;width:100%;height:340px;overflow:hidden}
+.bb-quad{position:absolute;font-family:var(--mono);pointer-events:none}
+.bb-quad-label{font-size:11px;font-weight:700;opacity:.55}
+.bb-quad-sub{font-size:9px;color:var(--text2);opacity:.75}
+.bb-quad-n{font-size:15px;font-weight:700;font-family:var(--mono)}
+.bb-axis-label{position:absolute;font-size:9px;color:var(--text2);font-family:var(--mono);pointer-events:none;white-space:nowrap}
+.bb-bubble{cursor:pointer;transition:opacity .15s,filter .15s}
+.bb-bubble:hover{filter:brightness(1.3)}
+.bb-bubble.bb-selected{stroke:var(--cyan);stroke-width:2.5}
+.bb-tag{font-size:9px;font-family:var(--sans);pointer-events:none;text-anchor:middle;fill:var(--text)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .selected-industry-bar{padding:8px 14px;background:rgba(76,141,255,.06);border-bottom:1px solid var(--border);display:none;align-items:center;gap:8px;font-size:12px}
 .selected-industry-bar.show{display:flex}
@@ -1091,6 +1102,10 @@ body{
         </div>
       </div>
       <div class="radar-btn-row">
+        <button class="radar-btn active" id="rvBtnTreemap" onclick="setRadarView('treemap')">▦ 區塊圖</button>
+        <button class="radar-btn" id="rvBtnBubble" onclick="setRadarView('bubble')">◉ 泡泡圖</button>
+      </div>
+      <div class="radar-btn-row" id="radarModeRow">
         <button class="radar-btn active" onclick="setRadarMode('all',this)">全部</button>
         <button class="radar-btn" onclick="setRadarMode('foreign',this)">🌐 外資</button>
         <button class="radar-btn" onclick="setRadarMode('trust',this)">🏦 投信</button>
@@ -1099,6 +1114,10 @@ body{
       <div class="treemap-wrap" id="treemapWrap">
         <div class="radar-loading" id="treemapLoading"><div class="radar-spin"></div>載入資金流向中...</div>
       </div>
+      <div class="bubble-wrap" id="bubbleWrap" style="display:none">
+        <div class="radar-loading" id="bubbleLoading"><div class="radar-spin"></div>尚未載入</div>
+      </div>
+      <div class="t2" id="bubbleNote" style="display:none;font-size:10px;padding:4px 12px 10px;line-height:1.6"></div>
     </div>
 
     <!-- 右：法人合計淨買超長條圖 -->
@@ -5856,6 +5875,256 @@ function renderRadar() {
   });
 }
 
+// ════════════════════════════════════════
+// v10.13 泡泡圖(仿 tide-tw.app 畫法):X=近5日法人淨買超金額(億)
+// Y=近5日步調是否比近20日均快(加速/放緩)、大小=近20日流向規模、顏色=近5日漲跌
+// 分類沿用既有證交所產業分類(FULL_INDUSTRY_MAP/getIndustry)，非 tide-tw.app 自訂主題
+// ════════════════════════════════════════
+let bubbleFlowData = null; // {industries:[{name,x,y,size,pctChg,stocks}], unit, n5, n20, latestDate, priceOk}
+
+async function loadMoneyFlowBubble() {
+  const wrap = document.getElementById("bubbleWrap");
+  const loading = document.getElementById("bubbleLoading");
+  if (loading) { loading.style.display = "flex"; loading.innerHTML = `<div class="radar-spin"></div>載入近20日資金流向中(資料量較大，請稍候)...`; }
+  if (wrap) Array.from(wrap.querySelectorAll(".bb-el")).forEach(el => el.remove());
+  try {
+    const fmtLocal = d => { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; };
+    const today = new Date();
+    const start = new Date(); start.setDate(today.getDate() - 30);
+    const url = `${BACKEND_URL}/api/institutional?token=${token}&start_date=${fmtLocal(start)}&end_date=${fmtLocal(today)}&_t=${Date.now()}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(45000) });
+    const json = await res.json();
+    if (!json.data || !json.data.length) throw new Error("無資料");
+
+    const byDateStock = {};
+    json.data.forEach(d => {
+      const id = d.Code || d.stock_id || "";
+      if (!id || !/^\d{4}$/.test(id) || id.startsWith("0")) return;
+      const date = d.date;
+      if (!date) return;
+      let net = 0;
+      if (d.Foreignbuy !== undefined) {
+        net = (parseInt(String(d.Foreignbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Foreignsell||"0").replace(/,/g,""))||0)
+            + (parseInt(String(d.Investmentbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Investmentsell||"0").replace(/,/g,""))||0)
+            + (parseInt(String(d.Dealerbuy||"0").replace(/,/g,""))||0) - (parseInt(String(d.Dealersell||"0").replace(/,/g,""))||0);
+      } else if (d.name !== undefined) {
+        net = (parseInt(d.buy||0)) - (parseInt(d.sell||0));
+      }
+      if (!byDateStock[date]) byDateStock[date] = {};
+      byDateStock[date][id] = (byDateStock[date][id] || 0) + net;
+    });
+
+    const dates = Object.keys(byDateStock).sort();
+    if (dates.length < 2) throw new Error("交易日數不足");
+    const n5 = Math.min(5, dates.length);
+    const n20 = Math.min(20, dates.length);
+    const last5Dates = dates.slice(-n5);
+    const last20Dates = dates.slice(-n20);
+    const latestDate = dates[dates.length - 1];
+
+    const stock5 = {}, stock20 = {};
+    last20Dates.forEach(d => {
+      const row = byDateStock[d] || {};
+      Object.entries(row).forEach(([id, net]) => {
+        stock20[id] = (stock20[id] || 0) + net;
+        if (last5Dates.includes(d)) stock5[id] = (stock5[id] || 0) + net;
+      });
+    });
+
+    // 換算金額：用最新收盤價估算(與 tide-tw.app 相同做法，非逐日實際成交價)
+    let priceOk = false, priceLatest = {}, price5ago = {};
+    try {
+      const [rp1, rp2] = await Promise.all([
+        fetch(`${FINMIND_API}?dataset=TaiwanStockPrice&date=${latestDate}&token=${token}`, { signal: AbortSignal.timeout(30000) }).then(r=>r.json()).catch(()=>null),
+        fetch(`${FINMIND_API}?dataset=TaiwanStockPrice&date=${last5Dates[0]}&token=${token}`, { signal: AbortSignal.timeout(30000) }).then(r=>r.json()).catch(()=>null),
+      ]);
+      ((rp1 && rp1.data) || []).forEach(r => { if (r.stock_id && parseFloat(r.close) > 0) priceLatest[r.stock_id] = parseFloat(r.close); });
+      ((rp2 && rp2.data) || []).forEach(r => { if (r.stock_id && parseFloat(r.close) > 0) price5ago[r.stock_id] = parseFloat(r.close); });
+      priceOk = Object.keys(priceLatest).length > 500;
+    } catch (e) { priceOk = false; }
+
+    const ind5Amt = {}, ind20Amt = {}, ind5Shares = {}, ind20Shares = {}, indStocks = {}, indChgSum = {}, indChgN = {};
+    const allIds = new Set([...Object.keys(stock5), ...Object.keys(stock20)]);
+    allIds.forEach(id => {
+      const ind = getIndustry(id);
+      const s5 = stock5[id] || 0, s20 = stock20[id] || 0;
+      ind5Shares[ind] = (ind5Shares[ind] || 0) + s5;
+      ind20Shares[ind] = (ind20Shares[ind] || 0) + s20;
+      (indStocks[ind] || (indStocks[ind] = new Set())).add(id);
+      if (priceOk && priceLatest[id]) {
+        ind5Amt[ind] = (ind5Amt[ind] || 0) + s5 * priceLatest[id];
+        ind20Amt[ind] = (ind20Amt[ind] || 0) + s20 * priceLatest[id];
+        if (price5ago[id]) {
+          const chg = (priceLatest[id] / price5ago[id] - 1) * 100;
+          indChgSum[ind] = (indChgSum[ind] || 0) + chg;
+          indChgN[ind] = (indChgN[ind] || 0) + 1;
+        }
+      }
+    });
+
+    const YI = 1e8;
+    const n5d = last5Dates.length, n20d = last20Dates.length;
+    const industries = Object.keys(indStocks).map(name => {
+      const useAmt = priceOk && ind5Amt[name] != null;
+      const x5  = useAmt ? ind5Amt[name] / YI : ind5Shares[name] / 1000;
+      const x20 = useAmt ? (ind20Amt[name] || 0) / YI : (ind20Shares[name] || 0) / 1000;
+      const rate5 = x5 / n5d, rate20 = x20 / n20d;
+      const yAccel = rate5 - rate20;
+      const pctChg = (indChgN[name] > 0) ? indChgSum[name] / indChgN[name] : null;
+      return { name, x: x5, y: yAccel, size: Math.abs(x20), stocks: indStocks[name].size, pctChg };
+    }).filter(d => d.x !== 0 || d.y !== 0);
+
+    bubbleFlowData = { industries, unit: priceOk ? "億" : "張", n5: n5d, n20: n20d, latestDate, priceOk };
+    renderBubbleChart();
+  } catch (e) {
+    console.error("資金雷達泡泡圖失敗:", e);
+    const loading2 = document.getElementById("bubbleLoading");
+    if (loading2) { loading2.style.display = "flex"; loading2.innerHTML = `<span style="color:var(--red)">載入失敗：${esc(e.message)}</span>`; }
+  }
+}
+
+function renderBubbleChart() {
+  const wrap = document.getElementById("bubbleWrap");
+  const loading = document.getElementById("bubbleLoading");
+  const note = document.getElementById("bubbleNote");
+  if (!bubbleFlowData || !bubbleFlowData.industries.length) {
+    if (loading) { loading.style.display = "flex"; loading.innerHTML = "尚無資料"; }
+    if (note) note.style.display = "none";
+    return;
+  }
+  if (loading) loading.style.display = "none";
+  Array.from(wrap.querySelectorAll(".bb-el")).forEach(el => el.remove());
+
+  const W = wrap.offsetWidth  || 400;
+  const H = wrap.offsetHeight || 340;
+  const PAD = { l: 34, r: 14, t: 14, b: 26 };
+  const plotW = Math.max(40, W - PAD.l - PAD.r);
+  const plotH = Math.max(40, H - PAD.t - PAD.b);
+
+  const industries = bubbleFlowData.industries;
+  const maxAbsX = Math.max(1e-6, ...industries.map(d => Math.abs(d.x)));
+  const maxAbsY = Math.max(1e-6, ...industries.map(d => Math.abs(d.y)));
+  const kX = maxAbsX / 4, kY = maxAbsY / 4;
+  const symlog = (v, k) => Math.sign(v) * Math.log10(1 + Math.abs(v) / Math.max(k, 1e-9));
+  const maxSX = symlog(maxAbsX, kX) || 1;
+  const maxSY = symlog(maxAbsY, kY) || 1;
+
+  const xPix = v => PAD.l + plotW/2 + (symlog(v, kX) / maxSX) * (plotW/2 - 10);
+  const yPix = v => PAD.t + plotH/2 - (symlog(v, kY) / maxSY) * (plotH/2 - 10);
+
+  const maxSize = Math.max(1e-6, ...industries.map(d => d.size));
+  const rPix = s => 6 + Math.sqrt(s / maxSize) * 26;
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "bb-el");
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
+  svg.style.cssText = "position:absolute;left:0;top:0";
+
+  const cx = xPix(0), cy = yPix(0);
+
+  // ── 象限背景與標籤 ──
+  const quads = [
+    { x: cx, y: PAD.t, w: PAD.l+plotW-cx, h: cy-PAD.t, label: "漲潮", sub: "加速流入", n: 0, fill: "rgba(240,66,78,.07)", tx: cx+10, ty: PAD.t+18, anchor: "start" },
+    { x: cx, y: cy,    w: PAD.l+plotW-cx, h: PAD.t+plotH-cy, label: "輪動", sub: "流入但放緩", n: 0, fill: "rgba(240,66,78,.03)", tx: cx+10, ty: PAD.t+plotH-12, anchor: "start" },
+    { x: PAD.l, y: PAD.t, w: cx-PAD.l, h: cy-PAD.t, label: "觀望", sub: "流出但放緩", n: 0, fill: "rgba(34,160,107,.03)", tx: cx-10, ty: PAD.t+18, anchor: "end" },
+    { x: PAD.l, y: cy,    w: cx-PAD.l, h: PAD.t+plotH-cy, label: "退潮", sub: "加速流出", n: 0, fill: "rgba(34,160,107,.07)", tx: cx-10, ty: PAD.t+plotH-12, anchor: "end" },
+  ];
+  industries.forEach(d => {
+    if (d.x >= 0 && d.y >= 0) quads[0].n++;
+    else if (d.x >= 0 && d.y < 0) quads[1].n++;
+    else if (d.x < 0 && d.y >= 0) quads[2].n++;
+    else quads[3].n++;
+  });
+  quads.forEach(q => {
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", q.x); rect.setAttribute("y", q.y);
+    rect.setAttribute("width", Math.max(0,q.w)); rect.setAttribute("height", Math.max(0,q.h));
+    rect.setAttribute("fill", q.fill);
+    svg.appendChild(rect);
+    const t1 = document.createElementNS(svgNS, "text");
+    t1.setAttribute("x", q.tx); t1.setAttribute("y", q.ty);
+    t1.setAttribute("text-anchor", q.anchor);
+    t1.setAttribute("class", "bb-quad-label");
+    t1.setAttribute("fill", "currentColor");
+    t1.textContent = `${q.label}（${q.n}）`;
+    svg.appendChild(t1);
+    const t2 = document.createElementNS(svgNS, "text");
+    t2.setAttribute("x", q.tx); t2.setAttribute("y", q.ty + 12);
+    t2.setAttribute("text-anchor", q.anchor);
+    t2.setAttribute("class", "bb-quad-sub");
+    t2.setAttribute("fill", "currentColor");
+    t2.textContent = q.sub;
+    svg.appendChild(t2);
+  });
+
+  // ── 十字座標軸 ──
+  const axisLine = (x1,y1,x2,y2) => {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1",x1); l.setAttribute("y1",y1); l.setAttribute("x2",x2); l.setAttribute("y2",y2);
+    l.setAttribute("stroke", "var(--border)"); l.setAttribute("stroke-width", "1");
+    svg.appendChild(l);
+  };
+  axisLine(PAD.l, cy, PAD.l+plotW, cy);
+  axisLine(cx, PAD.t, cx, PAD.t+plotH);
+
+  // ── 泡泡 ──
+  industries.slice().sort((a,b) => b.size - a.size).forEach(d => {
+    const px = xPix(d.x), py = yPix(d.y), r = rPix(d.size);
+    const up = d.pctChg != null ? d.pctChg > 0 : d.x >= 0;
+    const isFlat = d.pctChg != null && Math.abs(d.pctChg) < 0.01;
+    const color = isFlat ? "var(--text2)" : (up ? "var(--up)" : "var(--down)");
+    const isSel = selectedIndustry === d.name;
+
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("class", "bb-el bb-bubble" + (isSel ? " bb-selected" : ""));
+    circle.setAttribute("cx", px); circle.setAttribute("cy", py); circle.setAttribute("r", r);
+    circle.setAttribute("fill", color);
+    circle.setAttribute("fill-opacity", isSel ? "0.85" : "0.6");
+    circle.setAttribute("stroke", isSel ? "" : color);
+    circle.setAttribute("stroke-opacity", "0.9");
+    circle.addEventListener("click", () => selectIndustry(d.name));
+    const titleEl = document.createElementNS(svgNS, "title");
+    const chgTxt = d.pctChg != null ? `　5日漲跌${d.pctChg>0?"+":""}${d.pctChg.toFixed(1)}%` : "";
+    titleEl.textContent = `${d.name}\n近5日：${d.x>0?"+":""}${d.x.toFixed(1)}${bubbleFlowData.unit}　${d.stocks}檔${chgTxt}`;
+    circle.appendChild(titleEl);
+    svg.appendChild(circle);
+
+    if (r >= 14) {
+      const tag = document.createElementNS(svgNS, "text");
+      tag.setAttribute("class", "bb-el bb-tag");
+      tag.setAttribute("x", px); tag.setAttribute("y", py + 3);
+      tag.textContent = d.name.length > 6 ? d.name.slice(0,5)+"…" : d.name;
+      tag.style.pointerEvents = "none";
+      svg.appendChild(tag);
+    }
+  });
+
+  wrap.appendChild(svg);
+
+  // ── 軸說明 ──
+  const xLabel = document.createElement("div");
+  xLabel.className = "bb-el bb-axis-label";
+  xLabel.style.cssText = `left:${W-PAD.r-96}px;top:${H-16}px`;
+  xLabel.textContent = `→ 近5日淨買超(${bubbleFlowData.unit})`;
+  wrap.appendChild(xLabel);
+  const yLabel = document.createElement("div");
+  yLabel.className = "bb-el bb-axis-label";
+  yLabel.style.cssText = `left:${PAD.l+4}px;top:${PAD.t-2}px`;
+  yLabel.textContent = "↑ 較20日均加速流入";
+  wrap.appendChild(yLabel);
+
+  // ── 說明文字 ──
+  if (note) {
+    note.style.display = "block";
+    const priceNote = bubbleFlowData.priceOk
+      ? `金額以最新收盤價(${bubbleFlowData.latestDate})估算各股張數換算，非逐日實際成交金額，僅供趨勢參考。`
+      : `目前無法取得全市場股價快照，改以「張數」呈現買賣超規模(非金額)。`;
+    note.innerHTML = `X軸：近${bubbleFlowData.n5}日法人合計淨買超；Y軸：近${bubbleFlowData.n5}日日均步調 vs 近${bubbleFlowData.n20}日日均步調(加速/放緩)；泡泡大小：近${bubbleFlowData.n20}日規模；顏色：近5日該產業平均漲跌。${priceNote}分類採用證交所/FinMind官方產業分類(約30類)，非 tide-tw.app 自訂主題分類。`;
+  }
+}
+
 function renderFlowChart(stockFlow, date) {
   // 找外資/投信/自營商合計前10大個股
   const top10 = Object.entries(stockFlow)
@@ -5887,10 +6156,25 @@ function renderFlowChart(stockFlow, date) {
 
 function setRadarMode(mode, btn) {
   radarMode = mode;
-  document.querySelectorAll(".radar-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll("#radarModeRow .radar-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   if (moneyFlowData.length) renderRadar();
   else loadMoneyFlow();
+}
+
+// v10.13:區塊圖(treemap)／泡泡圖切換。泡泡圖資料量大(要抓近20個交易日全市場法人買賣超),
+// 第一次切過去才載入,避免拖慢原本區塊圖的預設載入速度。
+let radarView = "treemap";
+function setRadarView(view) {
+  if (radarView === view) return;
+  radarView = view;
+  document.getElementById("rvBtnTreemap").classList.toggle("active", view === "treemap");
+  document.getElementById("rvBtnBubble").classList.toggle("active", view === "bubble");
+  document.getElementById("radarModeRow").style.display = view === "treemap" ? "" : "none";
+  document.getElementById("treemapWrap").style.display = view === "treemap" ? "" : "none";
+  document.getElementById("bubbleWrap").style.display = view === "bubble" ? "" : "none";
+  document.getElementById("bubbleNote").style.display = view === "bubble" ? "" : "none";
+  if (view === "bubble" && !bubbleFlowData) loadMoneyFlowBubble();
 }
 
 function selectIndustry(name) {
@@ -5906,7 +6190,8 @@ function selectIndustry(name) {
   document.getElementById("selectedIndustryTag").textContent = name;
 
   // 更新 STOCK_LIST 只掃該產業
-  const ids = INDUSTRY_MAP[name] || [];
+  // v10.13 修正:原本查的是恆為空物件的 INDUSTRY_MAP,點選產業從未真的鎖定過股票清單,改查實際有資料的 FULL_INDUSTRY_MAP
+  const ids = FULL_INDUSTRY_MAP[name] || [];
   if (ids.length) {
     STOCK_LIST = ids.filter(id => stockNameMap[id] || BUILTIN_STOCKS[id]);
     document.getElementById("statStocks").textContent = `${STOCK_LIST.length} (${name})`;
@@ -5914,7 +6199,7 @@ function selectIndustry(name) {
   }
 
   // 重新渲染雷達（高亮選取）
-  renderRadar();
+  if (radarView === "bubble") renderBubbleChart(); else renderRadar();
 }
 
 function clearIndustryFilter() {
@@ -5923,7 +6208,7 @@ function clearIndustryFilter() {
   document.getElementById("selectedIndustryBar").classList.remove("show");
   document.getElementById("statStocks").textContent = STOCK_LIST.length;
   addLog("已清除產業篩選，恢復全市場掃描");
-  if (moneyFlowData.length) renderRadar();
+  if (radarView === "bubble") { if (bubbleFlowData) renderBubbleChart(); } else if (moneyFlowData.length) renderRadar();
 }
 
 
