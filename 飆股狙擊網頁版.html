@@ -7037,21 +7037,24 @@ async function fetchHolding(id) {
       (byDate[r.date] || (byDate[r.date] = [])).push(r);
     });
     const hDates = Object.keys(byDate).sort();
+    // v10.12:除了百分比,也把「張數」(原始股數÷1000)一併算出來,增減量才有具體單位可看,不是只有抽象的百分點
     const holdTrend = hDates.map(d => {
-      let big = 0, small = 0;
+      let big = 0, small = 0, bigShares = 0, smallShares = 0;
       byDate[d].forEach(r => {
         const lo = _holdLevelFloor(r.HoldingSharesLevel);
         const pct = parseFloat(r.percent) || 0;
-        if (lo != null && lo >= _BIGHOLDER_MIN_SHARES) big += pct;
-        if (lo != null && lo < 1000) small += pct;
+        const shares = parseFloat(r.unit) || 0;
+        if (lo != null && lo >= _BIGHOLDER_MIN_SHARES) { big += pct; bigShares += shares; }
+        if (lo != null && lo < 1000) { small += pct; smallShares += shares; }
       });
-      return { date: d, big: +big.toFixed(2), small: +small.toFixed(2) };
+      return { date: d, big: +big.toFixed(2), small: +small.toFixed(2), bigLots: Math.round(bigShares / 1000), smallLots: Math.round(smallShares / 1000) };
     });
     const fRows = ((rf && rf.data) || []).filter(r => r.ForeignInvestmentSharesRatio != null);
     fRows.sort((a, b) => a.date.localeCompare(b.date));
     const foreignTrend = fRows.map(r => ({
       date: r.date,
       ratio: parseFloat(r.ForeignInvestmentSharesRatio),
+      lots: r.ForeignInvestmentShares != null ? Math.round(parseFloat(r.ForeignInvestmentShares) / 1000) : null,
       limit: r.ForeignInvestmentUpperLimitRatio != null ? parseFloat(r.ForeignInvestmentUpperLimitRatio) : null,
       remain: r.ForeignInvestmentRemainRatio != null ? parseFloat(r.ForeignInvestmentRemainRatio) : null,
     }));
@@ -7983,15 +7986,24 @@ function p25(m) {
   const dF = ft.length > 1 ? ft[ft.length - 2] : null;
   const wF = A.nearestByDaysAgo(ft, 7, 3);
   const mF = A.nearestByDaysAgo(ft, 30, 6);
-  const dTag = (cur, base, field) => (base && base[field] != null) ? `<span class="${(cur - base[field]) >= 0 ? "up" : "down"}">${sg(cur - base[field], 1)}pp</span>` : "--";
+  // v10.12:改用「張數」(股數÷1000)當主要單位,比抽象的百分點(pp)具體好懂;括號內附占整體股本的百分比變化當輔助參考
+  const dTag = (curPct, curLots, base, pctField, lotsField) => {
+    if (!base || base[pctField] == null) return "--";
+    const dPct = curPct - base[pctField];
+    const cls = dPct >= 0 ? "up" : "down";
+    const pctTxt = `${dPct >= 0 ? "+" : ""}${nf(dPct, 1)}%`;
+    const dLots = (curLots != null && base[lotsField] != null) ? curLots - base[lotsField] : null;
+    const lotsTxt = dLots != null ? `${dLots >= 0 ? "+" : ""}${nf(dLots)}張` : null;
+    return `<span class="${cls}">${lotsTxt ? `${lotsTxt}(占比${pctTxt})` : pctTxt}</span>`;
+  };
   return {
     n: "25", t: "股權結構(大戶籌碼/外資)", s: latestH ? `資料日 ${latestH.date}` : (latestF ? `資料日 ${latestF.date}` : ""),
-    body: `${latestH ? row("大戶持股(≥400張)", `${nf(latestH.big, 1)}%<br><span class="t2" style="font-size:10px">週增減 ${dTag(latestH.big, wH, "big")}　月增減 ${dTag(latestH.big, mH, "big")}</span>`) : ""}
+    body: `${latestH ? row("大戶持股(≥400張)", `${nf(latestH.big, 1)}%<br><span class="t2" style="font-size:10px">週增減 ${dTag(latestH.big, latestH.bigLots, wH, "big", "bigLots")}　月增減 ${dTag(latestH.big, latestH.bigLots, mH, "big", "bigLots")}</span>`) : ""}
       ${latestH ? row("小散戶持股(＜1張)", nf(latestH.small, 1) + "%") : ""}
-      ${latestF ? row("外資持股比例", `${nf(latestF.ratio, 1)}%<br><span class="t2" style="font-size:10px">日增減 ${dTag(latestF.ratio, dF, "ratio")}　週增減 ${dTag(latestF.ratio, wF, "ratio")}　月增減 ${dTag(latestF.ratio, mF, "ratio")}</span>`) : ""}
+      ${latestF ? row("外資持股比例", `${nf(latestF.ratio, 1)}%<br><span class="t2" style="font-size:10px">日增減 ${dTag(latestF.ratio, latestF.lots, dF, "ratio", "lots")}　週增減 ${dTag(latestF.ratio, latestF.lots, wF, "ratio", "lots")}　月增減 ${dTag(latestF.ratio, latestF.lots, mF, "ratio", "lots")}</span>`) : ""}
       ${latestF && latestF.limit != null ? row("外資持股上限", nf(latestF.limit, 0) + "%") : ""}
       ${latestF && latestF.remain != null ? row("外資尚可增持空間", nf(latestF.remain, 1) + "%") : ""}
-      <div class="t2" style="font-size:10px;margin-top:6px">外資持股每個交易日更新,日/週/月增減都是真實數字;股權分散表(集保庫存)資料源本身只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日揭露,所以大戶持股只有週增減/月增減,做不出日增減(不是沒做,是資料源本身就沒有逐日數字)。月增減=與最接近30天前的一筆資料比較,找不到落在合理範圍內的比較基準時顯示「--」。大戶門檻採持股 400 張(40萬股)以上之市場慣例定義。</div>`
+      <div class="t2" style="font-size:10px;margin-top:6px">增減量以「張」(1張=1,000股)為主,括號內是占公司總股本的百分比變化,供參考。外資持股每個交易日更新,日/週/月增減都是真實數字;股權分散表(集保庫存)資料源本身只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日揭露,所以大戶持股只有週增減/月增減,做不出日增減(不是沒做,是資料源本身就沒有逐日數字)。月增減=與最接近30天前的一筆資料比較,找不到落在合理範圍內的比較基準時顯示「--」。大戶門檻採持股 400 張(40萬股)以上之市場慣例定義。</div>`
   };
 }
 
@@ -8022,7 +8034,7 @@ const HELP = {
   "22": ["查看這檔個股的相關新聞。", "按「載入新聞」才會抓取,以節省 API 額度。", "資料來自 FinMind 個股新聞資料集。"],
   "23": ["看歷年股利政策,以及除息後多久填權息(股價回到除息前水準)。", "「近N次除息中已知X次填權息」比例越高,代表這檔股票過去除息後越容易漲回來;未填權息不代表以後不會填,只是以目前資料為準的結果。", "股利資料來自 FinMind 股利政策表;填權息天數用已抓到的日K實際比對「除息日後收盤價首度≥除息參考價」所需交易日數計算,只涵蓋日K資料範圍內(約2年)的除息事件。"],
   "24": ["用申報財報的營收、獲利、負債、現金流看體質好壞,尤其適合比對借款戶同業財務狀況。", "負債比率越低越穩健;營業現金流/稅後淨利若長期明顯低於100%,代表淨利可能有應收帳款或存貨堆積、還沒真正變成現金,要留意獲利品質。", "資料來自 FinMind 綜合損益表/資產負債表/現金流量表,依科目代碼比對常見項目;找不到對應科目時顯示「--」,不用其他科目湊數。各期可能為單季或累計數,正式文件請另比對公開資訊觀測站原始財報。"],
-  "25": ["看大股東與外資的持股比例是在增加還是減少,判斷主力籌碼動向。", "大戶持股比例上升,通常代表主力/大股東在買進、籌碼趨於集中;外資持股比例上升且距離上限還有空間,代表外資買盤可能延續。外資持股每個交易日更新,所以有日/週/月三種增減;大戶持股(股權分散表)只有週資料,只有週/月增減。", "外資持股(TaiwanStockShareholding)每交易日更新,日增減=與上一交易日比、週增減=與最接近7天前比、月增減=與最接近30天前比;股權分散表(TaiwanStockHoldingSharesPer,集保庫存)只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日數字,週增減=與上一週比、月增減=與最接近30天前比,做不出日增減。找不到落在合理誤差內的比較基準時顯示「--」。大戶=持股400張以上。"],
+  "25": ["看大股東與外資的持股張數是在增加還是減少,判斷主力籌碼動向。", "增減量以「張」(1張=1,000股)為主,括號內是占整體股本的百分比變化,供參考。大戶持股張數上升,通常代表主力/大股東在買進、籌碼趨於集中;外資持股上升且距離上限還有空間,代表外資買盤可能延續。外資持股每個交易日更新,所以有日/週/月三種增減;大戶持股(股權分散表)只有週資料,只有週/月增減。", "外資持股(TaiwanStockShareholding)每交易日更新,日增減=與上一交易日比、週增減=與最接近7天前比、月增減=與最接近30天前比,張數直接取自 ForeignInvestmentShares 原始股數;股權分散表(TaiwanStockHoldingSharesPer,集保庫存)只有「週」頻率(集保結算所每週五公布上週資料),沒有逐日數字,週增減=與上一週比、月增減=與最接近30天前比,張數為該級距 unit 欄位(原始股數)加總,做不出日增減。找不到落在合理誤差內的比較基準時顯示「--」。大戶=持股400張以上。"],
 };
 
 const SPANS = { "01": [10, 12, 12], "02": [4, 6, 6], "03": [4, 6, 6], "04": [3, 6, 6], "05": [3, 6, 6], "06": [6, 6, 12], "07": [5, 6, 12], "08": [9, 12, 12], "09": [4, 6, 6], "10": [3, 6, 6], "11": [5, 12, 12], "12": [4, 6, 6], "13": [4, 6, 6], "14": [4, 6, 6], "15": [4, 6, 6], "16": [8, 6, 12], "17": [8, 6, 12], "18": [8, 12, 12], "19": [6, 4, 6], "20": [6, 4, 6], "21": [6, 4, 12], "22": [6, 12, 12], "23": [6, 6, 6], "24": [6, 6, 6], "25": [6, 6, 6] };
